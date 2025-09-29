@@ -1,18 +1,24 @@
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { TournamentResults } from "@/components/tournaments/tournament-results";
-    
-export default async function TournamentResultsPage({ params }: { id: string }) {
+
+export default async function TournamentResultsPage({
+  params: { id }
+}: {
+  params: { id: string };
+}) {
   const supabase = await createClient();
 
   // Get tournament details
   const { data: tournament, error } = await supabase
     .from("tournaments")
-    .select(`
+    .select(
+      `
       *,
       organizer:profiles(full_name, organization)
-    `)
-    .eq("id", params.id)
+    `
+    )
+    .eq("id", id)
     .single();
 
   if (error || !tournament) {
@@ -27,30 +33,34 @@ export default async function TournamentResultsPage({ params }: { id: string }) 
   // Get tournament results
   const { data: results } = await supabase
     .from("tournament_results")
-    .select(`
+    .select(
+      `
       *,
       athlete:athletes(*),
       division:divisions(*)
-    `)
-    .eq("tournament_id", params.id)
+    `
+    )
+    .eq("tournament_id", id)
     .order("division_id")
     .order("placement");
 
   // Get divisions with participants
   const { data: divisions } = await supabase
     .from("divisions")
-    .select(`
+    .select(
+      `
       *,
       participants:division_participants(
         *,
         athlete:athletes(*)
       )
-    `)
-    .eq("tournament_id", params.id);
+    `
+    )
+    .eq("tournament_id", id);
 
   return (
     <div className="min-h-screen bg-background">
-      <TournamentResults 
+      <TournamentResults
         tournament={tournament}
         results={results || []}
         divisions={divisions || []}
