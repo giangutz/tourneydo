@@ -62,7 +62,7 @@ export function DebugSignUpForm({
       
       // Test if we can access the database
       try {
-        const { data: testData, error: dbError } = await supabase
+        const { error: dbError } = await supabase
           .from('profiles')
           .select('count')
           .limit(1);

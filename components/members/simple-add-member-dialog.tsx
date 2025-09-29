@@ -30,7 +30,7 @@ interface SimpleAddMemberDialogProps {
   onMemberAdded: () => void;
 }
 
-export function SimpleAddMemberDialog({ open, onOpenChange, organizerId, organizerName, onMemberAdded }: SimpleAddMemberDialogProps) {
+export function SimpleAddMemberDialog({ open, onOpenChange, organizerId, onMemberAdded }: SimpleAddMemberDialogProps) {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     full_name: "",

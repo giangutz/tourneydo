@@ -1,3 +1,4 @@
+/* eslint-disable  @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useEffect, useState } from "react";
@@ -59,8 +60,6 @@ export function WeighInModal({
   const [weight, setWeight] = useState(weightValue.toString());
   const [notes, setNotes] = useState(registration?.notes || "");
   const [loading, setLoading] = useState(false);
-
-  const supabase = createClient();
 
   // Calculate age from date of birth
   const calculateAge = (dateOfBirth: string) => {
