@@ -3,9 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { EditTournamentForm } from "@/components/tournaments/edit-tournament-form";
 
-export default async function EditTournamentPage(
-  { params: { id } }: { params: { id: string } }
-) {
+export default async function EditTournamentPage(params: { id: string }) {
   const { userId } = await auth();
 
   if (!userId) {
@@ -29,7 +27,7 @@ export default async function EditTournamentPage(
   const { data: tournament, error } = await supabase
     .from("tournaments")
     .select("*")
-    .eq("id", id)
+    .eq("id", params.id)
     .single();
 
   if (error || !tournament) {

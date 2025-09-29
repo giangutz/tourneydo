@@ -2,11 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { TournamentResults } from "@/components/tournaments/tournament-results";
 
-export default async function TournamentResultsPage({
-  params: { id }
-}: {
-  params: { id: string };
-}) {
+export default async function TournamentResultsPage(params: { id: string }) {
   const supabase = await createClient();
 
   // Get tournament details
@@ -18,7 +14,7 @@ export default async function TournamentResultsPage({
       organizer:profiles(full_name, organization)
     `
     )
-    .eq("id", id)
+    .eq("id", params.id)
     .single();
 
   if (error || !tournament) {
@@ -40,7 +36,7 @@ export default async function TournamentResultsPage({
       division:divisions(*)
     `
     )
-    .eq("tournament_id", id)
+    .eq("tournament_id", params.id)
     .order("division_id")
     .order("placement");
 
@@ -56,7 +52,7 @@ export default async function TournamentResultsPage({
       )
     `
     )
-    .eq("tournament_id", id);
+    .eq("tournament_id", params.id);
 
   return (
     <div className="min-h-screen bg-background">
