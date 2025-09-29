@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { CreditCard, Users, Plus } from "lucide-react";
+import { CreditCard, Users } from "lucide-react";
 import { TeamPaymentModal } from "./team-payment-modal";
 
 interface Tournament {
@@ -144,7 +144,7 @@ export function CoachTeamSelector({ tournament, coachId, onPaymentUpdate }: Coac
           <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
           <h3 className="text-lg font-semibold mb-2">No registered teams</h3>
           <p className="text-muted-foreground">
-            You don't have any athletes registered for this tournament yet.
+            You don&apos;t have any athletes registered for this tournament yet.
           </p>
         </CardContent>
       </Card>

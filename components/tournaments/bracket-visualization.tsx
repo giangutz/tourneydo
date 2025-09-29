@@ -1,3 +1,4 @@
+/* eslint-disable  @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState } from "react";
@@ -5,18 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { 
   Trophy, 
-  Crown, 
-  Medal,
-  Users,
-  Clock,
+  Crown,
   CheckCircle
 } from "lucide-react";
 
@@ -100,7 +91,6 @@ export function BracketVisualization({ matches, canManage, onMatchUpdate, loadin
     .sort((a, b) => a - b);
 
   const maxRound = Math.max(...rounds);
-  const totalParticipants = Math.pow(2, maxRound);
 
   // Get round name
   const getRoundName = (round: number) => {

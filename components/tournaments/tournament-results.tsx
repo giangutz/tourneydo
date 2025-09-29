@@ -197,7 +197,7 @@ export function TournamentResults({ tournament, results, divisions }: Tournament
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-3">
-                        {divisionResults.map((result, index) => (
+                        {divisionResults.map((result) => (
                           <div
                             key={result.id}
                             className={`flex items-center justify-between p-4 rounded-lg border ${

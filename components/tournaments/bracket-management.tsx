@@ -1,3 +1,4 @@
+/* eslint-disable  @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState, useEffect } from "react";
@@ -14,14 +15,9 @@ import {
 } from "@/components/ui/select";
 import { 
   Trophy, 
-  Users, 
-  Play, 
   Download,
   Eye,
-  Settings,
   Shuffle,
-  Medal,
-  Crown
 } from "lucide-react";
 import { BracketVisualization } from "./bracket-visualization";
 
@@ -89,7 +85,6 @@ export function BracketManagement({
   tournament, 
   userProfile, 
   divisions, 
-  onBracketsUpdate, 
   loading 
 }: BracketManagementProps) {
   const [selectedDivision, setSelectedDivision] = useState<string>("");

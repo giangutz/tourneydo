@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Tournament, Profile } from "@/lib/types/database";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -13,18 +13,11 @@ import {
   Eye, 
   Calendar, 
   MapPin, 
-  DollarSign,
   Search,
-  Filter,
   Edit,
   Users,
   Clock,
-  AlertCircle,
-  CheckCircle,
-  MoreHorizontal,
-  Settings,
-  Copy,
-  Archive
+  AlertCircle
 } from "lucide-react";
 import Link from "next/link";
 

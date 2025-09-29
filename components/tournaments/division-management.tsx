@@ -1,6 +1,7 @@
+/* eslint-disable  @typescript-eslint/no-explicit-any */
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -253,21 +254,11 @@ export function DivisionManagement({
     });
     
     return Object.entries(teamCounts)
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       .filter(([_, count]) => count > 1)
       .map(([team, count]) => ({ team, count }));
   };
 
-  const getDivisionStats = () => {
-    const totalParticipants = divisions.reduce((sum, div) => sum + (div.participants?.length || 0), 0);
-    const categoryCounts = divisions.reduce((acc, div) => {
-      acc[div.category] = (acc[div.category] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-
-    return { totalParticipants, categoryCounts };
-  };
-
-  const stats = getDivisionStats();
 
   if (loading) {
     return (
@@ -313,7 +304,7 @@ export function DivisionManagement({
             <Alert className="mb-4">
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
-                {registrations.length - eligibleParticipants.length} participants haven't completed weigh-in yet. 
+                {registrations.length - eligibleParticipants.length} participants haven&apos;t completed weigh-in yet. 
                 Only weighed-in participants will be included in divisions.
               </AlertDescription>
             </Alert>

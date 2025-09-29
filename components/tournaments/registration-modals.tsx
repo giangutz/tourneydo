@@ -78,8 +78,6 @@ export function WeighInModal({
   };
 
   const age = registration ? calculateAge(registration.athlete.date_of_birth) : 0;
-  const requiresHeight = age < 12;
-  const requiresWeight = age >= 12;
 
   useEffect(() => {
     if (registration) {

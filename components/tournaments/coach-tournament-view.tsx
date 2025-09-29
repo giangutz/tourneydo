@@ -1,23 +1,28 @@
+/* eslint-disable  @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { CoachTeamSelector } from "./coach-team-selector";
 import { AthleteRegistrationForm } from "./athlete-registration-form";
-import { 
-  Trophy, 
-  Users, 
-  Calendar, 
-  MapPin, 
-  CreditCard,
+import {
+  Trophy,
+  Users,
+  Calendar,
+  MapPin,
   Clock,
   CheckCircle,
-  AlertCircle
 } from "lucide-react";
+import { TournamentRegistration } from "@/lib/types/database";
 
 interface Tournament {
   id: string;
@@ -44,10 +49,13 @@ interface CoachTournamentViewProps {
   coachId: string;
 }
 
-export function CoachTournamentView({ tournament, coachId }: CoachTournamentViewProps) {
+export function CoachTournamentView({
+  tournament,
+  coachId
+}: CoachTournamentViewProps) {
   const [activeTab, setActiveTab] = useState("overview");
   const [myRegistrations, setMyRegistrations] = useState([]);
-  const [paymentStatus, setPaymentStatus] = useState<any>(null);
+  const [setPaymentStatus] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   const supabase = createClient();
@@ -62,11 +70,13 @@ export function CoachTournamentView({ tournament, coachId }: CoachTournamentView
       // Get coach's registrations for this tournament
       const { data: registrations, error: regError } = await supabase
         .from("tournament_registrations")
-        .select(`
+        .select(
+          `
           *,
           athlete:athletes(*),
           team:teams(*)
-        `)
+        `
+        )
         .eq("tournament_id", tournament.id)
         .eq("team.coach_id", coachId);
 
@@ -82,7 +92,6 @@ export function CoachTournamentView({ tournament, coachId }: CoachTournamentView
 
       if (payError) throw payError;
       setPaymentStatus(payments || []);
-
     } catch (error) {
       console.error("Error fetching coach data:", error);
     } finally {
@@ -94,18 +103,20 @@ export function CoachTournamentView({ tournament, coachId }: CoachTournamentView
     const statusConfig = {
       draft: { color: "bg-gray-500", text: "Draft" },
       registration_open: { color: "bg-green-500", text: "Registration Open" },
-      registration_closed: { color: "bg-yellow-500", text: "Registration Closed" },
+      registration_closed: {
+        color: "bg-yellow-500",
+        text: "Registration Closed"
+      },
       weigh_in: { color: "bg-blue-500", text: "Weigh-in Period" },
       in_progress: { color: "bg-purple-500", text: "In Progress" },
-      completed: { color: "bg-gray-700", text: "Completed" },
+      completed: { color: "bg-gray-700", text: "Completed" }
     };
 
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.draft;
-    
+    const config =
+      statusConfig[status as keyof typeof statusConfig] || statusConfig.draft;
+
     return (
-      <Badge className={`${config.color} text-white`}>
-        {config.text}
-      </Badge>
+      <Badge className={`${config.color} text-white`}>{config.text}</Badge>
     );
   };
 
@@ -113,23 +124,33 @@ export function CoachTournamentView({ tournament, coachId }: CoachTournamentView
     return new Date(dateString).toLocaleDateString("en-US", {
       year: "numeric",
       month: "long",
-      day: "numeric",
+      day: "numeric"
     });
   };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-PH", {
       style: "currency",
-      currency: "PHP",
+      currency: "PHP"
     }).format(amount);
   };
 
   const getRegistrationStats = () => {
     const total = myRegistrations.length;
-    const paid = myRegistrations.filter((r: unknown) => (r as { payment_status: string }).payment_status === 'paid').length;
-    const pending = myRegistrations.filter((r: unknown) => (r as { payment_status: string }).payment_status === 'pending_approval').length;
-    const checkedIn = myRegistrations.filter((r: unknown) => (r as { checked_in: boolean }).checked_in).length;
-    const weighedIn = myRegistrations.filter((r: unknown) => (r as { weighed_in: boolean }).weighed_in).length;
+    const paid = myRegistrations.filter(
+      (r: unknown) =>
+        (r as { payment_status: string }).payment_status === "paid"
+    ).length;
+    const pending = myRegistrations.filter(
+      (r: unknown) =>
+        (r as { payment_status: string }).payment_status === "pending_approval"
+    ).length;
+    const checkedIn = myRegistrations.filter(
+      (r: unknown) => (r as { checked_in: boolean }).checked_in
+    ).length;
+    const weighedIn = myRegistrations.filter(
+      (r: unknown) => (r as { weighed_in: boolean }).weighed_in
+    ).length;
 
     return { total, paid, pending, checkedIn, weighedIn };
   };
@@ -168,7 +189,9 @@ export function CoachTournamentView({ tournament, coachId }: CoachTournamentView
             </div>
           </div>
           <div className="text-right">
-            <div className="text-2xl font-bold">{formatCurrency(tournament.entry_fee)}</div>
+            <div className="text-2xl font-bold">
+              {formatCurrency(tournament.entry_fee)}
+            </div>
             <div className="text-blue-100">Entry Fee per Athlete</div>
           </div>
         </div>
@@ -196,7 +219,9 @@ export function CoachTournamentView({ tournament, coachId }: CoachTournamentView
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{stats.paid}</div>
+            <div className="text-2xl font-bold text-green-600">
+              {stats.paid}
+            </div>
           </CardContent>
         </Card>
 
@@ -208,7 +233,9 @@ export function CoachTournamentView({ tournament, coachId }: CoachTournamentView
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">{stats.pending}</div>
+            <div className="text-2xl font-bold text-yellow-600">
+              {stats.pending}
+            </div>
           </CardContent>
         </Card>
 
@@ -220,7 +247,9 @@ export function CoachTournamentView({ tournament, coachId }: CoachTournamentView
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{stats.checkedIn}</div>
+            <div className="text-2xl font-bold text-blue-600">
+              {stats.checkedIn}
+            </div>
           </CardContent>
         </Card>
 
@@ -232,13 +261,19 @@ export function CoachTournamentView({ tournament, coachId }: CoachTournamentView
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-purple-600">{stats.weighedIn}</div>
+            <div className="text-2xl font-bold text-purple-600">
+              {stats.weighedIn}
+            </div>
           </CardContent>
         </Card>
       </div>
 
       {/* Main Content Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+      <Tabs
+        value={activeTab}
+        onValueChange={setActiveTab}
+        className="space-y-6"
+      >
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="overview">Tournament Info</TabsTrigger>
           <TabsTrigger value="register">Register Athletes</TabsTrigger>
@@ -251,7 +286,9 @@ export function CoachTournamentView({ tournament, coachId }: CoachTournamentView
             <Card>
               <CardHeader>
                 <CardTitle>Tournament Details</CardTitle>
-                <CardDescription>Important dates and information</CardDescription>
+                <CardDescription>
+                  Important dates and information
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 gap-3">
@@ -291,11 +328,15 @@ export function CoachTournamentView({ tournament, coachId }: CoachTournamentView
             <Card>
               <CardHeader>
                 <CardTitle>Organizer Information</CardTitle>
-                <CardDescription>Contact details and organization</CardDescription>
+                <CardDescription>
+                  Contact details and organization
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div>
-                  <div className="font-medium">{tournament.organizer.full_name}</div>
+                  <div className="font-medium">
+                    {tournament.organizer.full_name}
+                  </div>
                   {tournament.organizer.organization && (
                     <div className="text-sm text-muted-foreground">
                       {tournament.organizer.organization}
@@ -309,18 +350,21 @@ export function CoachTournamentView({ tournament, coachId }: CoachTournamentView
                   </div>
                 </div>
 
-                {tournament.payment_methods && tournament.payment_methods.length > 0 && (
-                  <div>
-                    <div className="text-sm font-medium mb-2">Accepted Payment Methods:</div>
-                    <div className="flex flex-wrap gap-2">
-                      {tournament.payment_methods.map((method) => (
-                        <Badge key={method} variant="outline">
-                          {method}
-                        </Badge>
-                      ))}
+                {tournament.payment_methods &&
+                  tournament.payment_methods.length > 0 && (
+                    <div>
+                      <div className="text-sm font-medium mb-2">
+                        Accepted Payment Methods:
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {tournament.payment_methods.map((method) => (
+                          <Badge key={method} variant="outline">
+                            {method}
+                          </Badge>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
               </CardContent>
             </Card>
           </div>
@@ -347,58 +391,77 @@ export function CoachTournamentView({ tournament, coachId }: CoachTournamentView
             <CardHeader>
               <CardTitle>My Registered Athletes</CardTitle>
               <CardDescription>
-                Athletes you've registered for this tournament
+                Athletes you&apos;ve registered for this tournament
               </CardDescription>
             </CardHeader>
             <CardContent>
               {myRegistrations.length === 0 ? (
                 <div className="text-center py-8">
                   <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">No athletes registered</h3>
+                  <h3 className="text-lg font-semibold mb-2">
+                    No athletes registered
+                  </h3>
                   <p className="text-muted-foreground">
-                    You haven't registered any athletes for this tournament yet.
+                    You haven&apos;t registered any athletes for this tournament yet.
                   </p>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {myRegistrations.map((registration: unknown) => {
-                    const regData = registration as { id: string; athlete: { full_name: string }; payment_status: string; checked_in: boolean; weighed_in: boolean };
+                  {myRegistrations.map((registration: TournamentRegistration) => {
                     return (
-                    <div key={registration.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div>
-                        <div className="font-medium">{registration.athlete.full_name}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {registration.team.name} • {registration.athlete.gender} • 
-                          {registration.athlete.age} years • {registration.athlete.weight}kg
+                      <div
+                        key={registration.id}
+                        className="flex items-center justify-between p-4 border rounded-lg"
+                      >
+                        <div>
+                          <div className="font-medium">
+                            {registration.athlete?.full_name || 'N/A'}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            {registration.team?.name || 'N/A'} •{" "}
+                            {registration.athlete?.gender || 'N/A'} •{" "}
+                            {registration.weight_recorded || registration.athlete?.weight || 'N/A'}kg
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            {registration.athlete?.belt_rank
+                              ?.replace("_", " ")
+                              .toUpperCase() || 'N/A'}
+                          </div>
                         </div>
-                        <div className="text-xs text-muted-foreground mt-1">
-                          {registration.athlete.belt_rank.replace("_", " ").toUpperCase()}
+
+                        <div className="flex items-center space-x-2">
+                          <Badge
+                            variant={
+                              registration.payment_status === "paid"
+                                ? "default"
+                                : registration.payment_status ===
+                                  "pending_approval"
+                                ? "secondary"
+                                : "outline"
+                            }
+                          >
+                            {registration.payment_status === "pending_approval"
+                              ? "Pending"
+                              : registration.payment_status.toUpperCase()}
+                          </Badge>
+
+                          {registration.checked_in && (
+                            <Badge variant="secondary">
+                              <CheckCircle className="h-3 w-3 mr-1" />
+                              Checked In
+                            </Badge>
+                          )}
+
+                          {registration.weighed_in && (
+                            <Badge variant="default">
+                              <Trophy className="h-3 w-3 mr-1" />
+                              Weighed In
+                            </Badge>
+                          )}
                         </div>
                       </div>
-                      
-                      <div className="flex items-center space-x-2">
-                        <Badge variant={registration.payment_status === "paid" ? "default" : 
-                                      registration.payment_status === "pending_approval" ? "secondary" : "outline"}>
-                          {registration.payment_status === "pending_approval" ? "Pending" : 
-                           registration.payment_status.toUpperCase()}
-                        </Badge>
-                        
-                        {registration.checked_in && (
-                          <Badge variant="secondary">
-                            <CheckCircle className="h-3 w-3 mr-1" />
-                            Checked In
-                          </Badge>
-                        )}
-                        
-                        {registration.weighed_in && (
-                          <Badge variant="default">
-                            <Trophy className="h-3 w-3 mr-1" />
-                            Weighed In
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </CardContent>

@@ -1,3 +1,4 @@
+/* eslint-disable  @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState, useEffect } from "react";
@@ -175,7 +176,7 @@ export function TeamPaymentModal({
     setLoading(true);
     try {
       // Create team payment record
-      const { data: paymentData, error: paymentError } = await supabase
+      const { error: paymentError } = await supabase
         .from("team_payments")
         .insert({
           tournament_id: tournament.id,
@@ -232,7 +233,7 @@ export function TeamPaymentModal({
             Team Payment - {teamName}
           </DialogTitle>
           <DialogDescription>
-            Submit payment for your team's tournament registration
+            Submit payment for your team&apos;s tournament registration
           </DialogDescription>
         </DialogHeader>
 

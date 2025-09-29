@@ -29,7 +29,7 @@ export function AuthDebug() {
         alert('Failed to reset metadata');
       }
     } catch (error) {
-      alert('Error resetting metadata');
+      console.error('Error resetting metadata:', error);
     }
   };
 
@@ -41,7 +41,7 @@ export function AuthDebug() {
       alert('Metadata set for single organizer role!');
       router.push('/dashboard');
     } catch (error) {
-      alert('Failed to set metadata');
+      console.error('Error setting metadata:', error);
     }
   };
 
@@ -53,7 +53,7 @@ export function AuthDebug() {
       alert('Multi-role setup needs to be done through profile completion');
       router.push('/auth/complete-profile');
     } catch (error) {
-      alert('Failed to set multi-role metadata');
+      console.error('Error setting multi-role metadata:', error);
     }
   };
 

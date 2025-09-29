@@ -17,12 +17,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   BarChart3, 
   Download, 
-  FileText, 
   Trophy, 
   Users, 
   DollarSign,
   Medal,
-  Calendar,
   Target
 } from "lucide-react";
 

@@ -1,3 +1,4 @@
+/* eslint-disable  @typescript-eslint/no-explicit-any */
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,7 +8,6 @@ import {
   Trophy, 
   Users, 
   Calendar, 
-  Settings, 
   FileText,
   Download,
   UserCheck,
@@ -15,10 +15,9 @@ import {
   Edit,
   MapPin,
   DollarSign,
-  TrendingUp,
   Clock
 } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import Link from "next/link";
 
 interface Tournament {

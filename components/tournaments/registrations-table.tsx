@@ -31,7 +31,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { 
   Search, 
-  Filter, 
   MoreHorizontal, 
   UserCheck, 
   Scale, 
@@ -39,7 +38,6 @@ import {
   Download,
   Users,
   CheckCircle,
-  XCircle,
   Clock,
   Edit
 } from "lucide-react";
@@ -76,6 +74,7 @@ interface Registration {
   team: {
     id: string;
     name: string;
+    coach_id: string;
   };
   registration_date: string;
   payment_status: string;
@@ -107,7 +106,6 @@ export function RegistrationsTable({
   const [filterStatus, setFilterStatus] = useState("all");
   const [sortBy, setSortBy] = useState("registration_date");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
   
   // Modal states
   const [weighInModal, setWeighInModal] = useState<Registration | null>(null);
@@ -117,7 +115,6 @@ export function RegistrationsTable({
   const [teamPaymentModal, setTeamPaymentModal] = useState<{teamName: string, coachId: string} | null>(null);
   const [paymentApprovalModal, setPaymentApprovalModal] = useState(false);
 
-  const supabase = createClient();
   const canManage = userProfile.role === "organizer" && tournament.organizer_id === userProfile.id;
   const isCoach = userProfile.role === "coach";
 
@@ -138,7 +135,7 @@ export function RegistrationsTable({
 
   // Filter and sort registrations
   const filteredRegistrations = useMemo(() => {
-    let filtered = registrations.filter(reg => {
+    const filtered = registrations.filter(reg => {
       const matchesSearch = 
         reg.athlete.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         reg.team.name.toLowerCase().includes(searchTerm.toLowerCase());

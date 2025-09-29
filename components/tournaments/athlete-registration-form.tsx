@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -183,9 +182,6 @@ export function AthleteRegistrationForm({
     }
   };
 
-  const getAthleteStatus = (athleteId: string) => {
-    return registrations.find(reg => reg.athlete_id === athleteId);
-  };
 
   const isRegistrationOpen = tournament.status === "registration_open";
   const isDeadlinePassed = new Date() > new Date(tournament.registration_deadline);
@@ -328,7 +324,7 @@ export function AthleteRegistrationForm({
             Registered Athletes ({registrations.length})
           </CardTitle>
           <CardDescription>
-            Athletes you've registered for this tournament
+            Athletes you&apos;ve registered for this tournament
           </CardDescription>
         </CardHeader>
         <CardContent>

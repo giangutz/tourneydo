@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar, MapPin, Users, Trophy, ArrowRight } from "lucide-react";
+import { Calendar, MapPin, ArrowRight } from "lucide-react";
 import Link from "next/link";
 
 export async function UpcomingTournaments() {

@@ -154,7 +154,7 @@ export function useResultsNotifications() {
         }
         acc[coachEmail].results.push(result);
         return acc;
-      }, {} as Record<string, any>);
+      }, {} as Record<string, unknown>);
 
       // Send consolidated results email to each coach
       for (const coachData of Object.values(resultsByCoach)) {
@@ -168,7 +168,10 @@ export function useResultsNotifications() {
 
   const sendConsolidatedResultsEmail = async (coachData: unknown) => {
     try {
-      const coachDataTyped = coachData as { coach: { email: string; full_name: string }; tournament: { name: string }; results: unknown[] };
+      const coachDataTyped = coachData as { coach: { email: string; full_name: string }; tournament: {
+        tournament_date: string | undefined;
+        location: string | undefined; name: string 
+}; results: unknown[] };
       const { coach, tournament, results } = coachDataTyped;
       
       // Create a summary of all results

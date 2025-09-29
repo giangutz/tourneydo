@@ -1,14 +1,13 @@
+/* eslint-disable  @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
@@ -18,17 +17,12 @@ import {
   BellRing, 
   Check, 
   X, 
-  Eye, 
-  Trash2,
-  AlertCircle,
   CheckCircle,
   Info,
   Trophy,
   CreditCard,
-  Users,
-  Calendar
+  Calendar,
 } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
 
 interface Notification {
   id: string;
@@ -202,6 +196,10 @@ export function NotificationSystem({ userId, className }: NotificationSystemProp
         return 'text-gray-600';
     }
   };
+
+  function formatDistanceToNow(date: Date, options: { addSuffix: boolean }) {
+    return formatDistanceToNow(date, options);
+  }
 
   return (
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>

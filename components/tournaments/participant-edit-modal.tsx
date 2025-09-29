@@ -1,3 +1,4 @@
+/* eslint-disable  @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState, useEffect } from "react";
@@ -22,7 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Edit, User, Calendar, Scale, Ruler, Mail, Trophy } from "lucide-react";
+import { Edit, User, Scale, Trophy } from "lucide-react";
 
 interface Registration {
   id: string;

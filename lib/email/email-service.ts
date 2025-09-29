@@ -1,5 +1,4 @@
 import { createClient } from "@/lib/supabase/server";
-import { emailPreferencesService } from "./email-preferences";
 
 export interface EmailTemplate {
   subject: string;

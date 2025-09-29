@@ -15,7 +15,6 @@ import {
   Mail,
   Building,
   User as UserIcon,
-  Plus,
   UserCheck,
   UserX
 } from "lucide-react";
@@ -46,7 +45,7 @@ interface MembersListProps {
   organizerName: string;
 }
 
-export function MembersList({ organizerId, organizerName }: MembersListProps) {
+export function MembersList({ organizerId }: MembersListProps) {
   const [members, setMembers] = useState<Profile[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [loading, setLoading] = useState(true);

@@ -305,7 +305,7 @@ export function TournamentRegistrationForm({
                           <h4 className="font-medium">{athlete.full_name}</h4>
                           <div className="text-sm text-muted-foreground">
                             {athlete.gender} • {athlete.belt_rank?.replace("_", " ").toUpperCase()} • 
-                            {athlete.weight_class && ` ${athlete.weight_class}kg`}
+                            {athlete.weight && ` ${athlete.weight}kg`}
                             {athlete.date_of_birth && ` • Age: ${new Date().getFullYear() - new Date(athlete.date_of_birth).getFullYear()}`}
                           </div>
                         </label>
