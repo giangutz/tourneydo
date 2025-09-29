@@ -4,9 +4,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Plus, Users } from "lucide-react";
-import { AvatarGroup } from "@/components/ui/avatar-group";
-import { NotificationSystem } from "@/components/notifications/notification-system";
+import { Plus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -16,6 +14,9 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { Profile } from "@/lib/types/database";
+import { Member } from "@/lib/types/database";
+import { AvatarGroup } from "../ui/avatar-group";
 
 interface MemberAvatarsProps {
   profile: Profile;
@@ -59,8 +60,8 @@ export function MemberAvatars({ profile }: MemberAvatarsProps) {
     return null;
   }
 
-  const displayMembers = members.slice(0, 2);
-  const hasMoreMembers = members.length > 2;
+  // members less than 2 or not
+  const displayMembers = members.length < 2 ? members : members.slice(0, 2);
 
   return (
     <div className="flex items-center space-x-2">
@@ -72,15 +73,27 @@ export function MemberAvatars({ profile }: MemberAvatarsProps) {
         </AvatarFallback>
       </Avatar>
 
-      {/* Member Avatars (up to 2) */}
-      {displayMembers.map((member) => (
-        <Avatar key={member.id} className="h-8 w-8 border-2 border-background">
-          <AvatarImage src={member.avatar_url} alt={member.full_name} />
-          <AvatarFallback className="bg-secondary text-secondary-foreground text-xs">
-            {member.full_name.split(' ').map(n => n[0]).join('').toUpperCase()}
-          </AvatarFallback>
-        </Avatar>
-      ))}
+      {/* Show Member Avatars if members.length < 2 */}
+      {members.length < 2 && (
+        <AvatarGroup members={members}>
+          {displayMembers.map((member) => (
+            <Avatar key={member.id} className="h-8 w-8 border-2 border-background">
+              <AvatarImage src={member.avatar_url} alt={member.full_name} />
+              <AvatarFallback className="bg-secondary text-secondary-foreground text-xs">
+                {member.full_name.split(' ').map(n => n[0]).join('').toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+          ))}
+          {members.length >= 2 && (
+            <Avatar className="h-8 w-8 border-2 border-background">
+              <AvatarFallback className="bg-secondary text-secondary-foreground text-xs">
+                +{members.length - 2}
+              </AvatarFallback>
+            </Avatar>
+          )}
+        </AvatarGroup>
+      )}
+      
 
       {/* Plus Button */}
       <Dialog open={showMembersDialog} onOpenChange={setShowMembersDialog}>

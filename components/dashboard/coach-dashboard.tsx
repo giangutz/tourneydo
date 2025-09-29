@@ -6,7 +6,7 @@ import { Profile, Athlete, Team, Tournament } from "@/lib/types/database";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Users, Trophy, Plus, Eye, UserPlus, Calendar } from "lucide-react";
+import { Users, Trophy, Eye, UserPlus, Calendar } from "lucide-react";
 import Link from "next/link";
 
 interface CoachDashboardProps {

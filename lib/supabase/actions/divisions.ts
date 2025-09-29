@@ -277,7 +277,7 @@ export const divisionQueries = {
   },
 
   // Get eligible athletes for division (weighed in, not already assigned)
-  getEligibleAthletes: async (tournamentId: string, category: string, gender: string, minAge: number, maxAge: number, minWeight?: number, maxWeight?: number, minHeight?: number, maxHeight?: number): Promise<any[]> => {
+  getEligibleAthletes: async (tournamentId: string, category: string, gender: string, minAge: number, maxAge: number, minWeight?: number, maxWeight?: number, minHeight?: number, maxHeight?: number): Promise<unknown[]> => {
     // Calculate date range for age
     const minDate = new Date();
     minDate.setFullYear(minDate.getFullYear() - maxAge - 1);
@@ -285,7 +285,7 @@ export const divisionQueries = {
     const maxDate = new Date();
     maxDate.setFullYear(maxDate.getFullYear() - minAge);
 
-    let query = supabase
+    const query = supabase
       .from('tournament_registrations')
       .select(`
         id,

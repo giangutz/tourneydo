@@ -1,16 +1,10 @@
-"use client";
-
 import { Button } from "@/components/ui/button";
 import { Bell } from "lucide-react";
-import { Profile } from "@/lib/types/database";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 import { UserButton } from "@clerk/nextjs";
 
-interface DashboardHeaderProps {
-  profile: Profile;
-}
 
-export function DashboardHeader({ profile }: DashboardHeaderProps) {
+export function DashboardHeader() {
   return (
     <header className="flex items-center justify-end space-x-2 sm:space-x-4 p-4">
       {/* Notifications */}

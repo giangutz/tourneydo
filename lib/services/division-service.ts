@@ -219,14 +219,12 @@ export class DivisionService {
     const groups: Record<string, AthleteWithRegistration[]> = {};
     const athletesPerGroup = Math.max(3, Math.floor(athletesWithWeight.length / 3));
 
-    let groupIndex = 1;
     for (let i = 0; i < athletesWithWeight.length; i += athletesPerGroup) {
       const group = athletesWithWeight.slice(i, i + athletesPerGroup);
       if (group.length >= 3) {
         const minWeight = group[0].actual_weight || group[0].weight_class || 0;
         const maxWeight = group[group.length - 1].actual_weight || group[group.length - 1].weight_class || 0;
         groups[`${minWeight.toFixed(1)}-${maxWeight.toFixed(1)}kg`] = group;
-        groupIndex++;
       } else if (i > 0) {
         // Add remaining athletes to the last group
         const lastGroupKey = Object.keys(groups)[Object.keys(groups).length - 1];

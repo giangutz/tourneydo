@@ -1,6 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
 import { 
-  Division, 
   DivisionParticipant, 
   Bracket, 
   Match,
@@ -45,7 +44,8 @@ export class BracketService {
       const participantCount = participants.length;
       const bracketSize = this.getNextPowerOfTwo(participantCount);
       const totalRounds = Math.log2(bracketSize);
-      const byeCount = bracketSize - participantCount;
+      // Calculate byes needed (not used in current implementation but kept for future use)
+      // const byeCount = bracketSize - participantCount;
 
       // Create bracket
       const { data: bracket, error: bracketError } = await this.supabase

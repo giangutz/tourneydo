@@ -9,12 +9,10 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { 
   Users, 
-  Plus, 
   Eye, 
   Edit, 
   Search,
   UserPlus,
-  Award,
   Calendar,
   Weight
 } from "lucide-react";

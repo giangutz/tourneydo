@@ -1,7 +1,4 @@
-"use client";
-
 import { useState } from "react";
-import { useUser } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,7 +29,6 @@ interface InviteMemberModalProps {
 }
 
 export function InviteMemberModal({ organizationId, onInviteSent }: InviteMemberModalProps) {
-  const { user } = useUser();
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -137,6 +133,7 @@ export function InviteMemberModal({ organizationId, onInviteSent }: InviteMember
             <Label htmlFor="role">Role *</Label>
             <Select
               value={formData.role}
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               onValueChange={(value) => setFormData({ ...formData, role: value as any })}
               required
             >

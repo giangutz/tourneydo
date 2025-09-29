@@ -187,7 +187,7 @@ export const paymentQueries = {
 
   // Update payment status
   updateStatus: async (id: string, status: PaymentStatus, reviewerId?: string, notes?: string): Promise<TeamPayment | null> => {
-    const updateData: any = {
+    const updateData: Partial<TeamPayment> = {
       status,
       reviewed_at: new Date().toISOString(),
       notes

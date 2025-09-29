@@ -1,5 +1,6 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
+import { ClerkUserMetadata } from '@/lib/types/clerk'
 
 const isProtectedRoute = createRouteMatcher([
   '/dashboard(.*)',
@@ -26,7 +27,7 @@ export default clerkMiddleware(async (auth, req) => {
         return NextResponse.next()
       }
       
-      const metadata = sessionClaims?.publicMetadata as any
+      const metadata = sessionClaims?.publicMetadata as ClerkUserMetadata
       
       // If metadata is undefined or null, this might be a session sync issue
       if (!metadata || metadata === null || Object.keys(metadata).length === 0) {
@@ -51,7 +52,7 @@ export default clerkMiddleware(async (auth, req) => {
         }
         
         // If multiple roles but no current role selected, redirect to role selection
-        if (metadata?.roles?.length > 1 && !metadata?.currentRole) {
+        if (metadata?.roles && metadata.roles.length > 1 && !metadata?.currentRole) {
           console.log('Redirecting to role selection - multiple roles, no current role')
           return NextResponse.redirect(new URL('/auth/select-role', req.url))
         }

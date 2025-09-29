@@ -15,7 +15,7 @@ export default function AuthPage() {
           </Link>
           <h2 className="text-3xl font-bold mb-2">Welcome</h2>
           <p className="text-muted-foreground">
-            Choose how you'd like to get started with TourneyDo
+            Choose how you&apos;d like to get started with TourneyDo
           </p>
         </div>
 

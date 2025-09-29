@@ -210,6 +210,18 @@ export interface RegisterAthleteData {
   notes?: string;
 }
 
+export interface CreateAthleteData {
+  full_name: string;
+  date_of_birth: string;
+  gender: Gender;
+  belt_rank: BeltRank;
+  weight_class?: number;
+  height?: number;
+  emergency_contact_name?: string;
+  emergency_contact_phone?: string;
+  medical_conditions?: string;
+}
+
 // Age calculation helper
 export function calculateAge(dateOfBirth: string): number {
   const today = new Date();
