@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { EditTournamentForm } from "@/components/tournaments/edit-tournament-form";
 
-export default async function EditTournamentPage({ params }: { params: { id: string } }) {
+export default async function EditTournamentPage({ params }: { params: Promise<{ id: string }> }) {
   const { userId } = await auth();
 
   if (!userId) {
@@ -11,6 +11,7 @@ export default async function EditTournamentPage({ params }: { params: { id: str
   }
 
   const supabase = await createClient();
+  const { id } = await params;
 
   // Get user profile to check role
   const { data: profile } = await supabase
@@ -27,7 +28,7 @@ export default async function EditTournamentPage({ params }: { params: { id: str
   const { data: tournament, error } = await supabase
     .from("tournaments")
     .select("*")
-    .eq("id", params.id)
+    .eq("id", id)
     .single();
 
   if (error || !tournament) {
