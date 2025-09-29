@@ -1,14 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { TournamentResults } from "@/components/tournaments/tournament-results";
-
-interface TournamentResultsPageProps {
-  params: {
-    id: string;
-  };
-}
-
-export default async function TournamentResultsPage({ params }: TournamentResultsPageProps) {
+    
+export default async function TournamentResultsPage({ params }: { id: string }) {
   const supabase = await createClient();
 
   // Get tournament details
