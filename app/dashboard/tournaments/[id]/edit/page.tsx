@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { EditTournamentForm } from "@/components/tournaments/edit-tournament-form";
 
-export default async function EditTournamentPage(params: { id: string }) {
+export default async function EditTournamentPage({ params }: { params: { id: string } }) {
   const { userId } = await auth();
 
   if (!userId) {
