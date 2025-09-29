@@ -126,10 +126,10 @@ export function CoachTournamentView({ tournament, coachId }: CoachTournamentView
 
   const getRegistrationStats = () => {
     const total = myRegistrations.length;
-    const paid = myRegistrations.filter((r: any) => r.payment_status === 'paid').length;
-    const pending = myRegistrations.filter((r: any) => r.payment_status === 'pending_approval').length;
-    const checkedIn = myRegistrations.filter((r: any) => r.checked_in).length;
-    const weighedIn = myRegistrations.filter((r: any) => r.weighed_in).length;
+    const paid = myRegistrations.filter((r: unknown) => (r as { payment_status: string }).payment_status === 'paid').length;
+    const pending = myRegistrations.filter((r: unknown) => (r as { payment_status: string }).payment_status === 'pending_approval').length;
+    const checkedIn = myRegistrations.filter((r: unknown) => (r as { checked_in: boolean }).checked_in).length;
+    const weighedIn = myRegistrations.filter((r: unknown) => (r as { weighed_in: boolean }).weighed_in).length;
 
     return { total, paid, pending, checkedIn, weighedIn };
   };
@@ -361,7 +361,9 @@ export function CoachTournamentView({ tournament, coachId }: CoachTournamentView
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {myRegistrations.map((registration: any) => (
+                  {myRegistrations.map((registration: unknown) => {
+                    const regData = registration as { id: string; athlete: { full_name: string }; payment_status: string; checked_in: boolean; weighed_in: boolean };
+                    return (
                     <div key={registration.id} className="flex items-center justify-between p-4 border rounded-lg">
                       <div>
                         <div className="font-medium">{registration.athlete.full_name}</div>

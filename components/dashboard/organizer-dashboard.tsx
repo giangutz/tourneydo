@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Profile, Tournament } from "@/lib/types/database";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -46,15 +46,15 @@ export function OrganizerDashboard({ profile }: OrganizerDashboardProps) {
     upcomingTournaments: 0,
   });
   const [loading, setLoading] = useState(true);
-  const [recentActivity, setRecentActivity] = useState<any[]>([]);
-  const [upcomingDeadlines, setUpcomingDeadlines] = useState<any[]>([]);
+  const [recentActivity, setRecentActivity] = useState<unknown[]>([]);
+  const [upcomingDeadlines, setUpcomingDeadlines] = useState<unknown[]>([]);
   const supabase = createClient();
 
   useEffect(() => {
     fetchDashboardData();
-  }, []);
+  }, [fetchDashboardData]);
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     try {
       // Fetch tournaments with more details
       const { data: tournamentsData } = await supabase
@@ -169,7 +169,7 @@ export function OrganizerDashboard({ profile }: OrganizerDashboardProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [supabase, profile.id]);
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
@@ -223,21 +223,24 @@ export function OrganizerDashboard({ profile }: OrganizerDashboardProps) {
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {upcomingDeadlines.slice(0, 3).map((tournament: any) => (
-                <div key={tournament.id} className="flex items-center justify-between p-3 bg-card border border-border rounded-lg">
+              {upcomingDeadlines.slice(0, 3).map((tournament: unknown) => {
+                const tournamentData = tournament as { id: string; name: string; registration_deadline: string; daysUntilDeadline: number };
+                return (
+                <div key={tournamentData.id} className="flex items-center justify-between p-3 bg-card border border-border rounded-lg">
                   <div>
-                    <p className="font-medium text-foreground">{tournament.name}</p>
+                    <p className="font-medium text-foreground">{tournamentData.name}</p>
                     <p className="text-sm text-muted-foreground">
-                      Registration closes in {tournament.daysUntilDeadline} day{tournament.daysUntilDeadline !== 1 ? 's' : ''}
+                      Registration closes in {tournamentData.daysUntilDeadline} day{tournamentData.daysUntilDeadline !== 1 ? 's' : ''}
                     </p>
                   </div>
-                  <Link href={`/dashboard/tournaments/${tournament.id}`}>
+                  <Link href={`/dashboard/tournaments/${tournamentData.id}`}>
                     <Button size="sm" variant="outline">
                       View
                     </Button>
                   </Link>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </CardContent>
         </Card>
@@ -403,22 +406,25 @@ export function OrganizerDashboard({ profile }: OrganizerDashboardProps) {
               </div>
             ) : (
               <div className="space-y-2 sm:space-y-3">
-                {recentActivity.slice(0, 5).map((activity: any, index: number) => (
+                {recentActivity.slice(0, 5).map((activity: unknown, index: number) => {
+                  const activityData = activity as { athlete?: { full_name: string }; tournament?: { name: string }; created_at: string };
+                  return (
                   <div key={index} className="flex items-center space-x-2 sm:space-x-3 p-2 rounded-lg bg-muted/50">
                     <div className="h-2 w-2 bg-green-500 rounded-full flex-shrink-0"></div>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs sm:text-sm font-medium truncate">
-                        {activity.athlete?.full_name || 'Unknown Athlete'}
+                        {activityData.athlete?.full_name || 'Unknown Athlete'}
                       </p>
                       <p className="text-xs text-muted-foreground truncate">
-                        Registered for {activity.tournament?.name || 'Unknown Tournament'}
+                        Registered for {activityData.tournament?.name || 'Unknown Tournament'}
                       </p>
                     </div>
                     <div className="text-xs text-muted-foreground flex-shrink-0 hidden sm:block">
-                      {new Date(activity.registration_date).toLocaleDateString()}
+                      {new Date(activityData.created_at).toLocaleDateString()}
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardContent>

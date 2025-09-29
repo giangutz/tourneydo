@@ -47,7 +47,7 @@ export function DebugCompleteProfileForm() {
 
     try {
       // Test if profiles table exists
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from("profiles")
         .select("count")
         .limit(1);

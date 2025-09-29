@@ -46,7 +46,7 @@ export function PublicTournamentsList({ tournaments }: PublicTournamentsListProp
 
   // Filter and sort tournaments
   const filteredTournaments = useMemo(() => {
-    let filtered = tournaments.filter(tournament => {
+    const filtered = tournaments.filter(tournament => {
       const matchesSearch = tournament.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            tournament.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            tournament.organizer?.full_name?.toLowerCase().includes(searchTerm.toLowerCase());

@@ -166,18 +166,20 @@ export function useResultsNotifications() {
     }
   };
 
-  const sendConsolidatedResultsEmail = async (coachData: any) => {
+  const sendConsolidatedResultsEmail = async (coachData: unknown) => {
     try {
-      const { coach, tournament, results } = coachData;
+      const coachDataTyped = coachData as { coach: { email: string; full_name: string }; tournament: { name: string }; results: unknown[] };
+      const { coach, tournament, results } = coachDataTyped;
       
       // Create a summary of all results
       const resultsSummary = results
-        .map((result: any) => {
-          const placementText = result.placement === 1 ? "🥇 1st Place" : 
-                               result.placement === 2 ? "🥈 2nd Place" : 
-                               result.placement === 3 ? "🥉 3rd Place" : 
-                               `${result.placement}th Place`;
-          return `${result.athlete.full_name}: ${placementText}`;
+        .map((result: unknown) => {
+          const resultData = result as { placement: number; athlete: { full_name: string }; division: { name: string } };
+          const placementText = resultData.placement === 1 ? "🥇 1st Place" : 
+                               resultData.placement === 2 ? "🥈 2nd Place" : 
+                               resultData.placement === 3 ? "🥉 3rd Place" : 
+                               `${resultData.placement}th Place`;
+          return `${resultData.athlete.full_name}: ${placementText}`;
         })
         .join('\n');
 
