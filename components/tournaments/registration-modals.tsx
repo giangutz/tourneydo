@@ -1,4 +1,3 @@
-/* eslint-disable  @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useEffect, useState } from "react";
@@ -17,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Scale, UserCheck, CreditCard, AlertCircle } from "lucide-react";
+import { calculateAge } from "@/lib/types/database";
 
 interface Registration {
   id: string;
@@ -58,6 +58,7 @@ export function WeighInModal({
     registration?.weight_recorded || registration?.athlete.weight || "";
   const heightValue = registration?.athlete.height || "";
   const [weight, setWeight] = useState(weightValue.toString());
+  const [height, setHeight] = useState(heightValue.toString());
   const [notes, setNotes] = useState(registration?.notes || "");
   const [loading, setLoading] = useState(false);
 
@@ -68,15 +69,16 @@ export function WeighInModal({
     const birthDate = new Date(dateOfBirth);
     let age = today.getFullYear() - birthDate.getFullYear();
     const monthDiff = today.getMonth() - birthDate.getMonth();
-    
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+
+    if (
+      monthDiff < 0 ||
+      (monthDiff === 0 && today.getDate() < birthDate.getDate())
+    ) {
       age--;
     }
-    
+
     return age;
   };
-
-  const age = registration ? calculateAge(registration.athlete.date_of_birth) : 0;
 
   useEffect(() => {
     if (registration) {
@@ -89,6 +91,8 @@ export function WeighInModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!registration) return;
+
+    const supabase = createClient();
 
     setLoading(true);
     try {
@@ -106,7 +110,10 @@ export function WeighInModal({
       if (regError) throw regError;
 
       // Update athlete's height if provided
-      if ((height && parseFloat(height) !== registration.athlete.height) || (weight && parseFloat(weight) !== registration.athlete.weight)) {
+      if (
+        (height && parseFloat(height) !== registration.athlete.height) ||
+        (weight && parseFloat(weight) !== registration.athlete.weight)
+      ) {
         const { error: athleteError } = await supabase
           .from("athletes")
           .update({ height: parseFloat(height), weight: parseFloat(weight) })
@@ -153,7 +160,7 @@ export function WeighInModal({
               </div>
               <div className="text-sm text-muted-foreground">
                 {registration.team.name} • {registration.athlete.gender} •{" "}
-                {registration.athlete.age} years
+                {calculateAge(registration.athlete.date_of_birth || "")} years
               </div>
               <div className="flex items-center space-x-2 mt-2">
                 <Badge variant="outline">
@@ -265,11 +272,11 @@ export function CheckInModal({
   const [notes, setNotes] = useState(registration?.notes || "");
   const [loading, setLoading] = useState(false);
 
-  const supabase = createClient();
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!registration) return;
+
+    const supabase = createClient();
 
     setLoading(true);
     try {
@@ -318,7 +325,7 @@ export function CheckInModal({
               </div>
               <div className="text-sm text-muted-foreground">
                 {registration.team.name} • {registration.athlete.gender} •{" "}
-                {registration.athlete.age} years
+                {calculateAge(registration.athlete.date_of_birth || "")} years
               </div>
               <div className="flex items-center space-x-2 mt-2">
                 <Badge variant="outline">
@@ -447,7 +454,7 @@ export function PaymentUpdateModal({
               </div>
               <div className="text-sm text-muted-foreground">
                 {registration.team.name} • {registration.athlete.gender} •{" "}
-                {registration.athlete.age} years
+                {calculateAge(registration.athlete.date_of_birth || "")} years
               </div>
             </div>
 
