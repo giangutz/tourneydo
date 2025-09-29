@@ -1,0 +1,271 @@
+/* UI Improvements for Better Spacing and UX */
+
+/* Improved button spacing and padding */
+.btn-improved {
+  @apply px-6 py-3 min-h-[44px] gap-2 rounded-lg transition-all duration-200;
+}
+
+.btn-improved-sm {
+  @apply px-4 py-2 min-h-[36px] gap-1.5 rounded-md text-sm;
+}
+
+.btn-improved-lg {
+  @apply px-8 py-4 min-h-[52px] gap-3 rounded-xl text-base font-semibold;
+}
+
+/* Better form spacing */
+.form-improved {
+  @apply space-y-6;
+}
+
+.form-improved .form-group {
+  @apply space-y-3;
+}
+
+.form-improved label {
+  @apply text-sm font-medium text-foreground mb-2 block;
+}
+
+.form-improved input,
+.form-improved textarea,
+.form-improved select {
+  @apply min-h-[44px] px-4 py-3 rounded-lg border border-input bg-background;
+}
+
+/* Improved card spacing */
+.card-improved {
+  @apply p-6 sm:p-8 rounded-xl border border-border bg-card shadow-sm;
+}
+
+.card-improved-compact {
+  @apply p-4 sm:p-6 rounded-lg border border-border bg-card;
+}
+
+/* Better responsive spacing */
+.container-improved {
+  @apply px-4 sm:px-6 lg:px-8 mx-auto max-w-7xl;
+}
+
+.section-spacing {
+  @apply py-8 sm:py-12 lg:py-16;
+}
+
+.content-spacing {
+  @apply space-y-6 sm:space-y-8 lg:space-y-10;
+}
+
+/* Improved navigation spacing */
+.nav-improved {
+  @apply px-4 py-3 min-h-[56px] flex items-center justify-between;
+}
+
+.nav-item-improved {
+  @apply px-4 py-2 min-h-[40px] rounded-lg transition-colors duration-200;
+}
+
+/* Better mobile touch targets */
+.touch-target {
+  @apply min-h-[44px] min-w-[44px] flex items-center justify-center;
+}
+
+/* Improved text spacing */
+.text-spacing {
+  @apply leading-relaxed;
+}
+
+.text-spacing h1 {
+  @apply mb-4 sm:mb-6;
+}
+
+.text-spacing h2 {
+  @apply mb-3 sm:mb-4;
+}
+
+.text-spacing h3 {
+  @apply mb-2 sm:mb-3;
+}
+
+.text-spacing p {
+  @apply mb-4;
+}
+
+/* Better focus states */
+.focus-improved:focus {
+  @apply ring-2 ring-primary ring-offset-2 ring-offset-background outline-none;
+}
+
+/* Improved hover states */
+.hover-improved {
+  @apply transition-all duration-200 hover:shadow-md hover:scale-[1.02];
+}
+
+/* Better loading states */
+.loading-improved {
+  @apply animate-pulse bg-muted rounded;
+}
+
+/* Improved error states */
+.error-improved {
+  @apply border-destructive bg-destructive/5 text-destructive;
+}
+
+/* Success states */
+.success-improved {
+  @apply border-green-500 bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300;
+}
+
+/* Responsive grid improvements */
+.grid-improved {
+  @apply grid gap-4 sm:gap-6 lg:gap-8;
+}
+
+.grid-improved-1 {
+  @apply grid-cols-1;
+}
+
+.grid-improved-2 {
+  @apply grid-cols-1 sm:grid-cols-2;
+}
+
+.grid-improved-3 {
+  @apply grid-cols-1 sm:grid-cols-2 lg:grid-cols-3;
+}
+
+.grid-improved-4 {
+  @apply grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4;
+}
+
+/* Better flex layouts */
+.flex-improved {
+  @apply flex gap-3 sm:gap-4 lg:gap-6;
+}
+
+.flex-improved-tight {
+  @apply flex gap-1 sm:gap-2;
+}
+
+.flex-improved-loose {
+  @apply flex gap-4 sm:gap-6 lg:gap-8;
+}
+
+/* Improved modal spacing */
+.modal-improved {
+  @apply p-6 sm:p-8 max-w-md sm:max-w-lg lg:max-w-xl mx-auto;
+}
+
+/* Better table spacing */
+.table-improved {
+  @apply w-full border-collapse;
+}
+
+.table-improved th,
+.table-improved td {
+  @apply px-4 py-3 text-left border-b border-border;
+}
+
+.table-improved th {
+  @apply font-semibold text-muted-foreground bg-muted/50;
+}
+
+/* Improved list spacing */
+.list-improved {
+  @apply space-y-2 sm:space-y-3;
+}
+
+.list-improved li {
+  @apply py-2 px-3 rounded-md;
+}
+
+/* Better badge spacing */
+.badge-improved {
+  @apply px-3 py-1 text-xs font-medium rounded-full;
+}
+
+/* Improved avatar spacing */
+.avatar-improved {
+  @apply h-10 w-10 sm:h-12 sm:w-12 rounded-full;
+}
+
+.avatar-improved-sm {
+  @apply h-8 w-8 rounded-full;
+}
+
+.avatar-improved-lg {
+  @apply h-16 w-16 sm:h-20 sm:w-20 rounded-full;
+}
+
+/* Better dropdown spacing */
+.dropdown-improved {
+  @apply min-w-[200px] p-2 space-y-1;
+}
+
+.dropdown-item-improved {
+  @apply px-3 py-2 rounded-md cursor-pointer transition-colors duration-150;
+}
+
+/* Improved search input */
+.search-improved {
+  @apply relative;
+}
+
+.search-improved input {
+  @apply pl-10 pr-4 py-3 w-full rounded-lg border border-input;
+}
+
+.search-improved .search-icon {
+  @apply absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground;
+}
+
+/* Better notification spacing */
+.notification-improved {
+  @apply p-4 rounded-lg border shadow-lg max-w-sm;
+}
+
+/* Improved sidebar spacing */
+.sidebar-improved {
+  @apply p-4 space-y-2;
+}
+
+.sidebar-item-improved {
+  @apply px-3 py-2 rounded-lg transition-colors duration-150;
+}
+
+/* Better dashboard spacing */
+.dashboard-improved {
+  @apply space-y-6 sm:space-y-8;
+}
+
+.dashboard-header-improved {
+  @apply pb-6 sm:pb-8 border-b border-border;
+}
+
+.dashboard-content-improved {
+  @apply pt-6 sm:pt-8;
+}
+
+/* Responsive utilities */
+@media (max-width: 640px) {
+  .mobile-stack {
+    @apply flex-col space-y-3 space-x-0;
+  }
+  
+  .mobile-full {
+    @apply w-full;
+  }
+  
+  .mobile-center {
+    @apply text-center;
+  }
+}
+
+@media (min-width: 768px) {
+  .tablet-row {
+    @apply flex-row space-y-0 space-x-4;
+  }
+}
+
+@media (min-width: 1024px) {
+  .desktop-grid {
+    @apply grid-cols-3;
+  }
+}
