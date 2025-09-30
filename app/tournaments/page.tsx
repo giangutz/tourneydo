@@ -38,6 +38,20 @@ export default function PublicTournamentsPage() {
 
   useEffect(() => {
     fetchTournaments();
+
+    // Refresh data when page becomes visible (user navigates back)
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log('Page became visible, refreshing tournament data...');
+        fetchTournaments();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   const fetchTournaments = async () => {
@@ -57,11 +71,17 @@ export default function PublicTournamentsPage() {
       // Get participant counts for all tournaments
       const counts: Record<string, number> = {};
       for (const tournament of tournamentsData || []) {
-        const { count } = await supabase
+        const { count, error: countError } = await supabase
           .from('registrations')
           .select('*', { count: 'exact', head: true })
           .eq('tournament_id', tournament.id);
+
+        if (countError) {
+          console.error('Error fetching participant count for tournament', tournament.id, ':', countError);
+        }
+
         counts[tournament.id] = count ?? 0;
+        console.log(`Tournament ${tournament.id} participant count:`, count ?? 0); // Debug log
       }
       setParticipantCounts(counts);
 

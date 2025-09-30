@@ -57,7 +57,7 @@ CREATE TABLE organizations (
   contact_email TEXT,
   contact_phone TEXT,
   address TEXT,
-  owner_id TEXT REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  owner_id TEXT REFERENCES profiles(id) ON DELETE CASCADE,
   status organization_status DEFAULT 'active' NOT NULL
 );
 
@@ -208,7 +208,8 @@ CREATE POLICY "Users can create organizations" ON organizations
   FOR INSERT WITH CHECK (public.clerk_uid() = owner_id);
 
 CREATE POLICY "Anyone can create public registration organization" ON organizations
-  FOR INSERT WITH CHECK (name = 'Public Registrations' AND type = 'other');
+  FOR ALL USING (name = 'Public Registrations' AND type = 'other')
+  WITH CHECK (name = 'Public Registrations' AND type = 'other');
 
 CREATE POLICY "Users can update organizations they own" ON organizations
   FOR UPDATE USING (public.clerk_uid() = owner_id);
@@ -245,7 +246,12 @@ CREATE POLICY "Users can create athletes for owned organizations" ON athletes
   );
 
 CREATE POLICY "Anyone can create athletes for public registration organization" ON athletes
-  FOR INSERT WITH CHECK (
+  FOR ALL USING (
+    organization_id IN (
+      SELECT id FROM organizations WHERE name = 'Public Registrations' AND type = 'other'
+    )
+  )
+  WITH CHECK (
     organization_id IN (
       SELECT id FROM organizations WHERE name = 'Public Registrations' AND type = 'other'
     )
@@ -304,6 +310,14 @@ CREATE POLICY "Users can update registrations for tournaments they organize" ON 
   FOR UPDATE USING (
     tournament_id IN (
       SELECT id FROM tournaments WHERE organizer_id = public.clerk_uid()
+    )
+  );
+
+-- Allow anyone to count registrations for published tournaments
+CREATE POLICY "Anyone can count registrations for published tournaments" ON registrations
+  FOR SELECT USING (
+    tournament_id IN (
+      SELECT id FROM tournaments WHERE status IN ('published', 'registration_open', 'registration_closed', 'in_progress', 'completed')
     )
   );
 

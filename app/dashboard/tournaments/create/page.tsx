@@ -82,6 +82,31 @@ export default function CreateTournamentPage() {
         throw new Error("User not authenticated");
       }
 
+      // Ensure user profile exists
+      const { data: existingProfile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', user.id)
+        .single();
+
+      if (!existingProfile) {
+        // Create profile if it doesn't exist
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            id: user.id,
+            email: user.primaryEmailAddress?.emailAddress || '',
+            full_name: user.fullName || null,
+            avatar_url: user.imageUrl || null,
+            onboarding_completed: false,
+          });
+
+        if (profileError) {
+          console.error('Error creating profile:', profileError);
+          throw new Error('Failed to create user profile');
+        }
+      }
+
       const tournamentData: TournamentInsert = {
         title: formData.title.trim(),
         description: formData.description.trim() || null,

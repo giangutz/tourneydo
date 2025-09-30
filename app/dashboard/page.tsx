@@ -122,7 +122,8 @@ export default function DashboardPage() {
         .from('registrations')
         .select(`
           *,
-          tournament:tournaments(title)
+          tournament:tournaments(title),
+          athlete:athletes(first_name, last_name)
         `)
         .order('registration_date', { ascending: false })
         .limit(50);

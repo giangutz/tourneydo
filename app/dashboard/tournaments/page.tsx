@@ -17,6 +17,24 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Trophy,
   Search,
   Plus,
@@ -56,6 +74,12 @@ export default function TournamentsPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+
+  // Delete confirmation modal
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [tournamentToDelete, setTournamentToDelete] = useState<TournamentWithStats | null>(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   // Load tournaments on mount
   useEffect(() => {
@@ -168,6 +192,45 @@ export default function TournamentsPage() {
     { value: "completed", label: "Completed" },
     { value: "cancelled", label: "Cancelled" },
   ];
+
+  const handleDeleteTournament = (tournament: TournamentWithStats) => {
+    setTournamentToDelete(tournament);
+    setDeleteConfirmation("");
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteTournament = async () => {
+    if (!tournamentToDelete || !session) return;
+
+    if (deleteConfirmation !== tournamentToDelete.title) {
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      const supabase = createClerkSupabaseClient(session);
+
+      // Delete the tournament (this will cascade delete registrations and athletes due to foreign keys)
+      const { error } = await supabase
+        .from('tournaments')
+        .delete()
+        .eq('id', tournamentToDelete.id)
+        .eq('organizer_id', user?.id); // Extra safety check
+
+      if (error) throw error;
+
+      // Close dialog and refresh immediately
+      setDeleteDialogOpen(false);
+      setTournamentToDelete(null);
+
+      // Refresh the tournaments list
+      await fetchTournaments();
+    } catch (error) {
+      console.error('Error deleting tournament:', error);
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -287,6 +350,17 @@ export default function TournamentsPage() {
                               <Users className="mr-2 h-4 w-4" />
                               Manage Participants
                             </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteTournament(tournament);
+                              }}
+                              className="text-red-600 focus:text-red-600"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete Tournament
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
@@ -344,6 +418,57 @@ export default function TournamentsPage() {
           </div>
         </main>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-600" />
+              Delete Tournament
+            </AlertDialogTitle>
+            <div className="space-y-3 text-sm text-muted-foreground">
+              <div>
+                Are you sure you want to delete <strong>"{tournamentToDelete?.title}"</strong>?
+                This action cannot be undone.
+              </div>
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <div className="text-sm text-red-800 font-medium mb-2">This will permanently delete:</div>
+                <ul className="text-sm text-red-700 space-y-1 ml-4">
+                  <li>• The tournament and all its details</li>
+                  <li>• All participant registrations ({tournamentToDelete?.participantCount} participants)</li>
+                  <li>• All associated athlete data</li>
+                  <li>• Payment and registration records</li>
+                </ul>
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="delete-confirmation" className="text-sm font-medium">
+                  Type <strong>"{tournamentToDelete?.title}"</strong> to confirm:
+                </label>
+                <Input
+                  id="delete-confirmation"
+                  value={deleteConfirmation}
+                  onChange={(e) => setDeleteConfirmation(e.target.value)}
+                  placeholder={`Type "${tournamentToDelete?.title}" here`}
+                  className="w-full"
+                />
+              </div>
+            </div>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteTournament}
+              disabled={!tournamentToDelete || deleteConfirmation !== tournamentToDelete.title || deleting}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              {deleting ? "Deleting..." : "Delete Tournament"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </SidebarProvider>
   );
 }

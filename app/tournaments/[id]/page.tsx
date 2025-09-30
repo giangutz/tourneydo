@@ -31,6 +31,7 @@ import {
   Check
 } from "lucide-react";
 import { createPublicSupabaseClient } from "@/lib/supabase";
+import { toast } from "sonner";
 import type { Tournament } from "@/types/database";
 
 export default function PublicTournamentPage() {
@@ -41,8 +42,10 @@ export default function PublicTournamentPage() {
   const [tournament, setTournament] = useState<Tournament | null>(null);
   const [loading, setLoading] = useState(true);
   const [registrationOpen, setRegistrationOpen] = useState(false);
+  const [showRegistrationDialog, setShowRegistrationDialog] = useState(false);
   const [participantCount, setParticipantCount] = useState(0);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [updatingStats, setUpdatingStats] = useState(false);
 
   useEffect(() => {
     if (tournamentId) {
@@ -69,12 +72,17 @@ export default function PublicTournamentPage() {
       setTournament(tournamentData);
 
       // Get participant count
-      const { count } = await supabase
+      const { count, error: countError } = await supabase
         .from('registrations')
         .select('*', { count: 'exact', head: true })
         .eq('tournament_id', tournamentId);
 
-      setParticipantCount(count ?? 0);
+      if (countError) {
+        console.error('Error fetching participant count:', countError);
+      }
+
+      const newCount = count ?? 0;
+      setParticipantCount(newCount);
 
       // Check if registration is open
       const now = new Date();
@@ -83,11 +91,11 @@ export default function PublicTournamentPage() {
         ? new Date(tournamentData.registration_deadline)
         : startDate;
 
-      setRegistrationOpen(
-        tournamentData.status === 'published' &&
+      const isOpen = tournamentData.status === 'published' &&
         now <= registrationDeadline &&
-        (tournamentData.max_participants ? (count ?? 0) < tournamentData.max_participants : true)
-      );
+        (tournamentData.max_participants ? newCount < tournamentData.max_participants : true);
+
+      setRegistrationOpen(isOpen);
 
     } catch (error) {
       console.error('Error fetching tournament:', error);
@@ -202,9 +210,32 @@ export default function PublicTournamentPage() {
             <Trophy className="h-5 w-5 text-blue-600" />
             <span className="text-sm font-medium text-gray-600">Taekwondo Tournament</span>
           </div>
-          <h1 className="text-4xl md:text-6xl font-bold bg-gradient-to-r from-blue-600 to-red-600 bg-clip-text text-transparent mb-4">
+          <h1 className="text-4xl md:text-6xl font-bold bg-gradient-to-r from-blue-600 to-red-600 bg-clip-text text-transparent mb-6">
             {tournament.title}
           </h1>
+
+          {/* Prominent Register Button */}
+          {registrationOpen && (
+            <div className="mb-6">
+              <Button
+                size="lg"
+                className="bg-gradient-to-r from-blue-600 to-red-600 hover:from-blue-700 hover:to-red-700 text-white font-semibold px-8 py-4 text-lg shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-200"
+                onClick={() => setShowRegistrationDialog(true)}
+              >
+                <UserPlus className="mr-3 h-6 w-6" />
+                Register for Tournament
+              </Button>
+              <p className="text-sm text-gray-500 mt-2">
+                {(() => {
+                  const daysLeft = getDaysUntilDeadline();
+                  return daysLeft !== null && daysLeft > 0
+                    ? `${daysLeft} days left to register`
+                    : 'Registration closes soon!';
+                })()}
+              </p>
+            </div>
+          )}
+
           {tournament.description && (
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
               {tournament.description}
@@ -242,12 +273,28 @@ export default function PublicTournamentPage() {
             <CardContent className="p-6">
               <div className="flex items-center gap-3">
                 <Users className="h-8 w-8 text-green-600" />
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Participants</p>
-                  <p className="text-lg font-bold">
-                    {participantCount}
-                    {tournament.max_participants && ` / ${tournament.max_participants}`}
-                  </p>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Participants</p>
+                      <p className="text-lg font-bold">
+                        {updatingStats ? (
+                          <span className="flex items-center gap-2">
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600"></div>
+                            Updating...
+                          </span>
+                        ) : (
+                          <>
+                            {participantCount}
+                            {tournament.max_participants && ` / ${tournament.max_participants}`}
+                          </>
+                        )}
+                      </p>
+                    </div>
+                    {updatingStats && (
+                      <div className="text-xs text-gray-500">Refreshing stats...</div>
+                    )}
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -311,7 +358,7 @@ export default function PublicTournamentPage() {
                 <Button
                   size="lg"
                   className="bg-gradient-to-r from-blue-600 to-red-600 hover:from-blue-700 hover:to-red-700"
-                  onClick={() => setRegistrationOpen(true)}
+                  onClick={() => setShowRegistrationDialog(true)}
                 >
                   <UserPlus className="mr-2 h-5 w-5" />
                   Register Now
@@ -453,7 +500,7 @@ export default function PublicTournamentPage() {
                 size="lg"
                 variant="secondary"
                 className="bg-white text-blue-600 hover:bg-gray-100"
-                onClick={() => setRegistrationOpen(true)}
+                onClick={() => setShowRegistrationDialog(true)}
               >
                 <UserPlus className="mr-2 h-5 w-5" />
                 Register for Tournament
@@ -466,11 +513,15 @@ export default function PublicTournamentPage() {
       {/* Registration Dialog */}
       <RegistrationDialog
         tournament={tournament}
-        open={registrationOpen}
-        onOpenChange={setRegistrationOpen}
-        onSuccess={() => {
-          setRegistrationOpen(false);
-          fetchTournament(); // Refresh participant count
+        open={showRegistrationDialog}
+        onOpenChange={setShowRegistrationDialog}
+        onSuccess={async () => {
+          setShowRegistrationDialog(false);
+          setUpdatingStats(true);
+          // Small delay to ensure database write is complete
+          await new Promise(resolve => setTimeout(resolve, 500));
+          await fetchTournament(); // Refresh participant count
+          setUpdatingStats(false);
         }}
       />
     </div>
@@ -518,7 +569,7 @@ function RegistrationDialog({
     if (step === 1) {
       // Validate first step
       if (!formData.first_name || !formData.last_name || !formData.date_of_birth || !formData.gender) {
-        alert('Please fill in all required fields');
+        toast.error('Please fill in all required fields');
         return;
       }
       setStep(2);
@@ -551,7 +602,6 @@ function RegistrationDialog({
             name: 'Public Registrations',
             type: 'other',
             description: 'Default organization for public tournament registrations',
-            owner_id: '00000000-0000-0000-0000-000000000000', // Placeholder owner ID
             status: 'active'
           })
           .select('id')
@@ -606,7 +656,7 @@ function RegistrationDialog({
 
       if (registrationError) throw registrationError;
 
-      alert('Registration submitted successfully! You will receive a confirmation email shortly.');
+      toast.success('Registration submitted successfully! You will receive a confirmation email shortly.');
       onSuccess();
       setStep(1);
       setFormData({
@@ -624,7 +674,7 @@ function RegistrationDialog({
 
     } catch (error) {
       console.error('Error submitting registration:', error);
-      alert('Failed to submit registration. Please try again.');
+      toast.error('Failed to submit registration. Please try again.');
     } finally {
       setLoading(false);
     }

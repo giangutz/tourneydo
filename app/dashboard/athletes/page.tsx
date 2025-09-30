@@ -6,6 +6,9 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Users, UserPlus, Trophy, Calendar, TrendingUp, Plus, Search, Filter } from "lucide-react";
 
+// Force dynamic rendering to avoid prerendering issues
+export const dynamic = 'force-dynamic';
+
 export default function AthletesDashboard() {
   return (
     <SidebarProvider defaultOpen={false}>

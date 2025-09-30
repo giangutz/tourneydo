@@ -22,6 +22,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Trophy,
@@ -74,6 +85,8 @@ export default function TournamentDetailPage() {
   const [participants, setParticipants] = useState<RegistrationWithAthlete[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [deleting, setDeleting] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
 
   // Load tournament data
@@ -173,24 +186,43 @@ export default function TournamentDetailPage() {
     }
   };
 
-  const handleDelete = async () => {
-    if (!session || !tournament) return;
+  const handleDeleteTournament = () => {
+    setDeleteConfirmation("");
+    setDeleteDialogOpen(true);
+  };
 
+  const confirmDeleteTournament = async () => {
+    if (!tournamentToDelete || !session) return;
+
+    if (deleteConfirmation !== tournamentToDelete.title) {
+      return;
+    }
+
+    setDeleting(true);
     try {
       const supabase = createClerkSupabaseClient(session);
 
+      // Delete the tournament (this will cascade delete registrations and athletes due to foreign keys)
       const { error } = await supabase
         .from('tournaments')
         .delete()
-        .eq('id', tournament.id);
+        .eq('id', tournamentToDelete.id)
+        .eq('organizer_id', user?.id); // Extra safety check
 
       if (error) throw error;
 
+      // Close dialog and redirect immediately
+      setDeleteDialogOpen(false);
       router.push('/dashboard/tournaments');
     } catch (error) {
       console.error('Error deleting tournament:', error);
+    } finally {
+      setDeleting(false);
     }
   };
+
+  // Helper function to get tournament for deletion
+  const tournamentToDelete = tournament;
 
   const handleParticipantStatusChange = async (participantId: string, newStatus: string) => {
     if (!session) return;
@@ -348,7 +380,7 @@ export default function TournamentDetailPage() {
                 )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  onClick={() => setDeleteDialogOpen(true)}
+                  onClick={() => handleDeleteTournament()}
                   className="text-destructive focus:text-destructive"
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
@@ -531,24 +563,55 @@ export default function TournamentDetailPage() {
       </div>
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete Tournament</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete "{tournament.title}"? This action cannot be undone and will remove all associated registrations.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-600" />
               Delete Tournament
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+            </AlertDialogTitle>
+            <div className="space-y-3 text-sm text-muted-foreground">
+              <div>
+                Are you sure you want to delete <strong>"{tournament.title}"</strong>?
+                This action cannot be undone.
+              </div>
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <div className="text-sm text-red-800 font-medium mb-2">This will permanently delete:</div>
+                <ul className="text-sm text-red-700 space-y-1 ml-4">
+                  <li>• The tournament and all its details</li>
+                  <li>• All participant registrations ({tournament.participantCount} participants)</li>
+                  <li>• All associated athlete data</li>
+                  <li>• Payment and registration records</li>
+                </ul>
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="delete-confirmation" className="text-sm font-medium">
+                  Type <strong>"{tournament.title}"</strong> to confirm:
+                </label>
+                <Input
+                  id="delete-confirmation"
+                  value={deleteConfirmation}
+                  onChange={(e) => setDeleteConfirmation(e.target.value)}
+                  placeholder={`Type "${tournament.title}" here`}
+                  className="w-full"
+                />
+              </div>
+            </div>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteTournament}
+              disabled={!tournament || deleteConfirmation !== tournament.title || deleting}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              {deleting ? "Deleting..." : "Delete Tournament"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </SidebarProvider>
   );
 }
