@@ -41,7 +41,10 @@ import {
   AlertTriangle,
   Settings,
   UserCheck,
-  UserX
+  UserX,
+  Share2,
+  Copy,
+  Check
 } from "lucide-react";
 import { createClerkSupabaseClient } from "@/lib/supabase";
 import { useUser, useSession } from "@clerk/nextjs";
@@ -71,6 +74,7 @@ export default function TournamentDetailPage() {
   const [participants, setParticipants] = useState<RegistrationWithAthlete[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
 
   // Load tournament data
   useEffect(() => {
@@ -238,6 +242,17 @@ export default function TournamentDetailPage() {
         return <XCircle className="h-4 w-4 text-red-600" />;
       default:
         return <AlertTriangle className="h-4 w-4 text-gray-600" />;
+    }
+  };
+
+  const copyTournamentLink = async () => {
+    const url = `${window.location.origin}/tournaments/${tournamentId}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy link:', err);
     }
   };
 
@@ -464,67 +479,51 @@ export default function TournamentDetailPage() {
               </CardContent>
             </Card>
 
-            {/* Participants Management */}
+            {/* Quick Actions */}
             <Card>
               <CardHeader>
-                <CardTitle>Participants ({participants.length})</CardTitle>
+                <CardTitle>Quick Actions</CardTitle>
                 <CardDescription>
-                  Manage tournament registrations and participant status
+                  Manage tournament participants and settings
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <Tabs defaultValue="all" className="w-full">
-                  <TabsList>
-                    <TabsTrigger value="all">All ({participants.length})</TabsTrigger>
-                    <TabsTrigger value="confirmed">
-                      Confirmed ({participants.filter(p => p.status === 'confirmed').length})
-                    </TabsTrigger>
-                    <TabsTrigger value="pending">
-                      Pending ({participants.filter(p => p.status === 'pending').length})
-                    </TabsTrigger>
-                  </TabsList>
-
-                  <TabsContent value="all" className="space-y-2">
-                    {participants.length > 0 ? (
-                      participants.map((participant) => (
-                        <ParticipantCard
-                          key={participant.id}
-                          participant={participant}
-                          onStatusChange={handleParticipantStatusChange}
-                        />
-                      ))
-                    ) : (
-                      <div className="text-center py-8 text-muted-foreground">
-                        <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                        <p>No participants registered yet</p>
-                      </div>
-                    )}
-                  </TabsContent>
-
-                  <TabsContent value="confirmed" className="space-y-2">
-                    {participants
-                      .filter(p => p.status === 'confirmed')
-                      .map((participant) => (
-                        <ParticipantCard
-                          key={participant.id}
-                          participant={participant}
-                          onStatusChange={handleParticipantStatusChange}
-                        />
-                      ))}
-                  </TabsContent>
-
-                  <TabsContent value="pending" className="space-y-2">
-                    {participants
-                      .filter(p => p.status === 'pending')
-                      .map((participant) => (
-                        <ParticipantCard
-                          key={participant.id}
-                          participant={participant}
-                          onStatusChange={handleParticipantStatusChange}
-                        />
-                      ))}
-                  </TabsContent>
-                </Tabs>
+              <CardContent className="space-y-3">
+                <Button
+                  className="w-full justify-start"
+                  variant="outline"
+                  onClick={() => router.push(`/dashboard/tournaments/${tournamentId}/participants`)}
+                >
+                  <Users className="mr-2 h-4 w-4" />
+                  Manage Participants ({participants.length})
+                </Button>
+                <Button
+                  className="w-full justify-start"
+                  variant="outline"
+                  onClick={() => router.push(`/dashboard/tournaments/${tournamentId}/edit`)}
+                >
+                  <Edit className="mr-2 h-4 w-4" />
+                  Edit Tournament
+                </Button>
+                <Button
+                  className="w-full justify-start"
+                  variant="outline"
+                  onClick={() => router.push(`/tournaments/${tournamentId}`)}
+                >
+                  <Eye className="mr-2 h-4 w-4" />
+                  View Public Page
+                </Button>
+                <Button
+                  className="w-full justify-start"
+                  variant="outline"
+                  onClick={copyTournamentLink}
+                >
+                  {copiedLink ? (
+                    <Check className="mr-2 h-4 w-4 text-green-600" />
+                  ) : (
+                    <Copy className="mr-2 h-4 w-4" />
+                  )}
+                  {copiedLink ? 'Link Copied!' : 'Copy Share Link'}
+                </Button>
               </CardContent>
             </Card>
           </div>

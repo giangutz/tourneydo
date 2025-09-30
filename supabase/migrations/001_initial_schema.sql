@@ -207,6 +207,9 @@ CREATE POLICY "Users can view organizations they own" ON organizations
 CREATE POLICY "Users can create organizations" ON organizations
   FOR INSERT WITH CHECK (public.clerk_uid() = owner_id);
 
+CREATE POLICY "Anyone can create public registration organization" ON organizations
+  FOR INSERT WITH CHECK (name = 'Public Registrations' AND type = 'other');
+
 CREATE POLICY "Users can update organizations they own" ON organizations
   FOR UPDATE USING (public.clerk_uid() = owner_id);
 
@@ -238,6 +241,13 @@ CREATE POLICY "Users can create athletes for owned organizations" ON athletes
   FOR INSERT WITH CHECK (
     organization_id IN (
       SELECT id FROM organizations WHERE owner_id = public.clerk_uid()
+    )
+  );
+
+CREATE POLICY "Anyone can create athletes for public registration organization" ON athletes
+  FOR INSERT WITH CHECK (
+    organization_id IN (
+      SELECT id FROM organizations WHERE name = 'Public Registrations' AND type = 'other'
     )
   );
 
@@ -277,6 +287,15 @@ CREATE POLICY "Users can create registrations for athletes in their organization
     athlete_id IN (
       SELECT id FROM athletes WHERE organization_id IN (
         SELECT id FROM organizations WHERE owner_id = public.clerk_uid()
+      )
+    )
+  );
+
+CREATE POLICY "Anyone can create registrations for public athletes" ON registrations
+  FOR INSERT WITH CHECK (
+    athlete_id IN (
+      SELECT id FROM athletes WHERE organization_id IN (
+        SELECT id FROM organizations WHERE name = 'Public Registrations' AND type = 'other'
       )
     )
   );

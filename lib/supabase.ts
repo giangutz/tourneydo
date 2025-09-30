@@ -9,6 +9,11 @@ export function createClientComponentClient() {
   return createBrowserClient(supabaseUrl, supabaseAnonKey)
 }
 
+// Public Supabase client for unauthenticated access
+export function createPublicSupabaseClient() {
+  return createClient(supabaseUrl, supabaseAnonKey)
+}
+
 // Clerk-integrated Supabase client (for use with useSession)
 export function createClerkSupabaseClient(session: any) {
   return createClient(supabaseUrl, supabaseAnonKey, {

@@ -16,11 +16,21 @@ const isAuthRoute = createRouteMatcher([
   '/sign-up(.*)',
 ]);
 
+const isPublicRoute = createRouteMatcher([
+  '/tournaments(.*)',
+  '/',
+]);
+
 export default clerkMiddleware(async (auth, req) => {
   const { userId, sessionClaims } = await auth();
 
   // Allow access to auth routes (sign-in/sign-up) for unauthenticated users
   if (isAuthRoute(req)) {
+    return NextResponse.next();
+  }
+
+  // Allow access to public routes (tournaments, home page) for all users
+  if (isPublicRoute(req)) {
     return NextResponse.next();
   }
 
