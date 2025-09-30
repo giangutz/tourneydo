@@ -1,5 +1,8 @@
 "use client";
 
+// Force dynamic rendering to avoid prerendering issues
+export const dynamic = 'force-dynamic';
+
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -44,9 +47,6 @@ import { createClerkSupabaseClient } from "@/lib/supabase";
 import { useUser, useSession } from "@clerk/nextjs";
 import type { Tournament, Registration } from "@/types/database";
 import { format, subDays, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
-
-// Force dynamic rendering to avoid prerendering issues
-export const dynamic = 'force-dynamic';
 
 interface DashboardStats {
   totalTournaments: number;
