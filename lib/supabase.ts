@@ -1,5 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { createBrowserClient } from '@supabase/ssr'
+import { useSession } from '@clerk/nextjs'
+import { useMemo } from 'react'
 
 // Lazy-loaded Supabase clients to avoid prerendering issues
 let supabaseUrl: string | undefined;
@@ -11,6 +13,10 @@ function getSupabaseConfig() {
     supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
     if (!supabaseUrl || !supabaseAnonKey) {
+      console.error('Supabase environment variables are not configured:', {
+        NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL ? 'Set' : 'Missing',
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'Set' : 'Missing'
+      });
       // During build/prerendering or when env vars are missing, return empty strings
       // Client components should check for mounting and handle missing config gracefully
       supabaseUrl = '';
@@ -24,6 +30,12 @@ function getSupabaseConfig() {
 // Client-side Supabase client with Clerk integration
 export function createClientComponentClient() {
   const { supabaseUrl, supabaseAnonKey } = getSupabaseConfig();
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.warn('Supabase configuration missing, returning dummy client');
+    return createBrowserClient('https://dummy.supabase.co', 'dummy-key');
+  }
+
   return createBrowserClient(supabaseUrl, supabaseAnonKey);
 }
 
@@ -39,31 +51,33 @@ export function createClerkSupabaseClient(session: any) {
 
   // During SSR/prerendering, config might be empty - return a dummy client
   if (!supabaseUrl || !supabaseAnonKey) {
-    return createClient('https://zboszzozvssdzvvwswso.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpib3N6em96dnNzZHp2dndzd3NvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkxODMzMDMsImV4cCI6MjA3NDc1OTMwM30.RcCuHpMDHjylcbhkXAln4OP6G34tOpsWlH71fiWAWBA');
+    return createBrowserClient('https://zboszzozvssdzvvwswso.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpib3N6em96dnNzZHp2dndzd3NvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkxODMzMDMsImV4cCI6MjA3NDc1OTMwM30.RcCuHpMDHjylcbhkXAln4OP6G34tOpsWlH71fiWAWBA');
   }
 
-  return createClient(supabaseUrl, supabaseAnonKey, {
-    global: {
-      // Get the custom Supabase token from Clerk
-      fetch: async (url, options = {}) => {
-        // The Clerk `session` object has the getToken() method
-        const clerkToken = await session?.getToken({
-          // Pass the name of the JWT template you created in the Clerk Dashboard
-          template: 'supabase',
-        });
-
-        // Insert the Clerk Supabase token into the headers
-        const headers = new Headers(options?.headers);
-        headers.set('Authorization', `Bearer ${clerkToken}`);
-
-        // Call the default fetch
-        return fetch(url, {
-          ...options,
-          headers,
-        });
-      },
+  return createBrowserClient(supabaseUrl, supabaseAnonKey, {
+    // Use Clerk session token directly (new integration method)
+    accessToken: async () => {
+      return await session?.getToken() ?? null;
     },
   });
+}
+
+// Custom hook for using Supabase with Clerk authentication
+export function useSupabase() {
+  const { session, isLoaded } = useSession();
+
+  const supabaseClient = useMemo(() => {
+    if (!isLoaded || !session) {
+      return null;
+    }
+    return createClerkSupabaseClient(session);
+  }, [session, isLoaded]);
+
+  return {
+    supabase: supabaseClient,
+    isLoaded,
+    session,
+  };
 }
 
 // Legacy client for backward compatibility - lazy loaded to avoid build issues

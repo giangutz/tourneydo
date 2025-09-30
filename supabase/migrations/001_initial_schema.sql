@@ -183,10 +183,22 @@ ALTER TABLE athletes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE registrations ENABLE ROW LEVEL SECURITY;
 
 -- Create function to get Clerk user ID from JWT (in public schema)
+-- Updated for new Clerk integration - uses session token sub claim
 CREATE OR REPLACE FUNCTION public.clerk_uid()
 RETURNS TEXT AS $$
   SELECT NULLIF(current_setting('request.jwt.claims', true)::json->>'sub', '')::text;
 $$ LANGUAGE sql STABLE SECURITY DEFINER;
+
+-- Alternative function to get user ID from auth context
+CREATE OR REPLACE FUNCTION public.get_current_user_id()
+RETURNS TEXT AS $$
+BEGIN
+  RETURN public.clerk_uid();
+EXCEPTION
+  WHEN OTHERS THEN
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
 
 -- Create RLS policies using Clerk user ID
 
