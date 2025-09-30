@@ -14,6 +14,9 @@ import { useUser, useSession } from "@clerk/nextjs";
 import { createClerkSupabaseClient } from "@/lib/supabase";
 import type { TournamentInsert } from "@/types/database";
 
+// Force dynamic rendering to avoid prerendering issues
+export const dynamic = 'force-dynamic';
+
 export default function CreateTournamentPage() {
   const router = useRouter();
   const { user } = useUser();

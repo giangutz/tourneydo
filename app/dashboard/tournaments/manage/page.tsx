@@ -31,6 +31,9 @@ import { createClerkSupabaseClient } from "@/lib/supabase";
 import { useUser, useSession } from "@clerk/nextjs";
 import type { Tournament } from "@/types/database";
 
+// Force dynamic rendering to avoid prerendering issues
+export const dynamic = 'force-dynamic';
+
 interface TournamentWithCount extends Tournament {
   participantCount: number;
 }
