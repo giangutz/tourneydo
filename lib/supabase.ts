@@ -39,7 +39,7 @@ export function createClerkSupabaseClient(session: any) {
 
   // During SSR/prerendering, config might be empty - return a dummy client
   if (!supabaseUrl || !supabaseAnonKey) {
-    return createClient('https://dummy.supabase.co', 'dummy-key');
+    return createClient('https://zboszzozvssdzvvwswso.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpib3N6em96dnNzZHp2dndzd3NvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkxODMzMDMsImV4cCI6MjA3NDc1OTMwM30.RcCuHpMDHjylcbhkXAln4OP6G34tOpsWlH71fiWAWBA');
   }
 
   return createClient(supabaseUrl, supabaseAnonKey, {
