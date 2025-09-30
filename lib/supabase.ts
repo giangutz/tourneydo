@@ -11,14 +11,10 @@ function getSupabaseConfig() {
     supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
     if (!supabaseUrl || !supabaseAnonKey) {
-      // During build/prerendering, environment variables might not be available
-      // Return empty strings to prevent crashes, but client components should check for mounting
-      if (typeof window === 'undefined') {
-        supabaseUrl = '';
-        supabaseAnonKey = '';
-      } else {
-        throw new Error('Supabase environment variables are not configured');
-      }
+      // During build/prerendering or when env vars are missing, return empty strings
+      // Client components should check for mounting and handle missing config gracefully
+      supabaseUrl = '';
+      supabaseAnonKey = '';
     }
   }
 
@@ -79,12 +75,8 @@ export const supabase = (() => {
     const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
     if (!url || !key) {
-      // During build/prerendering, return a dummy client
-      if (typeof window === 'undefined') {
-        legacyClient = createClient('https://dummy.supabase.co', 'dummy-key');
-      } else {
-        throw new Error('Supabase environment variables are not configured');
-      }
+      // Return a dummy client when env vars are missing
+      legacyClient = createClient('https://dummy.supabase.co', 'dummy-key');
     } else {
       legacyClient = createClient(url, key);
     }

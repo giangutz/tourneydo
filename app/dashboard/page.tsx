@@ -115,6 +115,13 @@ export default function DashboardPage() {
     try {
       const supabase = createClerkSupabaseClient(session);
 
+      // Check if Supabase client is properly configured
+      if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+        console.error('Supabase environment variables are not configured');
+        setLoading(false);
+        return;
+      }
+
       // Fetch tournaments
       const { data: tournaments } = await supabase
         .from('tournaments')
