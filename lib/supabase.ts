@@ -70,8 +70,24 @@ export function createClerkSupabaseClient(session: any) {
   });
 }
 
-// Legacy client for backward compatibility
-export const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+// Legacy client for backward compatibility - lazy loaded to avoid build issues
+let legacyClient: any = null;
+
+export const supabase = (() => {
+  if (!legacyClient) {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (!url || !key) {
+      // During build/prerendering, return a dummy client
+      if (typeof window === 'undefined') {
+        legacyClient = createClient('https://dummy.supabase.co', 'dummy-key');
+      } else {
+        throw new Error('Supabase environment variables are not configured');
+      }
+    } else {
+      legacyClient = createClient(url, key);
+    }
+  }
+  return legacyClient;
+})();
