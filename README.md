@@ -1,8 +1,31 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app) and integrated with [Clerk](https://clerk.com) for authentication.
 
 ## Getting Started
 
-First, run the development server:
+### 1. Environment Setup
+
+First, copy the environment variables and configure Clerk:
+
+1. Create a Clerk application at [https://clerk.com](https://clerk.com)
+2. Copy your publishable key and secret key from the Clerk dashboard
+3. Update `.env.local` with your actual Clerk keys:
+
+```env
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_your_publishable_key_here
+CLERK_SECRET_KEY=sk_test_your_secret_key_here
+```
+
+### 2. Install Dependencies
+
+```bash
+npm install
+```
+
+### 3. Configure Middleware
+
+The middleware is already set up in `middleware.ts` to protect routes. You can modify the `isProtectedRoute` matcher to add more protected routes as needed.
+
+### 4. Run the Development Server
 
 ```bash
 npm run dev
