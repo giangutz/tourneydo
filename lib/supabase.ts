@@ -11,7 +11,14 @@ function getSupabaseConfig() {
     supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
     if (!supabaseUrl || !supabaseAnonKey) {
-      throw new Error('Supabase environment variables are not configured');
+      // During build/prerendering, environment variables might not be available
+      // Return empty strings to prevent crashes, but client components should check for mounting
+      if (typeof window === 'undefined') {
+        supabaseUrl = '';
+        supabaseAnonKey = '';
+      } else {
+        throw new Error('Supabase environment variables are not configured');
+      }
     }
   }
 
@@ -33,6 +40,12 @@ export function createPublicSupabaseClient() {
 // Clerk-integrated Supabase client (for use with useSession)
 export function createClerkSupabaseClient(session: any) {
   const { supabaseUrl, supabaseAnonKey } = getSupabaseConfig();
+
+  // During SSR/prerendering, config might be empty - return a dummy client
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return createClient('https://dummy.supabase.co', 'dummy-key');
+  }
+
   return createClient(supabaseUrl, supabaseAnonKey, {
     global: {
       // Get the custom Supabase token from Clerk

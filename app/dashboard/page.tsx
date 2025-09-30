@@ -1,7 +1,5 @@
 "use client";
 
-export const dynamic = 'force-dynamic';
-
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -77,6 +75,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const { user } = useUser();
   const { session } = useSession();
+  const [mounted, setMounted] = useState(false);
 
   const [stats, setStats] = useState<DashboardStats>({
     totalTournaments: 0,
@@ -98,6 +97,11 @@ export default function DashboardPage() {
 
   const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Ensure component only renders after mounting on client
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (user?.id) {
@@ -306,6 +310,25 @@ export default function DashboardPage() {
         return <Activity className="h-4 w-4 text-gray-600" />;
     }
   };
+
+  // Prevent rendering until component is mounted on client to avoid SSR issues
+  if (!mounted) {
+    return (
+      <SidebarProvider defaultOpen={false}>
+        <div className="flex min-h-screen w-full">
+          <AppSidebar />
+          <main className="flex-1 flex flex-col">
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                <p className="mt-2 text-muted-foreground">Loading dashboard...</p>
+              </div>
+            </div>
+          </main>
+        </div>
+      </SidebarProvider>
+    );
+  }
 
   if (loading) {
     return (

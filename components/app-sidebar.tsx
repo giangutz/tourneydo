@@ -76,15 +76,21 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { user } = useUser();
   const { session } = useSession();
   const { state } = useSidebar();
+  const [mounted, setMounted] = React.useState(false);
   const [recentTournaments, setRecentTournaments] = React.useState<Tournament[]>([]);
   const [tournamentsExpanded, setTournamentsExpanded] = React.useState(false);
 
-  // Fetch recent tournaments when user is available
+  // Ensure component only renders after mounting on client
   React.useEffect(() => {
-    if (user?.id && session) {
+    setMounted(true);
+  }, []);
+
+  // Fetch recent tournaments when user is available and component is mounted
+  React.useEffect(() => {
+    if (mounted && user?.id && session) {
       fetchRecentTournaments();
     }
-  }, [user?.id, session]);
+  }, [mounted, user?.id, session]);
 
   const fetchRecentTournaments = async () => {
     if (!user?.id || !session) return;
