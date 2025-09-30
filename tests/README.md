@@ -25,20 +25,28 @@ This directory contains end-to-end tests for the Tourneydo authentication and on
 ### Prerequisites
 1. Development server must be running: `npm run dev`
 2. Application accessible at `http://localhost:3000`
+3. Testing dependencies installed (automatic with test commands)
 
 ### Run All Tests
 ```bash
 npm test
 ```
+*Automatically installs testing dependencies if needed*
 
 ### Run Authentication Tests Only
 ```bash
 npm run test:auth
 ```
+*Automatically installs testing dependencies if needed*
+
+### Manual Testing Dependency Installation
+```bash
+npm run test:install
+```
 
 ### Run Specific Test File
 ```bash
-npx jest tests/auth-onboarding.test.js
+npm run test:install && npx jest tests/auth-onboarding.test.js
 ```
 
 ## Test Configuration
