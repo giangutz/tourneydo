@@ -36,6 +36,10 @@ export default clerkMiddleware(async (auth, req) => {
     if (isOnboardingRoute(req)) {
       return NextResponse.next();
     }
+    // Allow access to dashboard routes (users might be in the process of completing onboarding)
+    if (isProtectedRoute(req)) {
+      return NextResponse.next();
+    }
     // Redirect to onboarding for all other routes
     const onboardingUrl = new URL('/onboarding', req.url);
     return NextResponse.redirect(onboardingUrl);

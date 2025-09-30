@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { completeOnboarding } from './_actions';  
+import { useRouter } from 'next/navigation';
+import { completeOnboarding } from './_actions';
 
 export default function OnboardingPage() {
   const [isLoading, setIsLoading] = useState(false);
@@ -16,32 +17,25 @@ export default function OnboardingPage() {
 
     try {
       const formDataObj = new FormData(e.target as HTMLFormElement);
-      console.log('Form data:', Object.fromEntries(formDataObj));
       const result = await completeOnboarding(formDataObj);
-      console.log('Server action result:', result);
 
       if (result.success) {
         // Redirect based on organization type
-        const applicationType = formDataObj.get('organizationType') as string;
-        console.log('Application type:', applicationType);
+        const organizationType = formDataObj.get('organizationType') as string;
 
         // Tournament organizers and federations go to tournament management dashboard
-        if (applicationType === 'tournament-organizer' || applicationType === 'federation') {
-          console.log('Redirecting to tournaments dashboard');
+        if (organizationType === 'tournament-organizer' || organizationType === 'federation') {
           window.location.href = '/dashboard/tournaments';
         } else {
           // Other organization types (gyms, schools, etc.) go to athlete registration dashboard
-          console.log('Redirecting to athletes dashboard');
           window.location.href = '/dashboard/athletes';
         }
       } else {
         console.error('Onboarding failed:', result.error);
-        // Handle error (could add toast notification here)
         setIsLoading(false);
       }
     } catch (error) {
       console.error('Onboarding error:', error);
-      // Handle error (could add toast notification here)
       setIsLoading(false);
     }
   };
