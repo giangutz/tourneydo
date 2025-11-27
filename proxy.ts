@@ -4,8 +4,15 @@ import { NextRequest, NextResponse } from 'next/server'
 const isOnboardingRoute = createRouteMatcher(['/onboarding'])
 const isPublicRoute = createRouteMatcher([
   '/sign-in(.*)',
-  '/sign-up(.*)'
+  '/sign-up(.*)',
+  '/',
+  '/tournaments(.*)',
+  '/tournament(.*)',
+  '/live(.*)'
 ])
+
+const isOrganizerRoute = createRouteMatcher(['/dashboard/admin(.*)'])
+const isCoachRoute = createRouteMatcher(['/dashboard/coach(.*)'])
 
 export default clerkMiddleware(async (auth, req: NextRequest) => {
   const { isAuthenticated, sessionClaims, redirectToSignIn } = await auth()
@@ -23,6 +30,21 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
   if (isAuthenticated && !sessionClaims?.metadata?.onboardingComplete) {
     const onboardingUrl = new URL('/onboarding', req.url)
     return NextResponse.redirect(onboardingUrl)
+  }
+
+  // Role-based redirects
+  if (isAuthenticated && sessionClaims?.metadata?.onboardingComplete) {
+    const role = sessionClaims?.metadata?.role as string
+
+    // Prevent coaches from accessing admin routes
+    if (isOrganizerRoute(req) && role !== 'tournament-organizer') {
+      return NextResponse.redirect(new URL('/dashboard/coach', req.url))
+    }
+
+    // Prevent organizers from accessing coach routes (optional, but good for clarity)
+    if (isCoachRoute(req) && role !== 'coach') {
+      return NextResponse.redirect(new URL('/dashboard/tournament-organizer', req.url))
+    }
   }
 
   // If the user is logged in and the route is protected, let them view.
