@@ -56,13 +56,20 @@ export default function OnboardingComponent() {
     }
 
     const res = await completeOnboarding(formData)
-    if (res?.message) {
+    
+    if (res?.success && res?.role) {
       // Reloads the user's data from the Clerk API
       await user?.reload()
-      router.push('/')
+      // Redirect to role-specific dashboard
+      if (res.role === 'coach') {
+        router.push('/dashboard/coach')
+      } else {
+        router.push('/dashboard/tournament-organizer')
+      }
     }
+    
     if (res?.error) {
-      setError(res?.error)
+      setError(res.error)
     }
   }
 
