@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
@@ -14,18 +14,70 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
-import { createClerkSupabaseClientBrowser } from "@/lib/supabase/client"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { createClerkSupabaseClient } from "@/lib/supabase/client"
 import { useSession } from "@clerk/nextjs"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Loader2 } from "lucide-react"
 import { TagsSelector, Tag } from "@/components/ui/tags-selector"
+import { calculateAge } from "@/lib/utils"
+import type { BeltLevel } from "@/types/models"
+
+const BELT_LEVELS: BeltLevel[] = ['White', 'Yellow', 'Blue', 'Red', 'Brown', 'Black']
+
 
 const formSchema = z.object({
   first_name: z.string().min(2, "First name is required"),
   last_name: z.string().min(2, "Last name is required"),
-  email: z.string().email().optional().or(z.literal("")),
-  dob: z.string().optional(),
+  email: z.string().email("Invalid email address"),
+  dob: z.string().refine((val) => new Date(val) <= new Date(), {
+    message: "Date of birth cannot be in the future",
+  }),
+  weight: z.string().optional(),
+  height: z.string().optional(),
+  belt_level: z.string().min(1, "Belt level is required"),
+}).superRefine((data, ctx) => {
+  if (!data.dob) return;
+  const age = calculateAge(data.dob);
+
+  if (age >= 12) {
+    if (!data.weight || data.weight.trim() === "") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Weight is required for players 12 and older",
+        path: ["weight"],
+      });
+    } else if (parseFloat(data.weight) < 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Weight cannot be negative",
+        path: ["weight"],
+      });
+    }
+  }
+
+  if (age < 12) {
+    if (!data.height || data.height.trim() === "") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Height is required for players under 12",
+        path: ["height"],
+      });
+    } else if (parseFloat(data.height) < 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Height cannot be negative",
+        path: ["height"],
+      });
+    }
+  }
 })
 
 interface EditPlayerFormProps {
@@ -47,24 +99,37 @@ export function EditPlayerForm({ player, availableTeams, currentAssignments }: E
       last_name: player.last_name,
       email: player.email || "",
       dob: player.dob || "",
+      weight: player.weight?.toString() || "",
+      height: player.height?.toString() || "",
+      belt_level: player.belt_level || "",
     },
   })
+
+  // Calculate age from DOB to determine which field to show
+  const dob = form.watch('dob')
+  const age = useMemo(() => {
+    if (!dob) return null
+    return calculateAge(dob)
+  }, [dob])
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!session) return
 
     setIsLoading(true)
     try {
-      const supabase = createClerkSupabaseClientBrowser(session)
+      const supabase = createClerkSupabaseClient({ session })
       
       // 1. Update Player Details
-      const { error: updateError } = await supabase
+      const { error: updateError } = await (supabase as any)
         .from("players")
         .update({
           first_name: values.first_name,
           last_name: values.last_name,
           email: values.email || null,
           dob: values.dob || null,
+          weight: values.weight ? parseFloat(values.weight) : null,
+          height: values.height ? parseFloat(values.height) : null,
+          belt_level: values.belt_level || null,
         })
         .eq("id", player.id)
 
@@ -84,7 +149,7 @@ export function EditPlayerForm({ player, availableTeams, currentAssignments }: E
           team_id: team.id,
           player_id: player.id
         }))
-        const { error: insertError } = await supabase
+        const { error: insertError } = await (supabase as any)
           .from("team_players")
           .insert(toInsert)
         if (insertError) throw insertError
@@ -93,7 +158,7 @@ export function EditPlayerForm({ player, availableTeams, currentAssignments }: E
       // Delete removed teams
       if (removedTeams.length > 0) {
         const toDeleteIds = removedTeams.map(t => t.id)
-        const { error: deleteError } = await supabase
+        const { error: deleteError } = await (supabase as any)
           .from("team_players")
           .delete()
           .eq("player_id", player.id)
@@ -101,7 +166,7 @@ export function EditPlayerForm({ player, availableTeams, currentAssignments }: E
         if (deleteError) throw deleteError
       }
 
-      router.refresh()
+      router.push("/dashboard/coach/players")
       // Optional: Show toast success
     } catch (error) {
       console.error("Error updating player:", error)
@@ -156,7 +221,7 @@ export function EditPlayerForm({ player, availableTeams, currentAssignments }: E
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email (Optional)</FormLabel>
+                    <FormLabel>Email</FormLabel>
                     <FormControl>
                       <Input type="email" placeholder="john@example.com" {...field} />
                     </FormControl>
@@ -170,10 +235,68 @@ export function EditPlayerForm({ player, availableTeams, currentAssignments }: E
                 name="dob"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Date of Birth (Optional)</FormLabel>
+                    <FormLabel>Date of Birth</FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} />
+                      <Input type="date" max={new Date().toISOString().split('T')[0]} {...field} />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Conditional Weight/Height based on age */}
+              {age !== null && age >= 12 && (
+                <FormField
+                  control={form.control}
+                  name="weight"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Weight (kg)</FormLabel>
+                      <FormControl>
+                        <Input type="number" step="0.1" placeholder="65.5" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              {age !== null && age < 12 && (
+                <FormField
+                  control={form.control}
+                  name="height"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Height (cm)</FormLabel>
+                      <FormControl>
+                        <Input type="number" step="0.1" placeholder="150.5" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              <FormField
+                control={form.control}
+                name="belt_level"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Belt Level</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select belt level" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {BELT_LEVELS.map((level) => (
+                          <SelectItem key={level} value={level}>
+                            {level}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}

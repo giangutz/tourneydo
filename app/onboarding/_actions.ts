@@ -1,7 +1,7 @@
 'use server'
 
 import { auth, clerkClient } from '@clerk/nextjs/server'
-import { createClerkSupabaseClient } from '@/lib/supabase/server'
+import { createServerSupabaseClient } from '@/lib/supabase/server'
 import type { UserRole } from '@/lib/supabase/types'
 
 interface OnboardingResult {
@@ -49,7 +49,7 @@ export const completeOnboarding = async (formData: FormData): Promise<Onboarding
     })
 
     // Store user in Supabase
-    const supabase = await createClerkSupabaseClient()
+    const supabase = await createServerSupabaseClient()
 
     // Insert or update user in Supabase
     const { error: userError } = await supabase

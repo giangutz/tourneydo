@@ -1,4 +1,4 @@
-import { createClerkSupabaseClient } from "@/lib/supabase/server"
+import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { auth } from "@clerk/nextjs/server"
 import {
   Card,
@@ -13,7 +13,7 @@ export default async function TournamentOrganizerDashboard() {
   const { userId } = await auth()
   if (!userId) return null
 
-  const supabase = await createClerkSupabaseClient()
+  const supabase = createServerSupabaseClient()
 
   // Fetch stats
   const { count: tournamentCount } = await supabase

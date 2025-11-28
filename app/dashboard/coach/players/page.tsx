@@ -1,13 +1,13 @@
-import { createClerkSupabaseClient } from "@/lib/supabase/server"
-import { auth } from "@clerk/nextjs/server"
-import { Button } from "@/components/ui/button"
+import { getPlayersWithTeams } from '@/lib/db/queries/players'
+import { auth } from '@clerk/nextjs/server'
+import { Button } from '@/components/ui/button'
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
+} from '@/components/ui/card'
 import {
   Table,
   TableBody,
@@ -15,34 +15,35 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
-import { Plus, UserPlus } from "lucide-react"
-import Link from "next/link"
+} from '@/components/ui/table'
+import { UserPlus, Pencil } from 'lucide-react'
+import Link from 'next/link'
+import { DashboardShell } from '@/components/layouts/dashboard-shell'
+import { PageHeader } from '@/components/ui/page-header'
+import { formatPlayerName, formatShortDate, calculateAge, getBeltLevelColor } from '@/lib/utils'
+import { routes } from '@/config/routes'
+import { Badge } from '@/components/ui/badge'
 
 export default async function CoachPlayersPage() {
   const { userId } = await auth()
   if (!userId) return null
 
-  const supabase = await createClerkSupabaseClient()
-  
-  // Fetch players created by this coach
-  const { data: players } = await supabase
-    .from("players")
-    .select("*")
-    .eq("coach_id", userId)
-    .order("created_at", { ascending: false })
+  // Fetch players using the query layer
+  const players = await getPlayersWithTeams(userId)
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight">My Players</h1>
-        <Button asChild>
-          <Link href="/dashboard/coach/players/new">
-            <UserPlus className="mr-2 h-4 w-4" />
-            Add Player
-          </Link>
-        </Button>
-      </div>
+    <DashboardShell>
+      <PageHeader
+        title="My Players"
+        action={
+          <Button asChild>
+            <Link href={routes.coach.playerNew}>
+              <UserPlus className="mr-2 h-4 w-4" />
+              Add Player
+            </Link>
+          </Button>
+        }
+      />
 
       <Card>
         <CardHeader>
@@ -54,31 +55,70 @@ export default async function CoachPlayersPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Date of Birth</TableHead>
+                <TableHead>Age</TableHead>
+                <TableHead>Weight / Height</TableHead>
+                <TableHead>Belt Level</TableHead>
+                <TableHead>Teams</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {players?.map((player) => (
+              {players.map((player) => (
                 <TableRow key={player.id}>
                   <TableCell className="font-medium">
-                    {player.first_name} {player.last_name}
+                    <div className="flex flex-col">
+                      <span>{formatPlayerName(player)}</span>
+                      <span className="text-xs text-muted-foreground">{player.email || 'No email'}</span>
+                    </div>
                   </TableCell>
-                  <TableCell>{player.email || "-"}</TableCell>
-                  <TableCell>{player.dob ? new Date(player.dob).toLocaleDateString() : "-"}</TableCell>
+                  <TableCell>
+                    {player.dob ? (
+                      <div className="flex flex-col">
+                        <span>{calculateAge(player.dob)} yrs</span>
+                        <span className="text-xs text-muted-foreground">{formatShortDate(player.dob)}</span>
+                      </div>
+                    ) : '-'}
+                  </TableCell>
+                  <TableCell>
+                    {player.weight ? (
+                      <span>{player.weight} kg</span>
+                    ) : player.height ? (
+                      <span>{player.height} cm</span>
+                    ) : '-'}
+                  </TableCell>
+                  <TableCell>
+                    {player.belt_level ? (
+                      <Badge variant="outline" className={getBeltLevelColor(player.belt_level)}>
+                        {player.belt_level}
+                      </Badge>
+                    ) : '-'}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1">
+                      {player.teams && player.teams.length > 0 ? (
+                        player.teams.map((team: any) => (
+                          <Badge key={team.id} variant="secondary" className="text-xs">
+                            {team.name}
+                          </Badge>
+                        ))
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Unassigned</span>
+                      )}
+                    </div>
+                  </TableCell>
                   <TableCell className="text-right">
-                    <Button variant="ghost" size="sm" asChild>
-                      <Link href={`/dashboard/coach/players/${player.id}`}>
-                        Manage
+                    <Button variant="ghost" size="icon" asChild>
+                      <Link href={routes.coach.playerDetail(player.id)}>
+                        <Pencil className="h-4 w-4" />
+                        <span className="sr-only">Edit</span>
                       </Link>
                     </Button>
                   </TableCell>
                 </TableRow>
               ))}
-              {players?.length === 0 && (
+              {players.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={4} className="h-24 text-center">
+                  <TableCell colSpan={6} className="h-24 text-center">
                     No players found. Add your first player to get started.
                   </TableCell>
                 </TableRow>
@@ -87,6 +127,6 @@ export default async function CoachPlayersPage() {
           </Table>
         </CardContent>
       </Card>
-    </div>
+    </DashboardShell>
   )
 }

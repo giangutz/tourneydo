@@ -1,7 +1,10 @@
 import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
-import { createClerkSupabaseClient } from "@/lib/supabase/server"
-import type { Team } from '@/lib/supabase/types'
+import { getPlayerCountByCoachId } from '@/lib/db/queries/players'
+import { getActiveRegistrationCount, getUpcomingEventsCount } from '@/lib/db/queries/registrations'
+import { DashboardShell } from '@/components/layouts/dashboard-shell'
+import { StatCard } from '@/components/ui/stat-card'
+import { Users, Trophy, Calendar } from 'lucide-react'
 
 export default async function CoachDashboard() {
   const { userId, sessionClaims } = await auth()
@@ -16,17 +19,15 @@ export default async function CoachDashboard() {
     redirect('/dashboard/tournament-organizer')
   }
 
-  // Fetch coach's team data
-  const supabase = await createClerkSupabaseClient()
-  const { data: teams, error } = await (supabase as any)
-    .from('teams')
-    .select('*')
-    .eq('user_id', userId)
-
-  const team = teams?.[0] as Team | undefined
+  // Fetch dashboard stats
+  const [playerCount, registrationCount, eventsCount] = await Promise.all([
+    getPlayerCountByCoachId(userId),
+    getActiveRegistrationCount(userId),
+    getUpcomingEventsCount(),
+  ])
 
   return (
-    <div className="space-y-8">
+    <DashboardShell>
       <div>
         <h1 className="text-3xl font-bold">Coach Dashboard</h1>
         <p className="text-muted-foreground mt-2">
@@ -34,45 +35,26 @@ export default async function CoachDashboard() {
         </p>
       </div>
 
-      {team && (
-        <div className="rounded-lg border bg-white p-6">
-          <h2 className="text-xl font-semibold mb-4">Your Team</h2>
-          <div className="space-y-2">
-            <div>
-              <span className="text-sm text-muted-foreground">Team Name:</span>
-              <p className="font-medium">{team.name}</p>
-            </div>
-            <div>
-              <span className="text-sm text-muted-foreground">Created:</span>
-              <p className="font-medium">{new Date(team.created_at).toLocaleDateString()}</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-          <p className="text-red-800">Error loading team data. Please try again later.</p>
-        </div>
-      )}
-
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <div className="rounded-lg border bg-white p-6">
-          <h3 className="font-semibold mb-2">Athletes</h3>
-          <p className="text-3xl font-bold">0</p>
-          <p className="text-sm text-muted-foreground mt-1">Registered athletes</p>
-        </div>
-        <div className="rounded-lg border bg-white p-6">
-          <h3 className="font-semibold mb-2">Tournaments</h3>
-          <p className="text-3xl font-bold">0</p>
-          <p className="text-sm text-muted-foreground mt-1">Active registrations</p>
-        </div>
-        <div className="rounded-lg border bg-white p-6">
-          <h3 className="font-semibold mb-2">Upcoming Events</h3>
-          <p className="text-3xl font-bold">0</p>
-          <p className="text-sm text-muted-foreground mt-1">Events this month</p>
-        </div>
+        <StatCard
+          title="Athletes"
+          value={playerCount}
+          description="Registered athletes"
+          icon={Users}
+        />
+        <StatCard
+          title="Tournaments"
+          value={registrationCount}
+          description="Active registrations"
+          icon={Trophy}
+        />
+        <StatCard
+          title="Upcoming Events"
+          value={eventsCount}
+          description="Events this month"
+          icon={Calendar}
+        />
       </div>
-    </div>
+    </DashboardShell>
   )
 }

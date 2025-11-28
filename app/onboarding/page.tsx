@@ -8,7 +8,6 @@ import { RadioCard } from '@/components/ui/radio-group-card'
 import { RadioGroup } from '@/components/ui/radio-group'
 import { Trophy, Users2 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
-import { z } from 'zod'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import {
@@ -19,26 +18,15 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Button } from '@/components/ui/button'
-
-const onboardingSchema = z.object({
-  role: z.enum(['tournament-organizer', 'coach']),
-  clubName: z.string().optional(),
-}).refine((data) => {
-  if (data.role === 'coach') {
-    return !!data.clubName && data.clubName.trim().length > 0
-  }
-  return true
-}, {
-  message: 'Club/Gym/School Name is required for Coaches.',
-  path: ['clubName'],
-})
+import { onboardingSchema, type OnboardingInput } from '@/lib/validations/user'
+import { getDashboardRoute } from '@/config/routes'
 
 export default function OnboardingComponent() {
   const [error, setError] = React.useState('')
   const { user } = useUser()
   const router = useRouter()
 
-  const form = useForm<z.infer<typeof onboardingSchema>>({
+  const form = useForm<OnboardingInput>({
     resolver: zodResolver(onboardingSchema),
     defaultValues: {
       role: 'tournament-organizer',
@@ -48,7 +36,7 @@ export default function OnboardingComponent() {
 
   const selectedRole = form.watch('role')
 
-  const onSubmit = async (data: z.infer<typeof onboardingSchema>) => {
+  const onSubmit = async (data: OnboardingInput) => {
     const formData = new FormData()
     formData.append('role', data.role)
     if (data.clubName) {
@@ -60,12 +48,8 @@ export default function OnboardingComponent() {
     if (res?.success && res?.role) {
       // Reloads the user's data from the Clerk API
       await user?.reload()
-      // Redirect to role-specific dashboard
-      if (res.role === 'coach') {
-        router.push('/dashboard/coach')
-      } else {
-        router.push('/dashboard/tournament-organizer')
-      }
+      // Redirect to role-specific dashboard using centralized route helper
+      router.push(getDashboardRoute(res.role))
     }
     
     if (res?.error) {

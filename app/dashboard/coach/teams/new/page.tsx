@@ -14,7 +14,7 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
-import { createClerkSupabaseClientBrowser } from "@/lib/supabase/client"
+import { createClerkSupabaseClient } from "@/lib/supabase/client"
 import { useSession } from "@clerk/nextjs"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -43,7 +43,7 @@ export default function NewTeamPage() {
 
     setIsLoading(true)
     try {
-      const supabase = createClerkSupabaseClientBrowser(session)
+      const supabase = createClerkSupabaseClient({ session })
       
       const { error } = await supabase.from("teams").insert({
         name: values.name,

@@ -1,4 +1,4 @@
-import { createClerkSupabaseClient } from "@/lib/supabase/server"
+import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { auth } from "@clerk/nextjs/server"
 import { NewPlayerForm } from "./new-player-form"
 import { Tag } from "@/components/ui/tags-selector"
@@ -7,7 +7,7 @@ export default async function NewPlayerPage() {
   const { userId } = await auth()
   if (!userId) return null
 
-  const supabase = await createClerkSupabaseClient()
+  const supabase = createServerSupabaseClient()
   
   // Fetch coach's teams
   const { data: teams } = await (supabase as any)
