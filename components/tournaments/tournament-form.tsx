@@ -1,3 +1,5 @@
+'use client'
+
 import { useActionState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import {

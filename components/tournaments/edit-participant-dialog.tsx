@@ -62,7 +62,12 @@ export function EditParticipantDialog({ participant, tournamentId, open, onOpenC
       mode="edit"
       title="Edit Participant"
       description={`Update the details for ${participant.player.first_name} ${participant.player.last_name}.`}
-      player={participant.player}
+      player={{
+        ...participant.player,
+        coach_id: '',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      } as any}
       onSubmit={handleSubmit}
       submitButtonText="Update Participant"
     />

@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import { Team } from '@/types/models'
 import { PlayerFormDialog, type PlayerFormData } from '@/components/players/player-form-dialog'
 import { useRouter } from 'next/navigation'
-import { routes } from '@/lib/config/routes'
+import { routes } from '@/config/routes'
 
 interface AddParticipantDialogProps {
   tournamentId: string

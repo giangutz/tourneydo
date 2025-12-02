@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Calendar, MapPin, Users, Trophy, PhilippinePeso } from 'lucide-react'
+import { Calendar, MapPin, Users, Trophy, PhilippinePeso, Printer } from 'lucide-react'
 import { formatShortDate } from '@/lib/utils'
 import { ParticipantList } from '@/components/tournaments/participant-list'
 import Link from 'next/link'
@@ -217,12 +217,20 @@ export default async function PublicTournamentPage({ params }: PublicTournamentP
                        
                        return (
                          <Card key={teamId} className="border-2">
-                           <CardHeader className="pb-3">
-                             <CardTitle className="text-lg">{team.name}</CardTitle>
-                             <CardDescription>
-                               {teamParticipants.length} {teamParticipants.length === 1 ? 'player' : 'players'}
-                             </CardDescription>
-                           </CardHeader>
+                            <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+                              <div>
+                                <CardTitle className="text-lg">{team.name}</CardTitle>
+                                <CardDescription>
+                                  {teamParticipants.length} {teamParticipants.length === 1 ? 'player' : 'players'}
+                                </CardDescription>
+                              </div>
+                              <Button variant="outline" size="sm" asChild>
+                                <Link href={`/tournaments/${tournament.id}/print-ids?teamId=${team.id}`} target="_blank">
+                                  <Printer className="mr-2 h-4 w-4" />
+                                  Print IDs
+                                </Link>
+                              </Button>
+                            </CardHeader>
                            <CardContent>
                              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                                {teamParticipants.map((p) => (

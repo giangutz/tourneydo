@@ -22,7 +22,7 @@ export default async function CoachTournamentsPage() {
         title="Tournaments"
         description="Browse and register for upcoming tournaments."
       />
-      <TournamentList tournaments={tournaments} teams={teams} registrations={registrations} />
+      <TournamentList tournaments={tournaments} teams={teams} registrations={registrations} coachId={userId} />
     </DashboardShell>
   )
 }

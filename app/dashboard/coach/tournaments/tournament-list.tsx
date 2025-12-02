@@ -31,7 +31,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { formatShortDate, formatCurrency } from "@/lib/utils"
-import { Calendar, MapPin, Trophy, Users, Clock } from "lucide-react"
+import { Calendar, MapPin, Trophy, Users, Clock, Printer } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { registerTeam } from "./actions"
 import { getTeamPlayers } from "@/lib/actions/teams"
@@ -46,9 +46,10 @@ interface TournamentListProps {
   tournaments: Tournament[]
   teams: Team[]
   registrations: TournamentRegistration[]
+  coachId: string
 }
 
-export function TournamentList({ tournaments, teams, registrations }: TournamentListProps) {
+export function TournamentList({ tournaments, teams, registrations, coachId }: TournamentListProps) {
   const [selectedTeam, setSelectedTeam] = useState<string>("")
   const [teamPlayers, setTeamPlayers] = useState<Player[]>([])
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([])
@@ -206,6 +207,15 @@ export function TournamentList({ tournaments, teams, registrations }: Tournament
                   View
                 </Link>
               </Button>
+
+              {registrations.some(r => r.tournament_id === tournament.id) && (
+                <Button variant="outline" size="sm" className="flex-1" asChild>
+                  <Link href={`/tournaments/${tournament.id}/print-ids?coachId=${coachId}`} target="_blank">
+                    <Printer className="h-4 w-4 mr-2" />
+                    ID
+                  </Link>
+                </Button>
+              )}
               
               <Dialog open={openDialogId === tournament.id} onOpenChange={(open) => setOpenDialogId(open ? tournament.id : null)}>
                 <DialogTrigger asChild>

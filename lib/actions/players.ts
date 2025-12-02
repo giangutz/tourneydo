@@ -45,7 +45,11 @@ export async function createPlayerAction(formData: FormData): Promise<ActionResu
       email: validated.email || null,
       dob: validated.dob || null,
       coach_id: userId,
-    })
+      weight: null,
+      height: null,
+      belt_level: null,
+      gender: null,
+    } as any)
 
     // Handle team assignments if provided
     const teamIds = formData.get('team_ids') as string

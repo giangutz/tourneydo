@@ -57,6 +57,8 @@ export const completeOnboarding = async (formData: FormData): Promise<Onboarding
       .upsert({
         user_id: userId,
         email,
+        first_name: clerkUser.firstName,
+        last_name: clerkUser.lastName,
         role,
       } as any)
 

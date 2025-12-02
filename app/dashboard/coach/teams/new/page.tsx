@@ -48,7 +48,7 @@ export default function NewTeamPage() {
       const { error } = await supabase.from("teams").insert({
         name: values.name,
         user_id: session.user.id,
-      })
+      } as never)
 
       if (error) throw error
 

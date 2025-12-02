@@ -1,4 +1,5 @@
 // Learn more: https://github.com/testing-library/jest-dom
+/* eslint-disable @typescript-eslint/no-require-imports */
 import '@testing-library/jest-dom'
 
 // Mock Next.js router

@@ -141,7 +141,12 @@ export async function getTournamentParticipants(tournamentId: string) {
       teams (
         id,
         name,
-        user_id
+        user_id,
+        users (
+          first_name,
+          last_name,
+          email
+        )
       )
     `)
     .eq('tournament_id', tournamentId)
