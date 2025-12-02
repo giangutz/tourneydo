@@ -13,6 +13,12 @@ interface LiveBracketPageProps {
   }>
 }
 
+import { TournamentBreadcrumbs } from '@/components/tournaments/tournament-breadcrumbs'
+import { Button } from '@/components/ui/button'
+import { ArrowLeft } from 'lucide-react'
+import Link from 'next/link'
+import { routes } from '@/config/routes'
+
 export const revalidate = 30 // Revalidate every 30 seconds
 
 export default async function LiveBracketPage({ params }: LiveBracketPageProps) {
@@ -28,11 +34,20 @@ export default async function LiveBracketPage({ params }: LiveBracketPageProps) 
   }
 
   return (
-    <div className="container mx-auto py-8">
-      <div className="mb-8 text-center">
-        <h1 className="text-3xl font-bold">{tournament.name}</h1>
-        <p className="text-muted-foreground">Live Bracket Results</p>
-      </div>
+    <DashboardShell>
+      <TournamentBreadcrumbs tournamentName={tournament.name} tournamentId={tournament.id} pageName="Matches" hideParent />
+      <PageHeader
+        title="Matches"
+        description="Live match console and results."
+        action={
+          <Button variant="outline" asChild>
+            <Link href={routes.organizer.tournamentDetail(id)}>
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to Tournament
+            </Link>
+          </Button>
+        }
+      />
 
       <Card>
         <CardContent className="p-6 overflow-x-auto">
@@ -49,6 +64,6 @@ export default async function LiveBracketPage({ params }: LiveBracketPageProps) 
           )}
         </CardContent>
       </Card>
-    </div>
+    </DashboardShell>
   )
 }

@@ -1,9 +1,11 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { BracketView } from '@/components/tournaments/bracket-view'
 import { MatchResultDialog } from '@/components/tournaments/match-result-dialog'
+import { EditMatchDialog } from '@/components/tournaments/edit-match-dialog'
 import { generateTournamentBracket } from '@/lib/actions/brackets'
 import { Match, Tournament } from '@/types/models'
 import { toast } from 'sonner'
@@ -18,6 +20,7 @@ interface BracketPageClientProps {
 }
 
 export function BracketPageClient({ tournament, participants, matches }: BracketPageClientProps) {
+  const router = useRouter()
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [generating, setGenerating] = useState(false)
@@ -30,6 +33,7 @@ export function BracketPageClient({ tournament, participants, matches }: Bracket
         toast.error(result.error)
       } else {
         toast.success("Bracket generated successfully")
+        router.refresh() // Refresh to show new matches
       }
     } catch (err) {
       toast.error("Failed to generate bracket")
@@ -41,6 +45,14 @@ export function BracketPageClient({ tournament, participants, matches }: Bracket
   const handleMatchClick = (match: Match) => {
     setSelectedMatch(match)
     setDialogOpen(true)
+  }
+
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [matchToEdit, setMatchToEdit] = useState<Match | null>(null)
+
+  const handleEditMatch = (match: Match) => {
+    setMatchToEdit(match)
+    setEditDialogOpen(true)
   }
 
   return (
@@ -67,6 +79,9 @@ export function BracketPageClient({ tournament, participants, matches }: Bracket
           matches={matches} 
           participants={participants} 
           onMatchClick={handleMatchClick}
+          isOrganizer={true}
+          onEditMatch={handleEditMatch}
+          courts={tournament.courts || 0}
         />
       )}
 
@@ -75,6 +90,14 @@ export function BracketPageClient({ tournament, participants, matches }: Bracket
         open={dialogOpen} 
         onOpenChange={setDialogOpen}
         participants={participants}
+      />
+
+      <EditMatchDialog
+        match={matchToEdit}
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        participants={participants}
+        tournamentId={tournament.id}
       />
     </div>
   )

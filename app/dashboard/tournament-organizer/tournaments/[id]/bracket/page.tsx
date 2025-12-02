@@ -17,6 +17,8 @@ interface BracketPageProps {
   }>
 }
 
+import { TournamentBreadcrumbs } from '@/components/tournaments/tournament-breadcrumbs'
+
 export default async function BracketPage({ params }: BracketPageProps) {
   const { id } = await params
   const [tournament, participants, matches] = await Promise.all([
@@ -31,8 +33,9 @@ export default async function BracketPage({ params }: BracketPageProps) {
 
   return (
     <DashboardShell>
+      <TournamentBreadcrumbs tournamentName={tournament.name} tournamentId={tournament.id} pageName="Bracket" hideParent />
       <PageHeader
-        title={`${tournament.name} - Bracket`}
+        title="Bracket"
         description="Manage tournament bracket and results."
         action={
           <Button variant="outline" asChild>

@@ -57,6 +57,7 @@ export interface Player {
   weight: number | null
   height: number | null
   belt_level: BeltLevel | null
+  gender: 'male' | 'female' | null
   coach_id: string
   created_at: string
   updated_at: string
@@ -85,6 +86,8 @@ export type TeamPlayerInsert = Omit<TeamPlayer, 'created_at'>
 // Tournament Types
 // ============================================================================
 
+export type TournamentType = 'standard' | 'open-belt'
+
 export interface Tournament {
   id: string
   name: string
@@ -96,7 +99,9 @@ export interface Tournament {
   venue: string | null
   max_players: number | null
   registration_deadline: string | null
+  courts: number | null
   status: 'upcoming' | 'ongoing' | 'completed' | 'cancelled'
+  tournament_type: TournamentType
   created_at: string
   updated_at: string
 }
@@ -114,13 +119,18 @@ export interface TournamentRegistration {
   team_id: string
   player_id: string
   coach_id: string
-  status: 'pending' | 'approved' | 'rejected'
-  payment_status: 'unpaid' | 'paid'
+  status: 'pending' | 'verified' | 'paid'
+  payment_status?: 'unpaid' | 'paid'
+  actual_weight: number | null
+  actual_height: number | null
+  disqualified: boolean
+  disqualification_reason: string | null
+  weighed_in_at: string | null
   created_at: string
   updated_at: string
 }
 
-export type RegistrationInsert = Omit<TournamentRegistration, 'id' | 'created_at' | 'updated_at'>
+export type RegistrationInsert = Omit<TournamentRegistration, 'id' | 'created_at' | 'updated_at' | 'actual_weight' | 'actual_height' | 'disqualified' | 'disqualification_reason' | 'weighed_in_at'>
 export type RegistrationUpdate = Partial<Omit<TournamentRegistration, 'id' | 'tournament_id' | 'team_id' | 'created_at' | 'updated_at'>>
 
 export type TournamentRegistrationInsert = Omit<TournamentRegistration, 'id' | 'created_at' | 'updated_at'>
@@ -142,6 +152,7 @@ export interface Match {
   winner_id: string | null
   score_player1: number
   score_player2: number
+  court_number: number | null
   status: MatchStatus
   next_match_id: string | null
   created_at: string

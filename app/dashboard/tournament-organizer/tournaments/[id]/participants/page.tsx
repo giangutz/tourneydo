@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { getTournamentById } from '@/lib/db/queries/tournaments'
 import { getTournamentParticipants } from '@/lib/db/queries/registrations'
+import { getAllTeams } from '@/lib/db/queries/teams'
 import { DashboardShell } from '@/components/layouts/dashboard-shell'
 import { PageHeader } from '@/components/ui/page-header'
 import { ParticipantList } from '@/components/tournaments/participant-list'
@@ -15,11 +16,14 @@ interface ParticipantsPageProps {
   }>
 }
 
+import { TournamentBreadcrumbs } from '@/components/tournaments/tournament-breadcrumbs'
+
 export default async function ParticipantsPage({ params }: ParticipantsPageProps) {
   const { id } = await params
-  const [tournament, participants] = await Promise.all([
+  const [tournament, participants, teams] = await Promise.all([
     getTournamentById(id),
-    getTournamentParticipants(id)
+    getTournamentParticipants(id),
+    getAllTeams()
   ])
 
   if (!tournament) {
@@ -28,8 +32,9 @@ export default async function ParticipantsPage({ params }: ParticipantsPageProps
 
   return (
     <DashboardShell>
+      <TournamentBreadcrumbs tournamentName={tournament.name} tournamentId={tournament.id} pageName="Participants" hideParent />
       <PageHeader
-        title={`${tournament.name} - Participants`}
+        title="Participants"
         description="Manage registered teams and athletes."
         action={
           <Button variant="outline" asChild>
@@ -40,7 +45,12 @@ export default async function ParticipantsPage({ params }: ParticipantsPageProps
           </Button>
         }
       />
-      <ParticipantList participants={participants as any} tournamentId={id} />
+      <ParticipantList 
+        participants={participants as any} 
+        tournamentId={id} 
+        tournamentType={tournament.tournament_type}
+        teams={teams} 
+      />
     </DashboardShell>
   )
 }

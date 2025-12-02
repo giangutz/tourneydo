@@ -86,8 +86,7 @@ export async function registerTeamForTournament(
       team_id: teamId,
       player_id: playerId,
       coach_id: coachId,
-      status: 'pending',
-      payment_status: 'unpaid'
+      status: 'pending'
     }))
 
     const { error: insertError } = await supabase
@@ -135,6 +134,7 @@ export async function getTournamentParticipants(tournamentId: string) {
         belt_level,
         weight,
         height,
+        gender,
         dob,
         coach_id
       ),
@@ -236,4 +236,129 @@ export async function getUpcomingEventsCount(): Promise<number> {
   }
 
   return count || 0
+}
+/**
+ * Create a single registration
+ */
+export async function createRegistration(data: RegistrationInsert): Promise<void> {
+  const supabase = createServerSupabaseClient()
+
+  const { error } = await supabase
+    .from('tournament_registrations')
+    .insert(data)
+
+  if (error) {
+    throw new Error(`Failed to create registration: ${error.message}`)
+  }
+}
+
+/**
+ * Update weigh-in data for a registration
+ */
+export async function updateWeighIn(
+  registrationId: string,
+  actualWeight: number | null,
+  actualHeight: number | null
+): Promise<void> {
+  const supabase = createServerSupabaseClient()
+
+  const { error } = await supabase
+    .from('tournament_registrations')
+    .update({
+      actual_weight: actualWeight,
+      actual_height: actualHeight,
+      weighed_in_at: new Date().toISOString()
+    })
+    .eq('id', registrationId)
+
+  if (error) {
+    throw new Error(`Failed to update weigh-in: ${error.message}`)
+  }
+}
+
+/**
+ * Update division assignment for a registration
+ */
+export async function updateDivisionAssignment(
+  registrationId: string,
+  divisionId: string,
+  categoryId: string
+): Promise<void> {
+  const supabase = createServerSupabaseClient()
+
+  const { error } = await supabase
+    .from('tournament_registrations')
+    .update({
+      division_id: divisionId,
+      category_id: categoryId
+    })
+    .eq('id', registrationId)
+
+  if (error) {
+    throw new Error(`Failed to update division assignment: ${error.message}`)
+  }
+}
+
+/**
+ * Update disqualification status for a registration
+ */
+export async function updateDisqualification(
+  registrationId: string,
+  disqualified: boolean,
+  reason: string | null
+): Promise<void> {
+  const supabase = createServerSupabaseClient()
+
+  const { error } = await supabase
+    .from('tournament_registrations')
+    .update({
+      disqualified,
+      disqualification_reason: reason
+    })
+    .eq('id', registrationId)
+
+  if (error) {
+    throw new Error(`Failed to update disqualification: ${error.message}`)
+  }
+}
+
+/**
+ * Get a single registration by ID with player and team data
+ */
+export async function getRegistrationById(registrationId: string) {
+  const supabase = createServerSupabaseClient()
+
+  const { data, error } = await supabase
+    .from('tournament_registrations')
+    .select(`
+      *,
+      players (
+        id,
+        first_name,
+        last_name,
+        belt_level,
+        weight,
+        height,
+        gender,
+        dob,
+        coach_id
+      ),
+      teams (
+        id,
+        name,
+        user_id
+      )
+    `)
+    .eq('id', registrationId)
+    .single()
+
+  if (error) {
+    throw new Error(`Failed to fetch registration: ${error.message}`)
+  }
+
+  return {
+    ...data,
+    player: data.players,
+    team: data.teams
+  }
 }

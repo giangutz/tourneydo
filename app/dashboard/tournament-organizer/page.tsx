@@ -9,6 +9,8 @@ import {
 } from "@/components/ui/card"
 import { Trophy, Users, Calendar } from "lucide-react"
 
+import { TournamentBreadcrumbs } from '@/components/tournaments/tournament-breadcrumbs'
+
 export default async function TournamentOrganizerDashboard() {
   const { userId } = await auth()
   if (!userId) return null

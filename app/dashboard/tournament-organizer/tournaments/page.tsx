@@ -15,13 +15,18 @@ import { PageHeader } from '@/components/ui/page-header'
 import { EmptyState } from '@/components/ui/empty-state'
 import { formatShortDate } from '@/lib/utils'
 import { routes } from '@/config/routes'
+import { redirect } from 'next/navigation'
 
-export default async function OrganizerTournamentsPage() {
+import { TournamentBreadcrumbs } from '@/components/tournaments/tournament-breadcrumbs'
+
+export default async function TournamentsPage() {
   const { userId } = await auth()
-  if (!userId) return null
+  if (!userId) {
+    redirect('/sign-in')
+  }
 
   // Fetch tournaments using the query layer
-  const tournaments = await getTournamentsByOrganizerId(userId)
+  const tournaments = await getTournamentsByOrganizerId(userId) // Assuming getOrganizerTournaments is a typo and it should be getTournamentsByOrganizerId or a new import is needed. Sticking to existing import.
 
   return (
     <DashboardShell>

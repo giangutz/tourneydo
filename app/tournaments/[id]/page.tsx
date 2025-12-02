@@ -15,7 +15,9 @@ import { ParticipantList } from '@/components/tournaments/participant-list'
 import Link from 'next/link'
 import { routes } from '@/config/routes'
 import { SiteHeader } from "@/components/layouts/site-header"
-import { SiteFooter } from "@/components/layouts/site-footer"
+// import { SiteFooter } from "@/components/layouts/site-footer"
+import { PublicTournamentClient } from './public-tournament-client'
+import { LiveCourtsView } from '@/components/tournaments/live-courts-view'
 
 interface PublicTournamentPageProps {
   params: Promise<{
@@ -52,58 +54,96 @@ export default async function PublicTournamentPage({ params }: PublicTournamentP
       <SiteHeader />
       <main className="flex-1">
         {/* Hero Section */}
-        <div className="bg-muted/50 border-b">
-        <div className="container mx-auto py-12 px-4">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <Badge variant={tournament.status === 'ongoing' ? 'default' : 'secondary'}>
-                  {tournament.status}
-                </Badge>
+        <div className="bg-gradient-to-br from-primary/10 via-background to-background border-b">
+          <div className="container mx-auto max-w-7xl py-12 px-4 sm:px-6 lg:px-8">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-3">
+                  <Badge 
+                    variant={tournament.status === 'ongoing' ? 'default' : 'secondary'}
+                    className="text-sm px-3 py-1"
+                  >
+                    {tournament.status}
+                  </Badge>
+                  <Trophy className="h-5 w-5 text-primary" />
+                </div>
+                <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
+                  {tournament.name}
+                </h1>
+                <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+                  {tournament.start_date && (
+                    <div className="flex items-center gap-2 bg-muted/50 px-3 py-2 rounded-md">
+                      <Calendar className="h-4 w-4" />
+                      <span>
+                        {formatShortDate(tournament.start_date)}
+                        {tournament.end_date && tournament.end_date !== tournament.start_date && ` - ${formatShortDate(tournament.end_date)}`}
+                      </span>
+                    </div>
+                  )}
+                  {tournament.venue && (
+                    <div className="flex items-center gap-2 bg-muted/50 px-3 py-2 rounded-md">
+                      <MapPin className="h-4 w-4" />
+                      <span>{tournament.venue}</span>
+                    </div>
+                  )}
+                  {tournament.entry_fee && (
+                    <div className="flex items-center gap-2 bg-muted/50 px-3 py-2 rounded-md">
+                      <PhilippinePeso className="h-4 w-4" />
+                      <span>{tournament.entry_fee.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 bg-muted/50 px-3 py-2 rounded-md">
+                    <Users className="h-4 w-4" />
+                    <span>{participants.length} participants</span>
+                  </div>
+                </div>
               </div>
-              <h1 className="text-4xl font-bold mb-2">{tournament.name}</h1>
-              <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-                {tournament.start_date && (
-                  <div className="flex items-center">
-                    <Calendar className="mr-1 h-4 w-4" />
-                    {formatShortDate(tournament.start_date)}
-                    {tournament.end_date && tournament.end_date !== tournament.start_date && ` - ${formatShortDate(tournament.end_date)}`}
-                  </div>
-                )}
-                {tournament.venue && (
-                  <div className="flex items-center">
-                    <MapPin className="mr-1 h-4 w-4" />
-                    {tournament.venue}
-                  </div>
-                )}
-                {tournament.entry_fee && (
-                  <div className="flex items-center">
-                    <PhilippinePeso className="mr-1 h-4 w-4" />
-                    {tournament.entry_fee.toFixed(2)}
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="flex gap-2">
               {tournament.status === 'upcoming' && (
-                <Button size="lg" asChild>
+                <Button size="lg" className="shadow-lg" asChild>
                   <Link href={routes.register}>Register Now</Link>
                 </Button>
               )}
             </div>
           </div>
         </div>
-      </div>
 
       {/* Content */}
-      <div className="container mx-auto py-8 px-4">
-        <Tabs defaultValue="overview" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="participants">Participants</TabsTrigger>
-            <TabsTrigger value="bracket">Bracket</TabsTrigger>
-            <TabsTrigger value="matches">Matches</TabsTrigger>
-          </TabsList>
+      <div className="container mx-auto max-w-7xl py-8 px-4 sm:px-6 lg:px-8">
+          <Tabs defaultValue="overview" className="w-full space-y-6">
+            <div className="bg-muted/30 rounded-lg p-1 w-full">
+              <TabsList className="grid w-full grid-cols-4 bg-transparent gap-1">
+                <TabsTrigger 
+                  value="overview"
+                  className="data-[state=active]:bg-background data-[state=active]:shadow-sm"
+                >
+                  Overview
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="participants"
+                  className="data-[state=active]:bg-background data-[state=active]:shadow-sm"
+                >
+                  Participants
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="bracket"
+                  className="data-[state=active]:bg-background data-[state=active]:shadow-sm"
+                >
+                  Bracket
+                </TabsTrigger>
+                {/* TODO: Re-enable Matches tab in future update */}
+                {/* <TabsTrigger value="matches">Matches</TabsTrigger> */}
+                <TabsTrigger 
+                  value="live"
+                  className="data-[state=active]:bg-background data-[state=active]:shadow-sm"
+                >
+                  Live Courts
+                </TabsTrigger>
+              </TabsList>
+            </div>
+
+          <TabsContent value="live">
+             <LiveCourtsView tournament={tournament} matches={matches} participants={participants} />
+          </TabsContent>
 
           <TabsContent value="overview" className="space-y-4">
             <div className="grid gap-4 md:grid-cols-3">
@@ -147,7 +187,7 @@ export default async function PublicTournamentPage({ params }: PublicTournamentP
                     <div>
                       <div className="font-medium">Participants</div>
                       <div className="text-sm text-muted-foreground">
-                        {uniqueTeams.length}{tournament.max_players ? `/${tournament.max_players}` : ''} teams registered
+                        {participants.length}{tournament.max_players ? `/${tournament.max_players}` : ''} participants registered
                       </div>
                     </div>
                   </CardContent>
@@ -204,6 +244,11 @@ export default async function PublicTournamentPage({ params }: PublicTournamentP
                                            {p.player.weight} kg
                                          </div>
                                        )}
+                                       {p.player?.height && (
+                                         <div className="text-xs">
+                                           {p.player.height} cm
+                                         </div>
+                                       )}
                                      </div>
                                    </div>
                                  </div>
@@ -226,7 +271,7 @@ export default async function PublicTournamentPage({ params }: PublicTournamentP
               </CardHeader>
               <CardContent className="overflow-x-auto">
                 {matches.length > 0 ? (
-                  <BracketView matches={matches} participants={participants} />
+                  <PublicTournamentClient matches={matches} participants={participants} />
                 ) : (
                   <div className="text-center py-12 text-muted-foreground">
                     Bracket has not been generated yet.
@@ -236,34 +281,86 @@ export default async function PublicTournamentPage({ params }: PublicTournamentP
             </Card>
           </TabsContent>
 
-          <TabsContent value="matches">
+          {/* TODO: Re-enable Matches tab in future update */}
+          {/* <TabsContent value="matches">
             <Card>
               <CardHeader>
                 <CardTitle>Match Results</CardTitle>
+                <CardDescription>
+                  Recently completed matches
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 {matches.length > 0 ? (
-                  <div className="space-y-4">
-                    {matches.map((match) => {
-                      const p1 = participants.find(p => p.id === match.player1_id)
-                      const p2 = participants.find(p => p.id === match.player2_id)
+                  <div className="space-y-6">
+                    {/* Group matches by division and sort by completion time *}
+                    {(Object.entries(
+                      matches
+                        .filter(m => m.status === 'completed') // Only show completed matches
+                        .reduce((acc, match) => {
+                          const key = `${match.division || 'No Division'}-${match.category || 'No Category'}`
+                          if (!acc[key]) acc[key] = []
+                          acc[key].push(match)
+                          return acc
+                        }, {} as Record<string, (typeof matches)[number][]>)
+                    ) as [string, (typeof matches)[number][]][])
+                    .map(([divisionKey, divisionMatches]) => {
+                      const firstMatch = divisionMatches[0]
+                      const divisionLabel = firstMatch.division || 'No Division'
+                      const categoryLabel = firstMatch.category || 'No Category'
+                      
+                      // Sort by updated_at (most recent first)
+                      const sortedMatches = [...divisionMatches].sort((a, b) => {
+                        const timeA = new Date(a.updated_at || a.created_at).getTime()
+                        const timeB = new Date(b.updated_at || b.created_at).getTime()
+                        return timeB - timeA // Most recent first
+                      })
+                      
                       return (
-                        <div key={match.id} className="flex items-center justify-between p-4 border rounded-lg">
-                          <div className="flex-1 text-right">
-                            <div className="font-medium">{p1?.team?.name || 'TBD'}</div>
-                            <div className="text-sm text-muted-foreground">{p1?.player?.first_name} {p1?.player?.last_name}</div>
-                          </div>
-                          <div className="px-4 flex flex-col items-center">
-                            <div className="text-xl font-bold">
-                              {match.score_player1} - {match.score_player2}
-                            </div>
-                            <Badge variant={match.status === 'completed' ? 'secondary' : 'outline'}>
-                              {match.status}
-                            </Badge>
-                          </div>
-                          <div className="flex-1 text-left">
-                            <div className="font-medium">{p2?.team?.name || 'TBD'}</div>
-                            <div className="text-sm text-muted-foreground">{p2?.player?.first_name} {p2?.player?.last_name}</div>
+                        <div key={divisionKey} className="space-y-3">
+                          <h3 className="font-semibold text-lg border-b pb-2">
+                            {divisionLabel} - {categoryLabel}
+                          </h3>
+                          <div className="space-y-3">
+                            {sortedMatches.map((match) => {
+                              const p1 = participants.find(p => p.player_id === match.player1_id)
+                              const p2 = participants.find(p => p.player_id === match.player2_id)
+                              const winner = match.winner_id === match.player1_id ? p1 : match.winner_id === match.player2_id ? p2 : null
+                              
+                              return (
+                                <div key={match.id} className="flex items-center justify-between p-4 border rounded-lg bg-card">
+                                  <div className="flex-1 text-right">
+                                    <div className={`font-bold ${match.winner_id === match.player1_id ? 'text-primary' : ''}`}>
+                                      {p1?.player?.first_name} {p1?.player?.last_name}
+                                    </div>
+                                    {p1?.team?.name && (
+                                      <div className="text-sm text-muted-foreground">{p1.team.name}</div>
+                                    )}
+                                  </div>
+                                  <div className="px-6 flex flex-col items-center">
+                                    <div className="text-2xl font-bold">
+                                      {match.score_player1} - {match.score_player2}
+                                    </div>
+                                    <Badge variant="secondary" className="mt-1">
+                                      Round {match.round}
+                                    </Badge>
+                                    {winner && (
+                                      <div className="text-xs text-muted-foreground mt-1">
+                                        Winner: {winner.player?.first_name} {winner.player?.last_name}
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="flex-1 text-left">
+                                    <div className={`font-bold ${match.winner_id === match.player2_id ? 'text-primary' : ''}`}>
+                                      {p2?.player?.first_name} {p2?.player?.last_name}
+                                    </div>
+                                    {p2?.team?.name && (
+                                      <div className="text-sm text-muted-foreground">{p2.team.name}</div>
+                                    )}
+                                  </div>
+                                </div>
+                              )
+                            })}
                           </div>
                         </div>
                       )
@@ -271,16 +368,17 @@ export default async function PublicTournamentPage({ params }: PublicTournamentP
                   </div>
                 ) : (
                   <div className="text-center py-12 text-muted-foreground">
-                    No matches scheduled yet.
+                    <Trophy className="mx-auto h-12 w-12 mb-4 opacity-50" />
+                    <p>No completed matches yet</p>
                   </div>
                 )}
               </CardContent>
             </Card>
-          </TabsContent>
+          </TabsContent> */}
         </Tabs>
       </div>
       </main>
-      <SiteFooter />
+      {/* <SiteFooter /> */}
     </div>
   )
 }

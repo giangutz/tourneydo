@@ -1,6 +1,4 @@
-'use client'
-
-import { useActionState } from 'react'
+import { useActionState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -20,25 +18,46 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { createTournament, updateTournament } from '@/lib/actions/tournaments'
+import { createTournament, updateTournament, type TournamentFormState } from '@/lib/actions/tournaments'
 import { Tournament } from '@/types/models'
 import { Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
+
+import { useRouter } from 'next/navigation'
+import { routes } from '@/config/routes'
 
 interface TournamentFormProps {
   tournament?: Tournament
 }
 
-const initialState = {
+const initialState: TournamentFormState = {
   error: '',
   fieldErrors: {},
+  success: false,
 }
 
 export function TournamentForm({ tournament }: TournamentFormProps) {
+  const router = useRouter()
   const action = tournament
     ? updateTournament.bind(null, tournament.id)
     : createTournament
 
   const [state, formAction, isPending] = useActionState(action, initialState)
+
+  useEffect(() => {
+    if (state?.error) {
+      toast.error(state.error)
+    }
+    if (state?.success) {
+      if (tournament) {
+        toast.success('Tournament updated successfully')
+        router.push(routes.organizer.tournamentDetail(tournament.id))
+      } else if (state.tournamentId) {
+        toast.success('Tournament created successfully')
+        router.push(routes.organizer.tournamentDetail(state.tournamentId))
+      }
+    }
+  }, [state, tournament, router])
 
   return (
     <Card>
@@ -63,6 +82,26 @@ export function TournamentForm({ tournament }: TournamentFormProps) {
             />
             {state.fieldErrors?.name && (
               <p className="text-sm text-destructive">{state.fieldErrors.name}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="tournament_type">Tournament Type</Label>
+            <Select name="tournament_type" defaultValue={tournament?.tournament_type || 'standard'} required>
+              <SelectTrigger>
+                <SelectValue placeholder="Select tournament type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="standard">Standard</SelectItem>
+                <SelectItem value="open-belt">Open Belt</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-sm text-muted-foreground">
+              <strong>Standard:</strong> Participants are grouped by belt level within divisions. 
+              <strong className="ml-2">Open Belt:</strong> All belt levels compete together in the same division.
+            </p>
+            {state.fieldErrors?.tournament_type && (
+              <p className="text-sm text-destructive">{state.fieldErrors.tournament_type}</p>
             )}
           </div>
 
@@ -119,6 +158,17 @@ export function TournamentForm({ tournament }: TournamentFormProps) {
                 min="1"
                 defaultValue={tournament?.max_players || ''}
                 placeholder="Unlimited"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="courts">Number of Courts</Label>
+              <Input
+                id="courts"
+                name="courts"
+                type="number"
+                min="1"
+                defaultValue={tournament?.courts || ''}
+                placeholder="e.g. 3"
               />
             </div>
           </div>

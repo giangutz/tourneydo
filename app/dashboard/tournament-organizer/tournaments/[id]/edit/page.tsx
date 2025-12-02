@@ -2,17 +2,19 @@ import { notFound } from 'next/navigation'
 import { getTournamentById } from '@/lib/db/queries/tournaments'
 import { DashboardShell } from '@/components/layouts/dashboard-shell'
 import { PageHeader } from '@/components/ui/page-header'
-import { TournamentForm } from '@/components/tournaments/tournament-form'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { routes } from '@/config/routes'
+import { EditTournamentClient } from './edit-tournament-client'
 
 interface TournamentEditPageProps {
   params: Promise<{
     id: string
   }>
 }
+
+import { TournamentBreadcrumbs } from '@/components/tournaments/tournament-breadcrumbs'
 
 export default async function TournamentEditPage({ params }: TournamentEditPageProps) {
   const { id } = await params
@@ -24,8 +26,9 @@ export default async function TournamentEditPage({ params }: TournamentEditPageP
 
   return (
     <DashboardShell>
+      <TournamentBreadcrumbs tournamentName={tournament.name} tournamentId={tournament.id} pageName="Settings" hideParent />
       <PageHeader
-        title={`Edit ${tournament.name}`}
+        title="Settings"
         description="Update tournament details and settings."
         action={
           <Button variant="outline" asChild>
@@ -37,7 +40,7 @@ export default async function TournamentEditPage({ params }: TournamentEditPageP
         }
       />
       <div className="max-w-2xl mx-auto">
-        <TournamentForm tournament={tournament} />
+        <EditTournamentClient tournament={tournament} />
       </div>
     </DashboardShell>
   )

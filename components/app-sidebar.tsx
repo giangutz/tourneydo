@@ -17,6 +17,8 @@ import { useUser } from "@clerk/nextjs"
 import { usePathname } from "next/navigation"
 import Link from "next/link"
 import { Calendar, Users, Trophy, LayoutDashboard, Shield } from "lucide-react"
+import Image from "next/image"
+
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { user } = useUser()
@@ -70,15 +72,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     <Sidebar {...props}>
       <SidebarHeader>
         <div className="flex items-center gap-2 px-4 py-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <Trophy className="h-4 w-4" />
-          </div>
-          <div className="font-semibold">Startup Boilerplate</div>
+          <Image src="/td-blue.svg" alt="TourneyDo Logo" width={32} height={32} className="h-8 w-8" />
+          <div className="font-semibold">TourneyDo</div>
         </div>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Platform</SidebarGroupLabel>
+          <SidebarGroupLabel>{role === "coach" ? "Coach" : "Tournament Organizer"}</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {items.map((item) => (

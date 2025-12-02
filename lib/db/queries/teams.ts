@@ -250,3 +250,22 @@ export async function getTeamWithPlayers(teamId: string): Promise<any> {
     team_players: undefined, // Remove nested structure
   }
 }
+/**
+ * Get all teams (for organizers)
+ * 
+ * @returns Array of all teams
+ */
+export async function getAllTeams(): Promise<Team[]> {
+  const supabase = createServerSupabaseClient()
+
+  const { data, error } = await supabase
+    .from('teams')
+    .select('*')
+    .order('name', { ascending: true })
+
+  if (error) {
+    throw new Error(`Failed to fetch teams: ${error.message}`)
+  }
+
+  return data || []
+}

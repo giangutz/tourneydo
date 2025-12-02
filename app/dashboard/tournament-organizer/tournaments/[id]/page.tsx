@@ -29,6 +29,8 @@ interface TournamentDashboardPageProps {
   }>
 }
 
+import { TournamentBreadcrumbs } from '@/components/tournaments/tournament-breadcrumbs'
+
 export default async function TournamentDashboardPage({ params }: TournamentDashboardPageProps) {
   const { id } = await params
   const tournament = await getTournamentById(id)
@@ -134,6 +136,17 @@ export default async function TournamentDashboardPage({ params }: TournamentDash
                 Settings
               </CardTitle>
               <CardDescription>Edit tournament details</CardDescription>
+            </CardHeader>
+          </Link>
+        </Card>
+        <Card className="hover:bg-muted/50 transition-colors">
+          <Link href={`${routes.organizer.tournamentDetail(tournament.id)}/courts`}>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Swords className="mr-2 h-5 w-5" />
+                Courts
+              </CardTitle>
+              <CardDescription>Manage court assignments</CardDescription>
             </CardHeader>
           </Link>
         </Card>

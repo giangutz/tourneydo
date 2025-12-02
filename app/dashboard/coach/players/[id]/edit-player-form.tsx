@@ -37,9 +37,8 @@ const formSchema = z.object({
   first_name: z.string().min(2, "First name is required"),
   last_name: z.string().min(2, "Last name is required"),
   email: z.string().email("Invalid email address"),
-  dob: z.string().refine((val) => new Date(val) <= new Date(), {
-    message: "Date of birth cannot be in the future",
-  }),
+  dob: z.string().min(1, "Date of birth is required"),
+  gender: z.string().min(1, "Gender is required for division assignment"),
   weight: z.string().optional(),
   height: z.string().optional(),
   belt_level: z.string().min(1, "Belt level is required"),
@@ -99,6 +98,7 @@ export function EditPlayerForm({ player, availableTeams, currentAssignments }: E
       last_name: player.last_name,
       email: player.email || "",
       dob: player.dob || "",
+      gender: player.gender || "",
       weight: player.weight?.toString() || "",
       height: player.height?.toString() || "",
       belt_level: player.belt_level || "",
@@ -127,6 +127,7 @@ export function EditPlayerForm({ player, availableTeams, currentAssignments }: E
           last_name: values.last_name,
           email: values.email || null,
           dob: values.dob || null,
+          gender: values.gender,
           weight: values.weight ? parseFloat(values.weight) : null,
           height: values.height ? parseFloat(values.height) : null,
           belt_level: values.belt_level || null,
@@ -239,6 +240,28 @@ export function EditPlayerForm({ player, availableTeams, currentAssignments }: E
                     <FormControl>
                       <Input type="date" max={new Date().toISOString().split('T')[0]} {...field} />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="gender"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Gender</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select gender" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="male">Male</SelectItem>
+                        <SelectItem value="female">Female</SelectItem>
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}

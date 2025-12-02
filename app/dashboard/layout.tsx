@@ -1,6 +1,7 @@
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/app-sidebar"
 import { UserButton } from "@clerk/nextjs"
+import { ModeToggle } from "@/components/layouts/mode-toggle"
 
 export default function DashboardLayout({
   children,
@@ -13,7 +14,10 @@ export default function DashboardLayout({
       <main className="w-full">
         <div className="flex items-center justify-between border-b p-4">
           <SidebarTrigger />
-          <UserButton afterSignOutUrl="/" />
+          <div className="flex items-center gap-4">
+            <ModeToggle />
+            <UserButton afterSignOutUrl="/" />
+          </div>
         </div>
         <div className="p-6">
           {children}

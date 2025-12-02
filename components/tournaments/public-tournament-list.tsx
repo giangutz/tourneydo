@@ -31,7 +31,7 @@ export function PublicTournamentList({ tournaments }: PublicTournamentListProps)
   }
 
   return (
-    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3" data-testid="tournament-list">
       {tournaments.map((tournament) => (
         <Card key={tournament.id} className="flex flex-col h-full hover:shadow-md transition-shadow">
           <CardHeader>
