@@ -14,15 +14,38 @@ interface ParticipantsPageProps {
   params: Promise<{
     id: string
   }>
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }
 
 import { TournamentBreadcrumbs } from '@/components/tournaments/tournament-breadcrumbs'
 
-export default async function ParticipantsPage({ params }: ParticipantsPageProps) {
+export default async function ParticipantsPage({ params, searchParams }: ParticipantsPageProps) {
   const { id } = await params
-  const [tournament, participants, teams] = await Promise.all([
+  const resolvedSearchParams = await searchParams
+  
+  const page = Number(resolvedSearchParams?.page) || 1
+  const limit = Number(resolvedSearchParams?.limit) || 10
+  const query = resolvedSearchParams?.q as string
+  const teamId = resolvedSearchParams?.team as string
+  const belt = resolvedSearchParams?.belt as string
+  const status = resolvedSearchParams?.status as string
+  const weighInStatus = resolvedSearchParams?.weighIn as string
+  const sort = resolvedSearchParams?.sort as string
+  const order = resolvedSearchParams?.order as 'asc' | 'desc'
+
+  const [tournament, participantsResult, teams] = await Promise.all([
     getTournamentById(id),
-    getTournamentParticipants(id),
+    getTournamentParticipants(id, {
+      page,
+      limit,
+      query,
+      teamId,
+      belt,
+      status,
+      weighInStatus,
+      sort,
+      order
+    }),
     getAllTeams()
   ])
 
@@ -46,7 +69,11 @@ export default async function ParticipantsPage({ params }: ParticipantsPageProps
         }
       />
       <ParticipantList 
-        participants={participants as any} 
+        participants={participantsResult.data as any} 
+        count={participantsResult.count}
+        page={participantsResult.page}
+        limit={participantsResult.limit}
+        totalPages={participantsResult.totalPages}
         tournamentId={id} 
         tournamentType={tournament.tournament_type}
         teams={teams} 

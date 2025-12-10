@@ -1,6 +1,14 @@
 -- Drop existing objects to ensure clean slate
-DROP TRIGGER IF EXISTS update_users_updated_at ON users;
-DROP TRIGGER IF EXISTS update_teams_updated_at ON teams;
+DO $$ 
+BEGIN
+    IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'users') THEN
+        DROP TRIGGER IF EXISTS update_users_updated_at ON users;
+    END IF;
+    IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'teams') THEN
+        DROP TRIGGER IF EXISTS update_teams_updated_at ON teams;
+    END IF;
+END $$;
+
 DROP FUNCTION IF EXISTS update_updated_at_column;
 DROP TABLE IF EXISTS teams;
 DROP TABLE IF EXISTS users;

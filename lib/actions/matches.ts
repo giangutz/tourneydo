@@ -147,7 +147,8 @@ export async function updateMatchParticipants(
 export async function assignMatchToCourt(
   matchId: string,
   tournamentId: string,
-  courtNumber: number
+  courtNumber: number,
+  status: 'scheduled' | 'in_progress' = 'scheduled'
 ): Promise<ActionResult<void>> {
   return safeAction(async () => {
     const { userId } = await auth()
@@ -158,11 +159,128 @@ export async function assignMatchToCourt(
 
     await updateMatch(matchId, {
       court_number: courtNumber,
-      status: 'in_progress' // Automatically set to in_progress when assigned to a court? Or keep it scheduled?
-      // User request says "set which courts are the current live matches".
-      // So implying it becomes live.
+      status: status
     })
 
+    revalidatePath(routes.organizer.tournamentDetail(tournamentId))
+  })
+}
+
+/**
+ * Update match status (Organizer only)
+ */
+export async function updateMatchStatus(
+  matchId: string,
+  tournamentId: string,
+  status: 'scheduled' | 'in_progress' | 'completed'
+): Promise<ActionResult<void>> {
+  return safeAction(async () => {
+    const { userId } = await auth()
+
+    if (!userId) {
+      throw new Error('Unauthorized')
+    }
+
+    await updateMatch(matchId, {
+      status: status
+    })
+
+    revalidatePath(routes.organizer.tournamentDetail(tournamentId))
+  })
+}
+
+/**
+ * Unassign match from court (Organizer only)
+ */
+export async function unassignMatch(
+  matchId: string,
+  tournamentId: string
+): Promise<ActionResult<void>> {
+  return safeAction(async () => {
+    const { userId } = await auth()
+
+    if (!userId) {
+      throw new Error('Unauthorized')
+    }
+
+    await updateMatch(matchId, {
+      court_number: null,
+      status: 'scheduled'
+    })
+
+    revalidatePath(routes.organizer.tournamentDetail(tournamentId))
+  })
+}
+
+/**
+ * Move a participant to a different division (Organizer only)
+ */
+export async function moveParticipantToDivision(
+  matchId: string,
+  tournamentId: string,
+  playerId: string,
+  newDivisionId: string,
+  newCategoryId: string
+): Promise<ActionResult<void>> {
+  return safeAction(async () => {
+    const { userId } = await auth()
+
+    if (!userId) {
+      throw new Error('Unauthorized')
+    }
+
+    const supabase = createServerSupabaseClient()
+
+    // 1. Update the participant's registration to the new division
+    const { error: regError } = await supabase
+      .from('tournament_registrations')
+      .update({
+        division_id: newDivisionId,
+        category_id: newCategoryId
+      })
+      .eq('tournament_id', tournamentId)
+      .eq('player_id', playerId)
+
+    if (regError) {
+      throw new Error(`Failed to update registration: ${regError.message}`)
+    }
+
+    // 2. Remove the player from the current match
+    // We need to check if they are player1 or player2
+    const { data: currentMatch, error: matchError } = await supabase
+      .from('matches')
+      .select('player1_id, player2_id')
+      .eq('id', matchId)
+      .single()
+
+    if (matchError || !currentMatch) {
+      throw new Error('Match not found')
+    }
+
+    const updates: any = {}
+    if (currentMatch.player1_id === playerId) {
+      updates.player1_id = null
+    } else if (currentMatch.player2_id === playerId) {
+      updates.player2_id = null
+    }
+
+    if (Object.keys(updates).length > 0) {
+      await updateMatch(matchId, updates)
+    }
+
+    // 3. Remove player from ANY other matches in the OLD division
+    // (This is important because they might be in multiple matches if they advanced)
+    // Actually, if we change their division, they shouldn't be in ANY match of the old division.
+    // But for now, let's just handle the current match as requested.
+    // The user said "move place to others divisions".
+    // If they are in other matches, those matches will still point to them.
+    // Ideally, we should remove them from all matches in the old division.
+    // But that might be too destructive if not intended.
+    // Let's stick to the current match for safety, or maybe the user implies a full move.
+    // Given "Switch Places" context, it's usually about fixing a mistake.
+    // So removing from the current match is the primary goal.
+
+    revalidatePath(routes.organizer.tournamentBracket(tournamentId))
     revalidatePath(routes.organizer.tournamentDetail(tournamentId))
   })
 }

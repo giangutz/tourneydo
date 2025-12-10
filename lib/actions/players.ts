@@ -8,7 +8,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { auth } from '@clerk/nextjs/server'
-import { createPlayer, updatePlayer as updatePlayerQuery, deletePlayer as deletePlayerQuery } from '@/lib/db/queries/players'
+import { createPlayer, updatePlayer as updatePlayerQuery, deletePlayer as deletePlayerQuery, searchPlayers } from '@/lib/db/queries/players'
 import { addPlayersToTeam } from '@/lib/db/queries/teams'
 import { playerFormSchema, assignPlayerToTeamsSchema } from '@/lib/validations/player'
 import { createActionSuccess, createActionError, safeAction } from '@/lib/utils/errors'
@@ -136,5 +136,19 @@ export async function assignPlayerToTeamsAction(playerId: string, teamIds: strin
 
     revalidatePath(routes.coach.players)
     revalidatePath(routes.coach.playerDetail(playerId))
+  })
+}
+
+/**
+ * Search for players
+ */
+export async function searchPlayersAction(query: string): Promise<ActionResult<Player[]>> {
+  return safeAction(async () => {
+    const { userId } = await auth()
+    if (!userId) {
+      throw new Error('Unauthorized')
+    }
+
+    return searchPlayers(query)
   })
 }

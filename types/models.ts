@@ -121,6 +121,8 @@ export interface TournamentRegistration {
   team_id: string
   player_id: string
   coach_id: string
+  division_id?: string
+  category_id?: string
   status: 'pending' | 'verified' | 'paid'
   payment_status?: 'unpaid' | 'paid'
   actual_weight: number | null
@@ -149,14 +151,26 @@ export interface Match {
   tournament_id: string
   round: number
   match_number: number
+  division_id?: string
+  category_id?: string
   player1_id: string | null
   player2_id: string | null
   winner_id: string | null
   score_player1: number
   score_player2: number
+  score_round1_player1: number
+  score_round1_player2: number
+  score_round2_player1: number
+  score_round2_player2: number
+  score_round3_player1: number
+  score_round3_player2: number
+  winner_round1: string | null
+  winner_round2: string | null
+  winner_round3: string | null
   court_number: number | null
   status: MatchStatus
   next_match_id: string | null
+  source_match_id: string | null
   created_at: string
   updated_at: string
 }

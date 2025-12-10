@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import {
   Table,
   TableBody,
@@ -31,11 +32,13 @@ import { AddParticipantDialog } from './add-participant-dialog'
 import { EditParticipantDialog } from './edit-participant-dialog'
 import { WeighInDialog } from './weigh-in-dialog'
 import { Team } from '@/types/models'
-import { Pencil, MoreHorizontal, Search, Check, X, DollarSign, Loader2, Scale, CheckCircle2, AlertTriangle, ArrowUpDown, Filter } from 'lucide-react'
-import { updateParticipantStatus } from '@/lib/actions/participants'
+import { Pencil, MoreHorizontal, Search, Check, X, DollarSign, Loader2, Scale, CheckCircle2, AlertTriangle, ArrowUpDown, Filter, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react'
+import { updateParticipantStatus, bulkWeighIn, deleteParticipant, bulkDeleteParticipants } from '@/lib/actions/participants'
+import { DeleteConfirmDialog } from './delete-confirm-dialog'
 import { toast } from 'sonner'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { useDebouncedCallback } from 'use-debounce'
 
 interface Participant {
   id: string
@@ -67,90 +70,100 @@ interface Participant {
 
 interface ParticipantListProps {
   participants: Participant[]
+  count: number
+  page: number
+  limit: number
+  totalPages: number
   tournamentId: string
   tournamentType?: 'standard' | 'open-belt'
   teams: Team[]
 }
 
-type SortKey = 'name' | 'team' | 'belt' | 'status' | 'weighIn'
-type SortDirection = 'asc' | 'desc'
+import { useTournamentRealtime } from '@/hooks/use-tournament-realtime'
 
-export function ParticipantList({ participants, tournamentId, tournamentType = 'standard', teams }: ParticipantListProps) {
-  const [searchQuery, setSearchQuery] = useState('')
+export function ParticipantList({ 
+  participants, 
+  count, 
+  page, 
+  limit, 
+  totalPages, 
+  tournamentId, 
+  tournamentType = 'standard', 
+  teams 
+}: ParticipantListProps) {
+  useTournamentRealtime(tournamentId)
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const pathname = usePathname()
+
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [isUpdating, setIsUpdating] = useState(false)
   const [editingParticipant, setEditingParticipant] = useState<Participant | null>(null)
   const [weighingParticipant, setWeighingParticipant] = useState<Participant | null>(null)
+  const [deletingParticipant, setDeletingParticipant] = useState<Participant | null>(null)
+  const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false)
   
-  // Filter states
-  const [filterTeam, setFilterTeam] = useState<string>('all')
-  const [filterBelt, setFilterBelt] = useState<string>('all')
-  const [filterWeighIn, setFilterWeighIn] = useState<string>('all')
-  const [filterStatus, setFilterStatus] = useState<string>('all')
+  // URL Params state
+  const searchQuery = searchParams.get('q') || ''
+  const filterTeam = searchParams.get('team') || 'all'
+  const filterBelt = searchParams.get('belt') || 'all'
+  const filterStatus = searchParams.get('status') || 'all'
+  const filterWeighIn = searchParams.get('weighIn') || 'all'
+  const sortKey = searchParams.get('sort') || 'created_at'
+  const sortDirection = searchParams.get('order') || 'desc'
 
-  // Sort state
-  const [sortKey, setSortKey] = useState<SortKey>('name')
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
-
-  const handleSort = (key: SortKey) => {
-    if (sortKey === key) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+  const createQueryString = (name: string, value: string) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (value === 'all' || value === '') {
+      params.delete(name)
     } else {
-      setSortKey(key)
-      setSortDirection('asc')
+      params.set(name, value)
     }
+    // Reset page when filtering
+    if (name !== 'page' && name !== 'sort' && name !== 'order') {
+      params.set('page', '1')
+    }
+    return params.toString()
   }
-  
-  const filteredParticipants = participants.filter((p) => {
-    if (!p.player || !p.team) return false
-    
-    // Search query
-    const fullName = `${p.player.first_name} ${p.player.last_name}`.toLowerCase()
-    const teamName = p.team.name.toLowerCase()
-    const query = searchQuery.toLowerCase()
-    const matchesSearch = fullName.includes(query) || teamName.includes(query)
 
-    // Team filter
-    const matchesTeam = filterTeam === 'all' || p.team.name === filterTeam
-
-    // Belt filter
-    const matchesBelt = filterBelt === 'all' || p.player.belt_level === filterBelt
-
-    // Status filter
-    const matchesStatus = filterStatus === 'all' || p.status === filterStatus
-
-    // Weigh-in filter
-    let matchesWeighIn = true
-    if (filterWeighIn === 'completed') {
-      matchesWeighIn = !!p.weighed_in_at
-    } else if (filterWeighIn === 'pending') {
-      matchesWeighIn = !p.weighed_in_at && (p.status === 'verified' || p.status === 'paid')
-    } else if (filterWeighIn === 'not-required') {
-      matchesWeighIn = !p.weighed_in_at && p.status !== 'verified' && p.status !== 'paid'
+  const handleSearch = useDebouncedCallback((term: string) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (term) {
+      params.set('q', term)
+    } else {
+      params.delete('q')
     }
+    params.set('page', '1')
+    router.push(`${pathname}?${params.toString()}`)
+  }, 300)
 
-    return matchesSearch && matchesTeam && matchesBelt && matchesStatus && matchesWeighIn
-  }).sort((a, b) => {
-    const direction = sortDirection === 'asc' ? 1 : -1
-    
-    switch (sortKey) {
-      case 'name':
-        return direction * `${a.player.first_name} ${a.player.last_name}`.localeCompare(`${b.player.first_name} ${b.player.last_name}`)
-      case 'team':
-        return direction * a.team.name.localeCompare(b.team.name)
-      case 'belt':
-        return direction * (a.player.belt_level || '').localeCompare(b.player.belt_level || '')
-      case 'status':
-        return direction * a.status.localeCompare(b.status)
-      case 'weighIn':
-        const aWeighed = !!a.weighed_in_at
-        const bWeighed = !!b.weighed_in_at
-        if (aWeighed === bWeighed) return 0
-        return direction * (aWeighed ? -1 : 1) // Completed first if asc
-      default:
-        return 0
+  const handleSort = (key: string) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (sortKey === key) {
+      params.set('order', sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      params.set('sort', key)
+      params.set('order', 'asc')
     }
-  })
+    router.push(`${pathname}?${params.toString()}`)
+  }
+
+  const handleFilterChange = (key: string, value: string) => {
+    router.push(`${pathname}?${createQueryString(key, value)}`)
+  }
+
+  const handlePageChange = (newPage: number) => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('page', newPage.toString())
+    router.push(`${pathname}?${params.toString()}`)
+  }
+
+  const handleLimitChange = (newLimit: string) => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('limit', newLimit)
+    params.set('page', '1') // Reset to page 1
+    router.push(`${pathname}?${params.toString()}`)
+  }
 
   const handleStatusUpdate = async (id: string, status: 'verified' | 'paid') => {
     // If marking as verified, open weigh-in dialog
@@ -167,6 +180,7 @@ export function ParticipantList({ participants, tournamentId, tournamentType = '
       toast.error(result.error)
     } else {
       toast.success(`Participant marked as ${status}`)
+      router.refresh()
     }
   }
 
@@ -183,8 +197,67 @@ export function ParticipantList({ participants, tournamentId, tournamentType = '
       if (failed.length === 0) {
         toast.success(`${selectedIds.length} participants marked as ${status}`)
         setSelectedIds([])
+        router.refresh()
       } else {
         toast.error(`Failed to update ${failed.length} participants`)
+      }
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
+  const handleBulkWeighIn = async () => {
+    if (selectedIds.length === 0) return
+    
+    setIsUpdating(true)
+    try {
+      const result = await bulkWeighIn(selectedIds, tournamentId)
+      
+      if (result?.success) {
+        toast.success(`${selectedIds.length} participants weighed in`)
+        setSelectedIds([])
+        router.refresh()
+      } else {
+        toast.error(result?.error || 'Failed to weigh in participants')
+      }
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
+  const handleDeleteParticipant = async () => {
+    if (!deletingParticipant) return
+    
+    setIsUpdating(true)
+    try {
+      const result = await deleteParticipant(deletingParticipant.id, tournamentId)
+      
+      if (result.success) {
+        toast.success('Participant deleted successfully')
+        setDeletingParticipant(null)
+        router.refresh()
+      } else {
+        toast.error(result.error || 'Failed to delete participant')
+      }
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return
+    
+    setIsUpdating(true)
+    try {
+      const result = await bulkDeleteParticipants(selectedIds, tournamentId)
+      
+      if (result.success) {
+        toast.success(`${selectedIds.length} participants deleted successfully`)
+        setSelectedIds([])
+        setShowBulkDeleteDialog(false)
+        router.refresh()
+      } else {
+        toast.error(result.error || 'Failed to delete participants')
       }
     } finally {
       setIsUpdating(false)
@@ -198,16 +271,17 @@ export function ParticipantList({ participants, tournamentId, tournamentType = '
   }
 
   const toggleSelectAll = () => {
-    if (selectedIds.length === filteredParticipants.length) {
+    if (selectedIds.length === participants.length) {
       setSelectedIds([])
     } else {
-      setSelectedIds(filteredParticipants.map(p => p.id))
+      setSelectedIds(participants.map(p => p.id))
     }
   }
 
-  // Get unique belt levels and teams for filters
-  const uniqueBelts = Array.from(new Set(participants.map(p => p.player.belt_level).filter(Boolean)))
-  const uniqueTeams = Array.from(new Set(participants.map(p => p.team.name)))
+  // Get unique belt levels and teams for filters (from ALL teams, not just current page)
+  // Note: For teams, we use the `teams` prop which contains all teams.
+  // For belts, we can hardcode standard BJJ belts or fetch from DB. For now, hardcoded is safer or use unique from current page + standard.
+  const standardBelts = ['White', 'Yellow', 'Blue', 'Red', 'Brown', 'Black']
 
   return (
     <div className="space-y-4">
@@ -216,9 +290,9 @@ export function ParticipantList({ participants, tournamentId, tournamentType = '
         <div className="relative flex-1 w-full sm:max-w-sm">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search by name or team..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by name..."
+            defaultValue={searchQuery}
+            onChange={(e) => handleSearch(e.target.value)}
             className="pl-8"
           />
         </div>
@@ -243,6 +317,17 @@ export function ParticipantList({ participants, tournamentId, tournamentType = '
                   <DropdownMenuItem onClick={() => handleBulkStatusUpdate('paid')}>
                     <DollarSign className="mr-2 h-4 w-4" /> Mark as Paid
                   </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleBulkWeighIn}>
+                    <Scale className="mr-2 h-4 w-4" /> Bulk Weigh-In
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem 
+                    onClick={() => setShowBulkDeleteDialog(true)}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" /> Delete Selected
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -258,33 +343,33 @@ export function ParticipantList({ participants, tournamentId, tournamentType = '
           <span>Filters:</span>
         </div>
         
-        <Select value={filterTeam} onValueChange={setFilterTeam}>
+        <Select value={filterTeam} onValueChange={(val) => handleFilterChange('team', val)}>
           <SelectTrigger className="w-[180px] h-8 text-xs">
             <SelectValue placeholder="Team" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Teams</SelectItem>
-            {uniqueTeams.map(team => (
-              <SelectItem key={team} value={team}>{team}</SelectItem>
+            {teams.map(team => (
+              <SelectItem key={team.id} value={team.id}>{team.name}</SelectItem>
             ))}
           </SelectContent>
         </Select>
 
         {tournamentType === 'standard' && (
-          <Select value={filterBelt} onValueChange={setFilterBelt}>
+          <Select value={filterBelt} onValueChange={(val) => handleFilterChange('belt', val)}>
             <SelectTrigger className="w-[140px] h-8 text-xs">
               <SelectValue placeholder="Belt Level" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Belts</SelectItem>
-              {uniqueBelts.map(belt => (
-                <SelectItem key={belt as string} value={belt as string}>{belt}</SelectItem>
+              {standardBelts.map(belt => (
+                <SelectItem key={belt} value={belt}>{belt}</SelectItem>
               ))}
             </SelectContent>
           </Select>
         )}
 
-        <Select value={filterStatus} onValueChange={setFilterStatus}>
+        <Select value={filterStatus} onValueChange={(val) => handleFilterChange('status', val)}>
           <SelectTrigger className="w-[140px] h-8 text-xs">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
@@ -296,7 +381,7 @@ export function ParticipantList({ participants, tournamentId, tournamentType = '
           </SelectContent>
         </Select>
 
-        <Select value={filterWeighIn} onValueChange={setFilterWeighIn}>
+        <Select value={filterWeighIn} onValueChange={(val) => handleFilterChange('weighIn', val)}>
           <SelectTrigger className="w-[160px] h-8 text-xs">
             <SelectValue placeholder="Weigh-In Status" />
           </SelectTrigger>
@@ -308,16 +393,11 @@ export function ParticipantList({ participants, tournamentId, tournamentType = '
           </SelectContent>
         </Select>
 
-        {(filterTeam !== 'all' || filterBelt !== 'all' || filterStatus !== 'all' || filterWeighIn !== 'all') && (
+        {(filterTeam !== 'all' || filterBelt !== 'all' || filterStatus !== 'all' || filterWeighIn !== 'all' || searchQuery) && (
           <Button 
             variant="ghost" 
             size="sm" 
-            onClick={() => {
-              setFilterTeam('all')
-              setFilterBelt('all')
-              setFilterStatus('all')
-              setFilterWeighIn('all')
-            }}
+            onClick={() => router.push(pathname)}
             className="h-8 px-2 text-xs"
           >
             Reset
@@ -326,7 +406,7 @@ export function ParticipantList({ participants, tournamentId, tournamentType = '
       </div>
 
       <div className="text-sm text-muted-foreground">
-        {filteredParticipants.length} participants found
+        {count} participants found
       </div>
 
       <div className="rounded-md border">
@@ -335,7 +415,7 @@ export function ParticipantList({ participants, tournamentId, tournamentType = '
             <TableRow>
               <TableHead className="w-12">
                 <Checkbox
-                  checked={selectedIds.length === filteredParticipants.length && filteredParticipants.length > 0}
+                  checked={selectedIds.length === participants.length && participants.length > 0}
                   onCheckedChange={toggleSelectAll}
                   aria-label="Select all"
                 />
@@ -370,14 +450,14 @@ export function ParticipantList({ participants, tournamentId, tournamentType = '
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredParticipants.length === 0 ? (
+            {participants.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={8} className="h-24 text-center">
                   No participants found matching your filters.
                 </TableCell>
               </TableRow>
             ) : (
-              filteredParticipants.map((participant) => (
+              participants.map((participant) => (
                 <TableRow key={participant.id}>
                   <TableCell>
                     <Checkbox
@@ -469,6 +549,13 @@ export function ParticipantList({ participants, tournamentId, tournamentType = '
                         <DropdownMenuItem onClick={() => handleStatusUpdate(participant.id, 'paid')}>
                           <DollarSign className="mr-2 h-4 w-4" /> Mark as Paid
                         </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem 
+                          onClick={() => setDeletingParticipant(participant)}
+                          className="text-destructive focus:text-destructive"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" /> Delete
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -477,6 +564,53 @@ export function ParticipantList({ participants, tournamentId, tournamentType = '
             )}
           </TableBody>
         </Table>
+      </div>
+      
+      {/* Pagination Controls */}
+      <div className="flex items-center justify-between px-2">
+        <div className="flex items-center gap-4">
+          <div className="text-sm text-muted-foreground">
+            Page {page} of {totalPages}
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Rows per page</span>
+            <Select
+              value={limit.toString()}
+              onValueChange={handleLimitChange}
+            >
+              <SelectTrigger className="h-8 w-[70px]">
+                <SelectValue placeholder={limit.toString()} />
+              </SelectTrigger>
+              <SelectContent side="top">
+                {[10, 20, 50, 100].map((pageSize) => (
+                  <SelectItem key={pageSize} value={pageSize.toString()}>
+                    {pageSize}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div className="flex items-center space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handlePageChange(page - 1)}
+            disabled={page <= 1}
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Previous
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handlePageChange(page + 1)}
+            disabled={page >= totalPages}
+          >
+            Next
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       {editingParticipant && (
@@ -497,6 +631,26 @@ export function ParticipantList({ participants, tournamentId, tournamentType = '
           onOpenChange={(open) => !open && setWeighingParticipant(null)}
         />
       )}
+
+      {/* Individual Delete Confirmation */}
+      <DeleteConfirmDialog
+        open={!!deletingParticipant}
+        onOpenChange={(open) => !open && setDeletingParticipant(null)}
+        onConfirm={handleDeleteParticipant}
+        participantCount={1}
+        participantNames={deletingParticipant ? [`${deletingParticipant.player?.first_name} ${deletingParticipant.player?.last_name}`] : []}
+      />
+
+      {/* Bulk Delete Confirmation */}
+      <DeleteConfirmDialog
+        open={showBulkDeleteDialog}
+        onOpenChange={setShowBulkDeleteDialog}
+        onConfirm={handleBulkDelete}
+        participantCount={selectedIds.length}
+        participantNames={participants
+          .filter(p => selectedIds.includes(p.id))
+          .map(p => `${p.player?.first_name} ${p.player?.last_name}`)}
+      />
     </div>
   )
 }

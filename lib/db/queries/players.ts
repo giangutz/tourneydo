@@ -92,13 +92,20 @@ export async function updatePlayer(id: string, playerData: PlayerUpdate): Promis
     .update(playerData)
     .eq('id', id)
     .select()
-    .single()
 
   if (error) {
     throw new Error(`Failed to update player: ${error.message}`)
   }
 
-  return data
+  if (!data || data.length === 0) {
+    throw new Error(`Player with ID ${id} not found`)
+  }
+
+  if (data.length > 1) {
+    throw new Error(`Multiple players found with ID ${id}`)
+  }
+
+  return data[0]
 }
 
 /**
@@ -208,4 +215,30 @@ export async function getPlayersWithTeams(coachId: string): Promise<any[]> {
     teams: player.team_players?.map((tp: any) => tp.teams).filter(Boolean) || [],
     team_players: undefined, // Remove nested structure
   }))
+}
+
+/**
+ * Search players by name
+ * 
+ * @param query - Search query string
+ * @param limit - Max number of results (default 10)
+ * @returns Array of matching players
+ */
+export async function searchPlayers(query: string, limit = 10): Promise<Player[]> {
+  const supabase = createServerSupabaseClient()
+
+  if (!query || query.trim().length === 0) return []
+
+  // Basic search on first or last name
+  const { data, error } = await supabase
+    .from('players')
+    .select('*')
+    .or(`first_name.ilike.%${query}%,last_name.ilike.%${query}%`)
+    .limit(limit)
+
+  if (error) {
+    throw new Error(`Failed to search players: ${error.message}`)
+  }
+
+  return data || []
 }

@@ -225,8 +225,9 @@ export function MatchResultDialog({ match, open, onOpenChange, participants }: M
                     </Badge>
                   )}
                 </div>
-                <div className="grid grid-cols-5 gap-4 items-center mb-4">
-                  <div className="col-span-2">
+                <div className="flex flex-col md:grid md:grid-cols-5 gap-4 items-center mb-4">
+                  <div className="w-full md:col-span-2">
+                    <label className="md:hidden text-xs text-muted-foreground mb-1 block">{name1}</label>
                     <Input
                       type="number"
                       value={round1Score1}
@@ -235,8 +236,9 @@ export function MatchResultDialog({ match, open, onOpenChange, participants }: M
                       placeholder="0"
                     />
                   </div>
-                  <div className="text-center font-bold text-muted-foreground">VS</div>
-                  <div className="col-span-2">
+                  <div className="text-center font-bold text-muted-foreground py-2 md:py-0">VS</div>
+                  <div className="w-full md:col-span-2">
+                    <label className="md:hidden text-xs text-muted-foreground mb-1 block">{name2}</label>
                     <Input
                       type="number"
                       value={round1Score2}
@@ -248,30 +250,32 @@ export function MatchResultDialog({ match, open, onOpenChange, participants }: M
                 </div>
                 
                 {/* Manual Winner Selection for Tie-Break */}
-                <div className="flex justify-center gap-4">
-                  <div className="flex items-center space-x-2">
-                    <input 
-                      type="radio" 
-                      id="r1-p1" 
-                      name="round1-winner" 
-                      checked={manualWinner1 === match.player1_id}
-                      onChange={() => setManualWinner1(match.player1_id)}
-                      className="h-4 w-4"
-                    />
-                    <label htmlFor="r1-p1" className="text-sm font-medium">{name1}</label>
+                {round1Score1 === round1Score2 && (
+                  <div className="flex justify-center gap-4 mt-4 p-4 bg-muted/30 rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <input 
+                        type="radio" 
+                        id="r1-p1" 
+                        name="round1-winner" 
+                        checked={manualWinner1 === match.player1_id}
+                        onChange={() => setManualWinner1(match.player1_id)}
+                        className="h-4 w-4"
+                      />
+                      <label htmlFor="r1-p1" className="text-sm font-medium cursor-pointer">{name1}</label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <input 
+                        type="radio" 
+                        id="r1-p2" 
+                        name="round1-winner" 
+                        checked={manualWinner1 === match.player2_id}
+                        onChange={() => setManualWinner1(match.player2_id)}
+                        className="h-4 w-4"
+                      />
+                      <label htmlFor="r1-p2" className="text-sm font-medium cursor-pointer">{name2}</label>
+                    </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <input 
-                      type="radio" 
-                      id="r1-p2" 
-                      name="round1-winner" 
-                      checked={manualWinner1 === match.player2_id}
-                      onChange={() => setManualWinner1(match.player2_id)}
-                      className="h-4 w-4"
-                    />
-                    <label htmlFor="r1-p2" className="text-sm font-medium">{name2}</label>
-                  </div>
-                </div>
+                )}
               </CardContent>
             </Card>
 
@@ -287,8 +291,9 @@ export function MatchResultDialog({ match, open, onOpenChange, participants }: M
                     </Badge>
                   )}
                 </div>
-                <div className="grid grid-cols-5 gap-4 items-center mb-4">
-                  <div className="col-span-2">
+                <div className="flex flex-col md:grid md:grid-cols-5 gap-4 items-center mb-4">
+                  <div className="w-full md:col-span-2">
+                    <label className="md:hidden text-xs text-muted-foreground mb-1 block">{name1}</label>
                     <Input
                       type="number"
                       value={round2Score1}
@@ -297,8 +302,9 @@ export function MatchResultDialog({ match, open, onOpenChange, participants }: M
                       placeholder="0"
                     />
                   </div>
-                  <div className="text-center font-bold text-muted-foreground">VS</div>
-                  <div className="col-span-2">
+                  <div className="text-center font-bold text-muted-foreground py-2 md:py-0">VS</div>
+                  <div className="w-full md:col-span-2">
+                    <label className="md:hidden text-xs text-muted-foreground mb-1 block">{name2}</label>
                     <Input
                       type="number"
                       value={round2Score2}
@@ -310,30 +316,32 @@ export function MatchResultDialog({ match, open, onOpenChange, participants }: M
                 </div>
                 
                 {/* Manual Winner Selection for Tie-Break */}
-                <div className="flex justify-center gap-4">
-                  <div className="flex items-center space-x-2">
-                    <input 
-                      type="radio" 
-                      id="r2-p1" 
-                      name="round2-winner" 
-                      checked={manualWinner2 === match.player1_id}
-                      onChange={() => setManualWinner2(match.player1_id)}
-                      className="h-4 w-4"
-                    />
-                    <label htmlFor="r2-p1" className="text-sm font-medium">{name1}</label>
+                {round2Score1 === round2Score2 && (
+                  <div className="flex justify-center gap-4 mt-4 p-4 bg-muted/30 rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <input 
+                        type="radio" 
+                        id="r2-p1" 
+                        name="round2-winner" 
+                        checked={manualWinner2 === match.player1_id}
+                        onChange={() => setManualWinner2(match.player1_id)}
+                        className="h-4 w-4"
+                      />
+                      <label htmlFor="r2-p1" className="text-sm font-medium cursor-pointer">{name1}</label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <input 
+                        type="radio" 
+                        id="r2-p2" 
+                        name="round2-winner" 
+                        checked={manualWinner2 === match.player2_id}
+                        onChange={() => setManualWinner2(match.player2_id)}
+                        className="h-4 w-4"
+                      />
+                      <label htmlFor="r2-p2" className="text-sm font-medium cursor-pointer">{name2}</label>
+                    </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <input 
-                      type="radio" 
-                      id="r2-p2" 
-                      name="round2-winner" 
-                      checked={manualWinner2 === match.player2_id}
-                      onChange={() => setManualWinner2(match.player2_id)}
-                      className="h-4 w-4"
-                    />
-                    <label htmlFor="r2-p2" className="text-sm font-medium">{name2}</label>
-                  </div>
-                </div>
+                )}
               </CardContent>
             </Card>
 
@@ -352,8 +360,9 @@ export function MatchResultDialog({ match, open, onOpenChange, participants }: M
                     </Badge>
                   )}
                 </div>
-                <div className="grid grid-cols-5 gap-4 items-center mb-4">
-                  <div className="col-span-2">
+                <div className="flex flex-col md:grid md:grid-cols-5 gap-4 items-center mb-4">
+                  <div className="w-full md:col-span-2">
+                    <label className="md:hidden text-xs text-muted-foreground mb-1 block">{name1}</label>
                     <Input
                       type="number"
                       value={round3Score1}
@@ -363,8 +372,9 @@ export function MatchResultDialog({ match, open, onOpenChange, participants }: M
                       disabled={false}
                     />
                   </div>
-                  <div className="text-center font-bold text-muted-foreground">VS</div>
-                  <div className="col-span-2">
+                  <div className="text-center font-bold text-muted-foreground py-2 md:py-0">VS</div>
+                  <div className="w-full md:col-span-2">
+                    <label className="md:hidden text-xs text-muted-foreground mb-1 block">{name2}</label>
                     <Input
                       type="number"
                       value={round3Score2}
@@ -377,30 +387,32 @@ export function MatchResultDialog({ match, open, onOpenChange, participants }: M
                 </div>
                 
                 {/* Manual Winner Selection for Tie-Break */}
-                <div className="flex justify-center gap-4">
-                   <div className="flex items-center space-x-2">
-                    <input 
-                      type="radio" 
-                      id="r3-p1" 
-                      name="round3-winner" 
-                      checked={manualWinner3 === match.player1_id}
-                      onChange={() => setManualWinner3(match.player1_id)}
-                      className="h-4 w-4"
-                    />
-                    <label htmlFor="r3-p1" className="text-sm font-medium">{name1}</label>
+                {round3Score1 === round3Score2 && (
+                  <div className="flex justify-center gap-4 mt-4 p-4 bg-muted/30 rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <input 
+                        type="radio" 
+                        id="r3-p1" 
+                        name="round3-winner" 
+                        checked={manualWinner3 === match.player1_id}
+                        onChange={() => setManualWinner3(match.player1_id)}
+                        className="h-4 w-4"
+                      />
+                      <label htmlFor="r3-p1" className="text-sm font-medium cursor-pointer">{name1}</label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <input 
+                        type="radio" 
+                        id="r3-p2" 
+                        name="round3-winner" 
+                        checked={manualWinner3 === match.player2_id}
+                        onChange={() => setManualWinner3(match.player2_id)}
+                        className="h-4 w-4"
+                      />
+                      <label htmlFor="r3-p2" className="text-sm font-medium cursor-pointer">{name2}</label>
+                    </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <input 
-                      type="radio" 
-                      id="r3-p2" 
-                      name="round3-winner" 
-                      checked={manualWinner3 === match.player2_id}
-                      onChange={() => setManualWinner3(match.player2_id)}
-                      className="h-4 w-4"
-                    />
-                    <label htmlFor="r3-p2" className="text-sm font-medium">{name2}</label>
-                  </div>
-                </div>
+                )}
               </CardContent>
             </Card>
           </div>

@@ -5,15 +5,17 @@ import { Match } from '@/types/models'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { cn } from '@/lib/utils'
-import { Trophy, Search, Pencil, MapPin } from 'lucide-react'
-import { getBracketRoundLabel } from '@/lib/utils/bracket-generator'
+import { Trophy, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { assignMatchToCourt } from '@/lib/actions/matches'
 import { toast } from 'sonner'
+import BracketGenerator from './bracket/BracketGenerator'
+import { transformMatchToGame } from '@/lib/utils/bracket-data-transformer'
+import { Game } from '@/lib/types/bracket-models'
+import { MatchResultDialog } from './match-result-dialog'
+import { MatchParticipantsDialog } from './match-participants-dialog'
 
 interface BracketViewProps {
   matches: Match[]
@@ -22,25 +24,65 @@ interface BracketViewProps {
   isOrganizer?: boolean
   onEditMatch?: (match: Match) => void
   courts?: number
+  tournamentType?: 'standard' | 'open-belt'
 }
 
-export function BracketView({ matches, participants, onMatchClick, isOrganizer = false, onEditMatch, courts = 0 }: BracketViewProps) {
+/**
+ * Map belt level to skill category for Standard tournaments
+ */
+function getBeltSkillCategory(beltLevel: string | null | undefined): string {
+  if (!beltLevel) return ''
+  
+  const belt = beltLevel.toLowerCase()
+  
+  if (belt === 'white') return 'Beginner'
+  if (belt === 'yellow' || belt === 'blue') return 'Novice I'
+  if (belt === 'red' || belt === 'brown') return 'Novice II'
+  if (belt === 'black') return 'Advanced'
+  
+  return '' // Unknown belt levels don't get a skill category label
+}
+
+export function BracketView({ matches, participants, onMatchClick, isOrganizer = false, onEditMatch, courts = 0, tournamentType = 'standard' }: BracketViewProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedDivision, setSelectedDivision] = useState<string>('all')
   const [assigningMatch, setAssigningMatch] = useState<Match | null>(null)
   const [selectedCourt, setSelectedCourt] = useState<string>('')
   const [isAssigning, setIsAssigning] = useState(false)
+  const [editingMatch, setEditingMatch] = useState<Match | null>(null)
+  const [editingParticipantsMatch, setEditingParticipantsMatch] = useState<Match | null>(null)
+  const [hoveredTeamId, setHoveredTeamId] = useState<string | null>(null)
+
+  const handleEditMatch = (match: Match) => {
+    setEditingMatch(match)
+  }
+
+  const handleSwitchSides = (match: Match) => {
+    setEditingParticipantsMatch(match)
+  }
 
   const handleAssignCourt = async () => {
     if (!assigningMatch || !selectedCourt) return
 
     setIsAssigning(true)
     try {
-      const result = await assignMatchToCourt(assigningMatch.id, assigningMatch.tournament_id, parseInt(selectedCourt))
+      const courtNum = parseInt(selectedCourt)
+      
+      // Check if court is currently occupied (has an in_progress match)
+      const isOccupied = matches.some(m => m.court_number === courtNum && m.status === 'in_progress')
+      
+      // Determine status: if occupied -> scheduled (queue), if free -> in_progress (live)
+      const status = isOccupied ? 'scheduled' : 'in_progress'
+
+      const result = await assignMatchToCourt(assigningMatch.id, assigningMatch.tournament_id, courtNum, status)
+      
       if (!result.success) {
         toast.error(result.error)
       } else {
-        toast.success(`Match assigned to Court ${selectedCourt}`)
+        const message = isOccupied 
+          ? `Match added to Court ${selectedCourt} queue` 
+          : `Match assigned to Court ${selectedCourt} (Live)`
+        toast.success(message)
         setAssigningMatch(null)
         setSelectedCourt('')
       }
@@ -51,50 +93,51 @@ export function BracketView({ matches, participants, onMatchClick, isOrganizer =
     }
   }
 
-  // Get available courts (not currently occupied by in-progress matches)
+  // Get available courts (free OR queue < 3)
   const getAvailableCourts = () => {
-    const occupiedCourts = new Set(
-      matches
-        .filter(m => m.status === 'in_progress' && m.court_number !== null)
-        .map(m => m.court_number)
-    )
-    
     return Array.from({ length: courts }, (_, i) => i + 1)
-      .filter(courtNum => !occupiedCourts.has(courtNum))
+      .map(courtNum => {
+        const courtMatches = matches.filter(m => m.court_number === courtNum)
+        const isOccupied = courtMatches.some(m => m.status === 'in_progress')
+        const queueSize = courtMatches.filter(m => m.status === 'scheduled').length
+        
+        return {
+          courtNum,
+          isOccupied,
+          queueSize,
+          isAvailable: !isOccupied || queueSize < 3
+        }
+      })
+      .filter(c => c.isAvailable)
   }
 
   // Group matches by division and category
-  const divisionGroups = matches.reduce((acc, match: any) => {
-    const key = `${match.division_id || 'no-division'}_${match.category_id || 'no-category'}`
-    if (!acc[key]) {
-      acc[key] = {
-        matches: [],
-        division: match.tournament_divisions,
-        category: match.tournament_categories
+  const divisionGroups = useMemo(() => {
+    return matches.reduce((acc, match: any) => {
+      const key = `${match.division_id || 'no-division'}_${match.category_id || 'no-category'}`
+      if (!acc[key]) {
+        acc[key] = {
+          matches: [],
+          division: match.tournament_divisions,
+          category: match.tournament_categories
+        }
       }
-    }
-    acc[key].matches.push(match)
-    return acc
-  }, {} as Record<string, { matches: Match[], division: any, category: any }>)
+      acc[key].matches.push(match)
+      return acc
+    }, {} as Record<string, { matches: Match[], division: any, category: any }>)
+  }, [matches])
 
-  const getPlayerDisplay = (playerId: string | null, match?: any) => {
-    if (!playerId) {
-      // Check if this is a match waiting for a previous round to complete
-      if (match && match.round > 1) {
-        return { name: 'Waiting for opponent', team: null }
-      }
-      return { name: 'BYE', team: null }
-    }
+  const getPlayerDisplay = (playerId: string | null) => {
+    if (!playerId) return { name: 'BYE', team: null }
     const p = participants.find(p => p.player_id === playerId)
     if (!p) return { name: 'TBD', team: null }
-    
     return {
       name: `${p.player.first_name} ${p.player.last_name}`,
       team: p.team?.name || 'Unattached'
     }
   }
 
-  const getDivisionLabel = (division: any, category: any) => {
+  const getDivisionLabel = (division: any, category: any, skillLevel?: string) => {
     if (!division || !category) return 'General'
     
     // Normalize category name (FEATHER -> Feather)
@@ -111,20 +154,42 @@ export function BracketView({ matches, participants, onMatchClick, isOrganizer =
       genderLabel = isYouth ? 'Girls' : 'Women'
     }
 
-    return `${division.name} ${genderLabel} - ${categoryName}`.trim()
+    // Add skill level for Standard tournaments
+    const skillLevelLabel = (tournamentType === 'standard' && skillLevel) ? ` ${skillLevel}` : ''
+    
+    return `${division.name} ${genderLabel} ${skillLevelLabel} - ${categoryName}`.trim()
   }
 
   // Get unique divisions for filter
   const divisions = useMemo(() => {
     const uniqueDivisions = new Map<string, string>()
     Object.entries(divisionGroups).forEach(([key, group]) => {
-      const label = getDivisionLabel(group.division, group.category)
+      // For Standard tournaments, extract skill level from ANY participant in this group
+      let skillLevel = ''
+      if (tournamentType === 'standard') {
+        // Get all player IDs from matches in this group
+        const playerIds = new Set<string>()
+        group.matches.forEach(m => {
+          if (m.player1_id) playerIds.add(m.player1_id)
+          if (m.player2_id) playerIds.add(m.player2_id)
+        })
+        
+        // Find the first participant with a belt level
+        for (const playerId of playerIds) {
+          const participant = participants.find((p: any) => p.player_id === playerId)
+          if (participant?.player?.belt_level) {
+            skillLevel = getBeltSkillCategory(participant.player.belt_level)
+            break
+          }
+        }
+      }
+      const label = getDivisionLabel(group.division, group.category, skillLevel)
       uniqueDivisions.set(key, label)
     })
     return Array.from(uniqueDivisions.entries())
-  }, [divisionGroups])
+  }, [divisionGroups, participants, tournamentType])
 
-  // Filter matches based on search and division filter
+  // Filter groups based on search and division filter
   const filteredGroups = useMemo(() => {
     return Object.entries(divisionGroups).filter(([key, group]) => {
       // Division filter
@@ -148,9 +213,27 @@ export function BracketView({ matches, participants, onMatchClick, isOrganizer =
 
       return true
     })
-  }, [divisionGroups, selectedDivision, searchQuery])
+  }, [divisionGroups, selectedDivision, searchQuery, participants])
 
-  const availableCourts = Array.from({ length: courts }, (_, i) => i + 1)
+  // Transform matches to games for each group
+  const groupGames = useMemo(() => {
+    const result: Record<string, Game[]> = {}
+    
+    filteredGroups.forEach(([key, group]) => {
+      // Transform all matches in this group to games
+      // We map over all matches, but BracketGenerator only needs the "Finals" (roots)
+      // However, our transformMatchToGame builds the tree recursively if we pass all matches
+      // But we need to pass the array of Game objects to BracketGenerator
+      // BracketGenerator.makeFinals will filter out games that feed into others
+      
+      const games = group.matches.map(match => 
+        transformMatchToGame(match, group.matches, participants)
+      )
+      result[key] = games
+    })
+    
+    return result
+  }, [filteredGroups, participants])
 
   return (
     <div className="space-y-6">
@@ -210,135 +293,55 @@ export function BracketView({ matches, participants, onMatchClick, isOrganizer =
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-8">
           {filteredGroups.map(([key, group]) => {
-            const divisionMatches = group.matches
-            
-            // Group by round within this division
-            const rounds = divisionMatches.reduce((acc, match) => {
-              if (!acc[match.round]) {
-                acc[match.round] = []
+            // Extract skill level for this group (for Standard tournaments)
+            let skillLevel = ''
+            if (tournamentType === 'standard') {
+              const playerIds = new Set<string>()
+              group.matches.forEach(m => {
+                if (m.player1_id) playerIds.add(m.player1_id)
+                if (m.player2_id) playerIds.add(m.player2_id)
+              })
+              
+              for (const playerId of playerIds) {
+                const participant = participants.find((p: any) => p.player_id === playerId)
+                if (participant?.player?.belt_level) {
+                  skillLevel = getBeltSkillCategory(participant.player.belt_level)
+                  break
+                }
               }
-              acc[match.round].push(match)
-              return acc
-            }, {} as Record<number, Match[]>)
-
-            const roundNumbers = Object.keys(rounds).map(Number).sort((a, b) => a - b)
-            const totalRounds = roundNumbers.length
+            }
+            
+            const divisionLabel = getDivisionLabel(group.division, group.category, skillLevel)
+            const games = groupGames[key] || []
 
             return (
-              <Card key={key} className="overflow-hidden p-0 gap-0">
-                <CardHeader className="bg-muted/50 border-b py-8">
-                  <CardTitle className="flex items-center gap-2 text-xl">
-                    {getDivisionLabel(group.division, group.category)}
+              <Card key={key} className="overflow-hidden">
+                <CardHeader className="bg-muted/50 border-b py-4">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    {divisionLabel}
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="p-6">
-                  <div className="flex overflow-x-auto pb-4 -mx-2">
-                    {roundNumbers.map((round) => (
-                      <div key={round} className="flex flex-col justify-around min-w-[220px] mx-2 first:ml-0 last:mr-0">
-                        <div className="text-center font-semibold mb-4 text-sm uppercase tracking-wide text-muted-foreground">
-                          {getBracketRoundLabel(round, totalRounds)}
-                        </div>
-                        <div className="flex flex-col justify-around flex-grow space-y-4">
-                        {rounds[round]
-                          .sort((a, b) => a.match_number - b.match_number)
-                          .map((match) => (
-                            <Card 
-                              key={match.id} 
-                              className={cn(
-                                "cursor-pointer hover:border-primary transition-colors relative",
-                                match.status === 'completed' && "bg-muted/50",
-                                match.status === 'in_progress' && "border-green-500 ring-1 ring-green-500",
-                                (!match.player1_id || !match.player2_id) && "opacity-60 cursor-not-allowed"
-                              )}
-                              onClick={() => {
-                                // Only allow click if both players are set
-                                if (match.player1_id && match.player2_id) {
-                                  onMatchClick?.(match)
-                                }
-                              }}
-                            >
-                              <CardContent className="p-3 text-sm">
-                                <div className="flex flex-col gap-2">
-                  <div className={cn(
-                    "flex justify-between items-center p-2 rounded",
-                    match.winner_id === match.player1_id ? "bg-primary/10 font-bold" : "bg-muted/50"
-                  )}>
-                    <div className="flex flex-col">
-                      <span className="text-sm">{getPlayerDisplay(match.player1_id, match).name}</span>
-                      <span className="text-[10px] text-muted-foreground">{getPlayerDisplay(match.player1_id, match).team}</span>
-                    </div>
-                    {match.status === 'completed' && (
-                      <span className="text-sm font-bold">{match.score_player1}</span>
-                    )}
-                  </div>
-                  <div className={cn(
-                    "flex justify-between items-center p-2 rounded",
-                    match.winner_id === match.player2_id ? "bg-primary/10 font-bold" : "bg-muted/50"
-                  )}>
-                    <div className="flex flex-col">
-                      <span className="text-sm">{getPlayerDisplay(match.player2_id, match).name}</span>
-                      <span className="text-[10px] text-muted-foreground">{getPlayerDisplay(match.player2_id, match).team}</span>
-                    </div>
-                    {match.status === 'completed' && (
-                      <span className="text-sm font-bold">{match.score_player2}</span>
-                    )}
-                  </div>
-                </div>                
-                                {match.court_number && (
-                                  <div className="mt-2 text-xs font-medium text-green-600 dark:text-green-400 flex items-center gap-1">
-                                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                                    Court {match.court_number}
-                                  </div>
-                                )}
-
-                                {match.status === 'scheduled' && (
-                                  <div className="absolute -right-2 -top-2 flex gap-1">
-                                    {isOrganizer && courts > 0 && (
-                                      <Button
-                                        size="icon"
-                                        variant="secondary"
-                                        className="h-6 w-6 rounded-full shadow-sm bg-blue-100 hover:bg-blue-200 text-blue-700 dark:bg-blue-900 dark:text-blue-100"
-                                        onClick={(e) => {
-                                          e.stopPropagation()
-                                          setAssigningMatch(match)
-                                        }}
-                                        title="Assign to Court"
-                                      >
-                                        <MapPin className="h-3 w-3" />
-                                      </Button>
-                                    )}
-                                    {isOrganizer && onEditMatch && (
-                                      <Button
-                                        size="icon"
-                                        variant="secondary"
-                                        className="h-6 w-6 rounded-full shadow-sm"
-                                        onClick={(e) => {
-                                          e.stopPropagation()
-                                          onEditMatch(match)
-                                        }}
-                                      >
-                                        <Pencil className="h-3 w-3" />
-                                      </Button>
-                                    )}
-                                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground shadow-sm">
-                                      {match.match_number}
-                                    </span>
-                                  </div>
-                                )}
-                                
-                                {match.status === 'completed' && match.winner_id && (
-                                  <div className="mt-2 text-xs text-center text-muted-foreground">
-                                    Best of 3
-                                  </div>
-                                )}
-                              </CardContent>
-                            </Card>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
+                <CardContent className="p-0 bg-white dark:bg-zinc-900 overflow-x-auto">
+                  <div className="min-w-full p-6">
+                    <BracketGenerator 
+                      games={games}
+                      onMatchClick={(match) => {
+                        // Handle court assignment if in assigning mode or if organizer clicks
+                        if (isOrganizer) {
+                          // Open assignment dialog
+                          setAssigningMatch(match)
+                        } else if (onMatchClick) {
+                          onMatchClick(match)
+                        }
+                      }}
+                      isOrganizer={isOrganizer}
+                      onEditMatch={isOrganizer ? handleEditMatch : undefined}
+                      onSwitchSides={isOrganizer ? handleSwitchSides : undefined}
+                      hoveredTeamId={hoveredTeamId}
+                      onHoveredTeamIdChange={setHoveredTeamId}
+                    />
                   </div>
                 </CardContent>
               </Card>
@@ -366,9 +369,10 @@ export function BracketView({ matches, participants, onMatchClick, isOrganizer =
                       No courts available
                     </div>
                   ) : (
-                    getAvailableCourts().map((courtNum) => (
+                    getAvailableCourts().map(({ courtNum, isOccupied, queueSize }) => (
                       <SelectItem key={courtNum} value={courtNum.toString()}>
-                        Court {courtNum}
+                        Court {courtNum} 
+                        {isOccupied ? ` (Queue: ${queueSize}/3)` : ' (Free)'}
                       </SelectItem>
                     ))
                   )}
@@ -394,6 +398,31 @@ export function BracketView({ matches, participants, onMatchClick, isOrganizer =
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Match Result Dialog for Editing */}
+      <MatchResultDialog
+        open={!!editingMatch}
+        onOpenChange={(open) => !open && setEditingMatch(null)}
+        match={editingMatch}
+        participants={participants}
+      />
+
+      {/* Match Participants Dialog for Swapping */}
+      <MatchParticipantsDialog
+        open={!!editingParticipantsMatch}
+        onOpenChange={(open) => !open && setEditingParticipantsMatch(null)}
+        match={editingParticipantsMatch}
+        participants={participants}
+        divisions={divisions.map(([key, label]) => {
+          const [divisionId, categoryId] = key.split('_')
+          return {
+            id: key,
+            label,
+            divisionId: divisionId === 'no-division' ? null : divisionId,
+            categoryId: categoryId === 'no-category' ? null : categoryId
+          }
+        })}
+      />
     </div>
   )
 }

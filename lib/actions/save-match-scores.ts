@@ -57,6 +57,10 @@ export async function saveMatchScores(
       { roundNumber: 3, scores: scores.round3 }
     ]
 
+    let round1WinnerId: string | null = null
+    let round2WinnerId: string | null = null
+    let round3WinnerId: string | null = null
+
     for (const update of roundUpdates) {
       const round = rounds.find(r => r.round_number === update.roundNumber)
       if (!round) continue
@@ -90,6 +94,10 @@ export async function saveMatchScores(
         winner_id: winnerId,
         status: player1 === 0 && player2 === 0 ? 'pending' : 'completed'
       })
+      // Capture winner ID for syncing to matches table
+      if (update.roundNumber === 1) round1WinnerId = winnerId
+      else if (update.roundNumber === 2) round2WinnerId = winnerId
+      else if (update.roundNumber === 3) round3WinnerId = winnerId
     }
 
     console.log(`[SAVE SCORES] All rounds updated for match ${matchId}`)
@@ -98,6 +106,19 @@ export async function saveMatchScores(
     console.log(`[SAVE SCORES] Checking for match winner...`)
     const result = await checkAndUpdateMatchWinner(matchId)
     console.log(`[SAVE SCORES] Winner check result:`, result)
+
+    // Sync per-round scores to matches table for efficient querying in SVG bracket
+    await supabase.from('matches').update({
+      score_round1_player1: scores.round1.player1,
+      score_round1_player2: scores.round1.player2,
+      score_round2_player1: scores.round2.player1,
+      score_round2_player2: scores.round2.player2,
+      score_round3_player1: scores.round3.player1,
+      score_round3_player2: scores.round3.player2,
+      winner_round1: round1WinnerId,
+      winner_round2: round2WinnerId,
+      winner_round3: round3WinnerId,
+    }).eq('id', matchId)
 
     // Revalidate both bracket and tournament detail pages to show updates
     revalidatePath(routes.organizer.tournamentBracket(match.tournament_id))

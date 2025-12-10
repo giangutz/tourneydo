@@ -21,9 +21,9 @@ import { TournamentBreadcrumbs } from '@/components/tournaments/tournament-bread
 
 export default async function BracketPage({ params }: BracketPageProps) {
   const { id } = await params
-  const [tournament, participants, matches] = await Promise.all([
+  const [tournament, { data: participants }, matches] = await Promise.all([
     getTournamentById(id),
-    getTournamentParticipants(id),
+    getTournamentParticipants(id, { limit: 1000 }),
     getTournamentMatches(id)
   ])
 

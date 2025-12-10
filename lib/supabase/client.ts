@@ -1,6 +1,6 @@
 'use client'
 
-import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { createClient as createSupabaseClient, SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from './types'
 
 // Type for Clerk session object with getToken method
@@ -13,7 +13,7 @@ export function createClerkSupabaseClient({ session }: { session: ClerkSession }
     throw new Error("No session provided")
   }
 
-  return createClient<Database>(
+  return createSupabaseClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
@@ -21,5 +21,12 @@ export function createClerkSupabaseClient({ session }: { session: ClerkSession }
         return session.getToken() ?? null
       },
     },
+  )
+}
+
+export function createClient(): SupabaseClient<Database> {
+  return createSupabaseClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
 }

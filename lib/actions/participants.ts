@@ -231,8 +231,12 @@ export async function weighInParticipant(
       throw new Error('Player must have date of birth and gender')
     }
 
+    // If participant is not yet assigned to a division, just save the measurements
+    // Division assignment will happen later based on these measurements
     if (!registration.division_id || !registration.category_id) {
-      throw new Error('Participant must be assigned to a division first')
+      await updateWeighIn(registrationId, actualWeight, actualHeight)
+      revalidatePath(routes.organizer.tournamentParticipants(tournamentId))
+      return { needsAction: false }
     }
 
     // Get tournament divisions to find the registered category
@@ -379,3 +383,92 @@ export async function allowAtStatedWeight(
 }
 
 
+/**
+ * Bulk weigh-in participants using their declared measurements
+ */
+export async function bulkWeighIn(
+  registrationIds: string[],
+  tournamentId: string
+): Promise<ActionResult<void>> {
+  return safeAction(async () => {
+    const { userId } = await auth()
+    if (!userId) {
+      throw new Error('Unauthorized')
+    }
+
+    const { getRegistrationById, updateWeighIn } = await import('@/lib/db/queries/registrations')
+
+    // Process in parallel
+    await Promise.all(registrationIds.map(async (id) => {
+      const reg = await getRegistrationById(id)
+      if (reg.player) {
+        // Use declared weight/height as actual
+        await updateWeighIn(id, reg.player.weight, reg.player.height)
+      }
+    }))
+
+    revalidatePath(routes.organizer.tournamentParticipants(tournamentId))
+  })
+}
+
+import { createServerSupabaseClient } from '@/lib/supabase/server'
+
+/**
+ * Delete a single participant registration
+ */
+export async function deleteParticipant(
+  participantId: string,
+  tournamentId: string
+): Promise<ActionResult<void>> {
+  return safeAction(async () => {
+    const { userId } = await auth()
+    if (!userId) {
+      throw new Error('Unauthorized')
+    }
+
+    const supabase = createServerSupabaseClient()
+
+    // Delete the participant registration
+    const { error } = await supabase
+      .from('tournament_registrations')
+      .delete()
+      .eq('id', participantId)
+      .eq('tournament_id', tournamentId)
+
+    if (error) {
+      throw new Error(`Failed to delete participant: ${error.message}`)
+    }
+
+    revalidatePath(routes.organizer.tournamentDetail(tournamentId))
+  })
+}
+
+/**
+ * Delete multiple participant registrations
+ */
+export async function bulkDeleteParticipants(
+  participantIds: string[],
+  tournamentId: string
+): Promise<ActionResult<void>> {
+  return safeAction(async () => {
+    const { userId } = await auth()
+    if (!userId) {
+      throw new Error('Unauthorized')
+    }
+
+    const supabase = createServerSupabaseClient()
+
+    // Delete all selected participants
+    const { error } = await supabase
+      .from('tournament_registrations')
+      .delete()
+      .in('id', participantIds)
+      .eq('tournament_id', tournamentId)
+
+    if (error) {
+      throw new Error(`Failed to delete participants: ${error.message}`)
+    }
+
+    revalidatePath(routes.organizer.tournamentDetail(tournamentId))
+  })
+}

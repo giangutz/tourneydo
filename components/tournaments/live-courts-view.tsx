@@ -33,9 +33,11 @@ export function LiveCourtsView({ tournament, matches, participants }: LiveCourts
       <h2 className="text-2xl font-bold tracking-tight">Live Courts</h2>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {courts.map((courtNumber) => {
-          const currentMatch = matches.find(
-            (m) => m.court_number === courtNumber && m.status === 'in_progress'
-          )
+          const courtMatches = matches.filter(m => m.court_number === courtNumber)
+          const currentMatch = courtMatches.find(m => m.status === 'in_progress')
+          const queuedMatches = courtMatches
+            .filter(m => m.status === 'scheduled')
+            .sort((a, b) => (a.match_number || 0) - (b.match_number || 0))
 
           return (
             <Card key={courtNumber} className="overflow-hidden">
@@ -51,7 +53,7 @@ export function LiveCourtsView({ tournament, matches, participants }: LiveCourts
               </CardHeader>
               <CardContent className="pt-6">
                 {currentMatch ? (
-                  <div className="text-center">
+                  <div className="text-center mb-6">
                     <div className="mb-4 text-sm text-muted-foreground">
                       Match #{currentMatch.match_number} • Round {currentMatch.round}
                     </div>
@@ -80,10 +82,37 @@ export function LiveCourtsView({ tournament, matches, participants }: LiveCourts
                     </div>
                   </div>
                 ) : (
-                  <div className="flex h-32 items-center justify-center text-muted-foreground">
+                  <div className="flex h-32 items-center justify-center text-muted-foreground mb-6">
                     Waiting for next match...
                   </div>
                 )}
+
+                {/* Upcoming Matches Section */}
+                <div className="border-t pt-4">
+                  <h4 className="text-sm font-semibold mb-3">Upcoming Matches</h4>
+                  
+                  {queuedMatches.length === 0 ? (
+                    <p className="text-xs text-muted-foreground text-center py-2">No upcoming matches</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {queuedMatches.map((match, idx) => (
+                        <div key={match.id} className="text-sm border rounded p-2 bg-muted/20">
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="font-medium text-xs">Match #{match.match_number}</span>
+                            {idx === 0 && !currentMatch && (
+                              <Badge variant="outline" className="text-[10px] h-5">Next</Badge>
+                            )}
+                          </div>
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="truncate max-w-[45%]">{getPlayerDisplay(match.player1_id).name}</span>
+                            <span className="text-muted-foreground">vs</span>
+                            <span className="truncate max-w-[45%] text-right">{getPlayerDisplay(match.player2_id).name}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
           )

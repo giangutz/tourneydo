@@ -6,7 +6,7 @@
  */
 
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { RegistrationInsert } from '@/types/models'
+import { RegistrationInsert, TournamentRegistrationInsert } from '@/types/models'
 
 /**
  * Register a team for a tournament
@@ -120,14 +120,47 @@ export async function getCoachRegistrations(coachId: string) {
 /**
  * Get all participants for a tournament
  */
-export async function getTournamentParticipants(tournamentId: string) {
-  const supabase = createServerSupabaseClient()
+export type GetParticipantsOptions = {
+  page?: number
+  limit?: number
+  query?: string
+  teamId?: string
+  belt?: string
+  status?: string
+  weighInStatus?: string
+  sort?: string
+  order?: 'asc' | 'desc'
+}
 
-  const { data, error } = await supabase
+/**
+ * Get all participants for a tournament with pagination and filtering
+ */
+export async function getTournamentParticipants(
+  tournamentId: string,
+  options: GetParticipantsOptions = {}
+) {
+  const supabase = createServerSupabaseClient()
+  const {
+    page = 1,
+    limit = 10,
+    query,
+    teamId,
+    belt,
+    status,
+    weighInStatus,
+    sort = 'created_at',
+    order = 'desc'
+  } = options
+
+  const from = (page - 1) * limit
+  const to = from + limit - 1
+
+  // Base query with inner join on players for filtering
+  let queryBuilder = supabase
     .from('tournament_registrations')
     .select(`
       *,
-      players (
+      players!inner (
         id,
         first_name,
         last_name,
@@ -148,9 +181,58 @@ export async function getTournamentParticipants(tournamentId: string) {
           email
         )
       )
-    `)
+    `, { count: 'exact' })
     .eq('tournament_id', tournamentId)
-    .order('created_at', { ascending: false })
+
+  // Apply filters
+  if (teamId && teamId !== 'all') {
+    queryBuilder = queryBuilder.eq('team_id', teamId)
+  }
+
+  if (status && status !== 'all') {
+    queryBuilder = queryBuilder.eq('status', status)
+  }
+
+  if (belt && belt !== 'all') {
+    queryBuilder = queryBuilder.eq('players.belt_level', belt)
+  }
+
+  if (query) {
+    // Search by player first name or last name
+    queryBuilder = queryBuilder.or(`first_name.ilike.%${query}%,last_name.ilike.%${query}%`, { foreignTable: 'players' })
+  }
+
+  if (weighInStatus && weighInStatus !== 'all') {
+    if (weighInStatus === 'completed') {
+      queryBuilder = queryBuilder.not('weighed_in_at', 'is', null)
+    } else if (weighInStatus === 'pending') {
+      queryBuilder = queryBuilder.is('weighed_in_at', null).in('status', ['verified', 'paid'])
+    } else if (weighInStatus === 'not-required') {
+      queryBuilder = queryBuilder.is('weighed_in_at', null).not('status', 'in', '("verified","paid")')
+    }
+  }
+
+  // Apply sorting
+  if (sort === 'name') {
+    // Sort by player last name
+    queryBuilder = queryBuilder.order('players(last_name)', { ascending: order === 'asc' })
+  } else if (sort === 'team') {
+    queryBuilder = queryBuilder.order('teams(name)', { ascending: order === 'asc' })
+  } else if (sort === 'belt') {
+    queryBuilder = queryBuilder.order('players(belt_level)', { ascending: order === 'asc' })
+  } else if (sort === 'status') {
+    queryBuilder = queryBuilder.order('status', { ascending: order === 'asc' })
+  } else if (sort === 'weighIn') {
+    queryBuilder = queryBuilder.order('weighed_in_at', { ascending: order === 'asc', nullsFirst: false })
+  } else {
+    // Default sort
+    queryBuilder = queryBuilder.order('created_at', { ascending: false })
+  }
+
+  // Apply pagination
+  queryBuilder = queryBuilder.range(from, to)
+
+  const { data, error, count } = await queryBuilder
 
   if (error) {
     throw new Error(`Failed to fetch participants: ${error.message}`)
@@ -163,7 +245,13 @@ export async function getTournamentParticipants(tournamentId: string) {
     team: item.teams
   })) || []
 
-  return transformedData
+  return {
+    data: transformedData,
+    count: count || 0,
+    page,
+    limit,
+    totalPages: count ? Math.ceil(count / limit) : 0
+  }
 }
 
 /**
@@ -245,7 +333,10 @@ export async function getUpcomingEventsCount(): Promise<number> {
 /**
  * Create a single registration
  */
-export async function createRegistration(data: RegistrationInsert): Promise<void> {
+/**
+ * Create a single registration
+ */
+export async function createRegistration(data: TournamentRegistrationInsert): Promise<void> {
   const supabase = createServerSupabaseClient()
 
   const { error } = await supabase

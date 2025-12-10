@@ -13,6 +13,26 @@ import { routes } from '@/config/routes'
 import type { ActionResult } from '@/types/api'
 
 /**
+ * Map belt level to skill category for Standard tournaments
+ * White → Beginner
+ * Yellow, Blue → Novice I
+ * Red, Brown → Novice II
+ * Black → Advanced
+ */
+function getBeltSkillCategory(beltLevel: string | null | undefined): string {
+  if (!beltLevel) return 'unknown'
+
+  const belt = beltLevel.toLowerCase()
+
+  if (belt === 'white') return 'beginner'
+  if (belt === 'yellow' || belt === 'blue') return 'novice_i'
+  if (belt === 'red' || belt === 'brown') return 'novice_ii'
+  if (belt === 'black') return 'advanced'
+
+  return 'unknown'
+}
+
+/**
  * Generate and save bracket for a tournament
  */
 export async function generateTournamentBracket(tournamentId: string): Promise<ActionResult<void>> {
@@ -40,7 +60,7 @@ export async function generateTournamentBracket(tournamentId: string): Promise<A
     }
 
     // 3. Fetch participants
-    const participants = await getTournamentParticipants(tournamentId)
+    const { data: participants } = await getTournamentParticipants(tournamentId, { limit: 1000 })
     console.log('Total participants:', participants.length)
 
     const confirmedParticipants = participants.filter(p => (p.status === 'verified' || p.status === 'paid') && !p.disqualified)
@@ -123,23 +143,52 @@ export async function generateTournamentBracket(tournamentId: string): Promise<A
     }
 
     // 5. Refresh participants with division assignments
-    const assignedParticipants = await getTournamentParticipants(tournamentId)
+    const { data: assignedParticipants } = await getTournamentParticipants(tournamentId, { limit: 1000 })
+
+    console.log(`Total participants after assignment: ${assignedParticipants.length}`)
+    console.log('Participant assignment status:', assignedParticipants.map(p => ({
+      id: p.id,
+      name: `${p.player?.first_name} ${p.player?.last_name}`,
+      status: p.status,
+      disqualified: p.disqualified,
+      division_id: p.division_id,
+      category_id: p.category_id,
+      belt_level: p.player?.belt_level
+    })))
+
     const participantsWithDivisions = assignedParticipants.filter(
       p => (p.status === 'verified' || p.status === 'paid') && p.division_id && p.category_id && !p.disqualified
     )
 
-    // 6. Group participants by division, category, and optionally belt level
+    const filteredOut = assignedParticipants.filter(
+      p => !((p.status === 'verified' || p.status === 'paid') && p.division_id && p.category_id && !p.disqualified)
+    )
+
+    if (filteredOut.length > 0) {
+      console.warn(`⚠️ ${filteredOut.length} participants filtered out:`, filteredOut.map(p => ({
+        name: `${p.player?.first_name} ${p.player?.last_name}`,
+        reason: !p.division_id ? 'No division_id' :
+          !p.category_id ? 'No category_id' :
+            p.disqualified ? 'Disqualified' :
+              !(p.status === 'verified' || p.status === 'paid') ? `Status: ${p.status}` : 'Unknown'
+      })))
+    }
+
+    console.log(`Participants with divisions: ${participantsWithDivisions.length}`)
+
+    // 6. Group participants by division, category, and optionally belt skill category
     const groups = new Map<string, typeof participantsWithDivisions>()
 
     for (const participant of participantsWithDivisions) {
-      // For Standard tournaments: group by division, category, AND belt level
+      // For Standard tournaments: group by division, category, AND skill category (combined belt levels)
       // For Open Belt tournaments: group by division and category ONLY (ignore belt level)
       let key: string
       if (isOpenBelt) {
         key = `${participant.division_id}_${participant.category_id}`
       } else {
-        const beltLevel = participant.player?.belt_level || 'unknown'
-        key = `${participant.division_id}_${participant.category_id}_${beltLevel}`
+        // Use skill category instead of raw belt level
+        const skillCategory = getBeltSkillCategory(participant.player?.belt_level)
+        key = `${participant.division_id}_${participant.category_id}_${skillCategory}`
       }
 
       if (!groups.has(key)) {
@@ -148,7 +197,7 @@ export async function generateTournamentBracket(tournamentId: string): Promise<A
       groups.get(key)!.push(participant)
     }
 
-    console.log(`${isOpenBelt ? 'Open Belt' : 'Standard'} tournament - Division/Category${isOpenBelt ? '' : '/Belt'} groups:`, Array.from(groups.entries()).map(([key, participants]) => ({
+    console.log(`${isOpenBelt ? 'Open Belt' : 'Standard'} tournament - Division/Category${isOpenBelt ? '' : '/Skill Category'} groups:`, Array.from(groups.entries()).map(([key, participants]) => ({
       key,
       count: participants.length,
       participants: participants.map((p: any) => ({
@@ -156,7 +205,8 @@ export async function generateTournamentBracket(tournamentId: string): Promise<A
         name: `${p.player?.first_name} ${p.player?.last_name}`,
         division_id: p.division_id,
         category_id: p.category_id,
-        belt_level: p.player?.belt_level
+        belt_level: p.player?.belt_level,
+        skill_category: isOpenBelt ? 'N/A' : getBeltSkillCategory(p.player?.belt_level)
       }))
     })))
 
@@ -183,8 +233,15 @@ export async function generateTournamentBracket(tournamentId: string): Promise<A
           winner_id: groupParticipants[0].player_id,
           score_player1: 0,
           score_player2: 0,
+          score_round1_player1: 0,
+          score_round1_player2: 0,
+          score_round2_player1: 0,
+          score_round2_player2: 0,
+          score_round3_player1: 0,
+          score_round3_player2: 0,
           status: 'completed' as const,
           next_match_id: null,
+          source_match_id: null,
           court_number: null,
           division_id: divisionId,
           category_id: categoryId
@@ -224,6 +281,9 @@ export async function generateTournamentBracket(tournamentId: string): Promise<A
     // Save all matches at once
     await saveBracket(tournamentId, allMatches)
 
+    // Revalidate paths to prevent caching of bracket data
     revalidatePath(routes.organizer.tournamentDetail(tournamentId))
+    revalidatePath(routes.organizer.tournamentBracket(tournamentId))
+    revalidatePath(`/tournaments/${tournamentId}`)
   })
 }

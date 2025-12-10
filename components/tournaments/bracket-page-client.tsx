@@ -19,7 +19,10 @@ interface BracketPageClientProps {
   matches: Match[]
 }
 
+import { useTournamentRealtime } from '@/hooks/use-tournament-realtime'
+
 export function BracketPageClient({ tournament, participants, matches }: BracketPageClientProps) {
+  useTournamentRealtime(tournament.id)
   const router = useRouter()
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -82,6 +85,7 @@ export function BracketPageClient({ tournament, participants, matches }: Bracket
           isOrganizer={true}
           onEditMatch={handleEditMatch}
           courts={tournament.courts || 0}
+          tournamentType={tournament.tournament_type as 'standard' | 'open-belt'}
         />
       )}
 
@@ -102,3 +106,4 @@ export function BracketPageClient({ tournament, participants, matches }: Bracket
     </div>
   )
 }
+

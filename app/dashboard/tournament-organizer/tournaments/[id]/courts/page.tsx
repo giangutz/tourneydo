@@ -26,7 +26,7 @@ export default async function TournamentCourtsPage({ params }: TournamentCourtsP
     notFound()
   }
 
-  const participants = await getTournamentParticipants(id)
+  const { data: participants } = await getTournamentParticipants(id, { limit: 1000 })
   const matches = await getTournamentMatches(id)
 
   return (

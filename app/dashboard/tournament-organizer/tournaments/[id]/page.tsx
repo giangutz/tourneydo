@@ -39,8 +39,8 @@ export default async function TournamentDashboardPage({ params }: TournamentDash
     notFound()
   }
 
-  const participants = await getTournamentParticipants(id)
-  const approvedParticipants = participants.filter(p => p.status === 'approved')
+  const { data: participants, count } = await getTournamentParticipants(id, { limit: 1000 })
+  const approvedParticipants = participants.filter(p => p.status === 'verified' || p.status === 'paid')
 
   return (
     <DashboardShell>
@@ -82,7 +82,7 @@ export default async function TournamentDashboardPage({ params }: TournamentDash
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{participants.length}</div>
+            <div className="text-2xl font-bold">{count}</div>
             <p className="text-xs text-muted-foreground">
               {approvedParticipants.length} approved
             </p>
