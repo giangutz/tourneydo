@@ -6,7 +6,7 @@
  */
 
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { RegistrationInsert, TournamentRegistrationInsert } from '@/types/models'
+import { RegistrationInsert, TournamentRegistration, TournamentRegistrationInsert } from '@/types/models'
 
 /**
  * Register a team for a tournament
@@ -114,7 +114,7 @@ export async function getCoachRegistrations(coachId: string) {
     throw new Error(`Failed to fetch coach registrations: ${error.message}`)
   }
 
-  return data || []
+  return (data as unknown as TournamentRegistration[]) || []
 }
 
 /**

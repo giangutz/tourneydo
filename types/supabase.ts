@@ -232,6 +232,39 @@ export type Database = {
           },
         ]
       }
+      team_players: {
+        Row: {
+          created_at: string
+          player_id: string
+          team_id: string
+        }
+        Insert: {
+          created_at?: string
+          player_id: string
+          team_id: string
+        }
+        Update: {
+          created_at?: string
+          player_id?: string
+          team_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_players_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_players_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      },
       teams: {
         Row: {
           coach_name: string | null
@@ -286,7 +319,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          division_id: division_id
+          division_id: string
           gender: string
           id?: string
           max_weight?: number | null
