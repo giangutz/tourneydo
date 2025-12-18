@@ -19,6 +19,8 @@ interface PublicTournamentListProps {
   tournaments: Tournament[]
 }
 
+import { calculateTournamentPhase } from "@/lib/utils/tournament-phases"
+
 export function PublicTournamentList({ tournaments }: PublicTournamentListProps) {
   if (tournaments.length === 0) {
     return (
@@ -32,17 +34,21 @@ export function PublicTournamentList({ tournaments }: PublicTournamentListProps)
 
   return (
     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3" data-testid="tournament-list">
-      {tournaments.map((tournament) => (
+      {tournaments.map((tournament) => {
+        const phase = calculateTournamentPhase(tournament)
+        
+        return (
         <Card key={tournament.id} className="flex flex-col h-full hover:shadow-md transition-shadow">
           <CardHeader>
             <div className="flex justify-between items-start gap-2">
               <CardTitle className="line-clamp-1">{tournament.name}</CardTitle>
               <Badge variant={
-                tournament.status === 'upcoming' ? 'default' :
-                tournament.status === 'ongoing' ? 'secondary' :
+                phase === 'upcoming' ? 'default' :
+                phase === 'weigh-in' ? 'secondary' : // Or perhaps a distinct color if available
+                phase === 'ongoing' ? 'destructive' :
                 'outline'
-              }>
-                {tournament.status}
+              } className="capitalize">
+                {phase.replace('-', ' ')}
               </Badge>
             </div>
             <CardDescription>
@@ -86,7 +92,8 @@ export function PublicTournamentList({ tournaments }: PublicTournamentListProps)
             </Button>
           </CardFooter>
         </Card>
-      ))}
+        )
+      })}
     </div>
   )
 }

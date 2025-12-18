@@ -229,8 +229,11 @@ export async function getTournamentParticipants(
     queryBuilder = queryBuilder.order('created_at', { ascending: false })
   }
 
-  // Apply pagination
-  queryBuilder = queryBuilder.range(from, to)
+  // Apply pagination only for reasonable limits (for UI tables)
+  // For dashboard stats with high limits, skip pagination to get all records
+  if (limit < 5000) {
+    queryBuilder = queryBuilder.range(from, to)
+  }
 
   const { data, error, count } = await queryBuilder
 

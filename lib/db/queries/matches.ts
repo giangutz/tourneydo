@@ -1,6 +1,6 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { MatchInsert, MatchUpdate, Match } from '@/types/models'
-import { createMatchRounds } from './match-rounds'
+
 
 /**
  * Save a generated bracket (delete existing and insert new)
@@ -40,17 +40,33 @@ export async function saveBracket(tournamentId: string, matches: MatchInsert[]):
 
   console.log(`Successfully inserted ${data?.length || 0} matches`)
 
-  // 3. Create 3 rounds for each match
-  if (data) {
-    console.log('Creating rounds for each match...')
-    for (const match of data) {
-      try {
-        await createMatchRounds(match.id)
-      } catch (error) {
-        console.error(`Failed to create rounds for match ${match.id}:`, error)
+  // 3. Create 3 rounds for each match (Batch Insert)
+  if (data && data.length > 0) {
+    console.log('Creating rounds for matches...')
+
+    const allRounds = data.flatMap(match => [
+      { match_id: match.id, round_number: 1 },
+      { match_id: match.id, round_number: 2 },
+      { match_id: match.id, round_number: 3 }
+    ])
+
+    // Batch insert in chunks of 1000 to be safe
+    const CHUNK_SIZE = 1000
+    for (let i = 0; i < allRounds.length; i += CHUNK_SIZE) {
+      const chunk = allRounds.slice(i, i + CHUNK_SIZE)
+      const { error: roundsError } = await supabase
+        .from('match_rounds')
+        .insert(chunk)
+
+      if (roundsError) {
+        console.error('Failed to insert batch of rounds:', roundsError)
+        // We log but maybe don't throw to not kill the whole process if partial success? 
+        // Actually, if rounds fail, the match is broken. We should probably throw.
+        throw new Error(`Failed to create rounds: ${roundsError.message}`)
       }
     }
-    console.log('Rounds created successfully')
+
+    console.log(`Successfully created ${allRounds.length} rounds`)
   }
 }
 
@@ -110,6 +126,18 @@ export async function getTournamentMatches(tournamentId: string) {
         id,
         name,
         gender
+      ),
+      player1:players!player1_id (
+        id,
+        first_name,
+        last_name,
+        belt_level
+      ),
+      player2:players!player2_id (
+        id,
+        first_name,
+        last_name,
+        belt_level
       )
     `)
     .eq('tournament_id', tournamentId)

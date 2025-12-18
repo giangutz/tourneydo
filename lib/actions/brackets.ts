@@ -11,6 +11,7 @@ import { DEFAULT_DIVISIONS, calculateAge, findDivisionByAge, findCategory } from
 import { safeAction } from '@/lib/utils/errors'
 import { routes } from '@/config/routes'
 import type { ActionResult } from '@/types/api'
+import { id } from 'zod/v4/locales'
 
 /**
  * Map belt level to skill category for Standard tournaments
@@ -35,8 +36,21 @@ function getBeltSkillCategory(beltLevel: string | null | undefined): string {
 /**
  * Generate and save bracket for a tournament
  */
-export async function generateTournamentBracket(tournamentId: string): Promise<ActionResult<void>> {
-  return safeAction(async () => {
+// Custom result type for bracket generation with validation details
+export type GenerateBracketResult =
+  | { success: true }
+  | {
+    success: false;
+    error: string;
+    errorType?: 'unweighed' | 'unassigned' | 'general';
+    participants?: { id: string; name: string; reason?: string; currentWeight?: number; currentHeight?: number; age?: number }[]
+  }
+
+/**
+ * Generate and save bracket for a tournament
+ */
+export async function generateTournamentBracket(tournamentId: string): Promise<GenerateBracketResult> {
+  try {
     const { userId } = await auth()
 
     if (!userId) {
@@ -49,26 +63,20 @@ export async function generateTournamentBracket(tournamentId: string): Promise<A
       throw new Error('Tournament not found')
     }
     const isOpenBelt = tournament.tournament_type === 'open-belt'
-    console.log('Tournament type:', tournament.tournament_type, 'isOpenBelt:', isOpenBelt)
 
     // 2. Ensure tournament has divisions configured
-    let divisions = await getTournamentDivisions(tournamentId)
-    if (divisions.length === 0) {
-      // Create default divisions if none exist
-      await createDefaultDivisions(tournamentId, DEFAULT_DIVISIONS)
-      divisions = await getTournamentDivisions(tournamentId)
-    }
+    // 2. Ensure tournament has divisions configured (and backfill any missing categories)
+    const { ensureTournamentDivisionsAndCategories } = await import('@/lib/db/queries/divisions')
+    await ensureTournamentDivisionsAndCategories(tournamentId, DEFAULT_DIVISIONS)
+    const divisions = await getTournamentDivisions(tournamentId) as any
 
     // 3. Fetch participants
     const { data: participants } = await getTournamentParticipants(tournamentId, { limit: 1000 })
-    console.log('Total participants:', participants.length)
 
     const confirmedParticipants = participants.filter(p => (p.status === 'verified' || p.status === 'paid') && !p.disqualified)
-    console.log('Confirmed participants:', confirmedParticipants.length)
-    console.log('Confirmed participant statuses:', confirmedParticipants.map(p => ({ id: p.id, status: p.status, disqualified: p.disqualified })))
 
     if (confirmedParticipants.length < 2) {
-      throw new Error('Need at least 2 verified/paid participants to generate brackets')
+      return { success: false, error: 'Need at least 2 verified/paid participants to generate brackets', errorType: 'general' }
     }
 
     // 3.5. Validate all confirmed participants have completed weigh-in
@@ -88,24 +96,28 @@ export async function generateTournamentBracket(tournamentId: string): Promise<A
     })
 
     if (participantsWithoutWeighIn.length > 0) {
-      const names = participantsWithoutWeighIn.map(p => `${p.player?.first_name} ${p.player?.last_name}`).join(', ')
-      throw new Error(`The following participants need to complete weigh-in before bracket generation: ${names}`)
+      return {
+        success: false,
+        error: 'Some participants have not completed weigh-in',
+        errorType: 'unweighed',
+        participants: participantsWithoutWeighIn.map(p => ({
+          id: p.id,
+          name: `${p.player?.first_name} ${p.player?.last_name}`,
+          reason: 'Missing weigh-in data'
+        }))
+      }
     }
 
     // 4. Assign participants to divisions and categories
-    for (const participant of confirmedParticipants) {
-      console.log('Processing participant:', {
-        id: participant.id,
-        hasDOB: !!participant.player?.dob,
-        hasGender: !!participant.player?.gender,
-        gender: participant.player?.gender,
-        weight: participant.player?.weight,
-        height: participant.player?.height,
-        beltLevel: participant.player?.belt_level
-      })
+    const assignmentErrors: { id: string; name: string; reason: string; currentWeight?: number; currentHeight?: number; age?: number }[] = []
 
+    for (const participant of confirmedParticipants) {
       if (!participant.player?.dob || !participant.player?.gender) {
-        console.warn(`Skipping participant ${participant.id}: missing DOB or gender`)
+        assignmentErrors.push({
+          id: participant.id,
+          name: `${participant.player?.first_name} ${participant.player?.last_name}`,
+          reason: 'Missing DOB or Gender'
+        })
         continue
       }
 
@@ -113,7 +125,11 @@ export async function generateTournamentBracket(tournamentId: string): Promise<A
       const division = findDivisionByAge(age, DEFAULT_DIVISIONS)
 
       if (!division) {
-        console.warn(`No division found for participant ${participant.id} with age ${age}`)
+        assignmentErrors.push({
+          id: participant.id,
+          name: `${participant.player?.first_name} ${participant.player?.last_name}`,
+          reason: `No division found for age ${age}`
+        })
         continue
       }
 
@@ -125,56 +141,62 @@ export async function generateTournamentBracket(tournamentId: string): Promise<A
       )
 
       if (!category) {
-        console.warn(`No category found for participant ${participant.id}`)
+        assignmentErrors.push({
+          id: participant.id,
+          name: `${participant.player?.first_name} ${participant.player?.last_name}`,
+          reason: `No matching weight/height category`,
+          currentWeight: participant.player?.weight || undefined,
+          currentHeight: participant.player?.height || undefined,
+          age: age
+        })
         continue
       }
 
       // Find the division and category IDs from the database
       const dbDivision = divisions.find(d => d.name === division.name)
-      if (!dbDivision) continue
+      if (!dbDivision) {
+        assignmentErrors.push({
+          id: participant.id,
+          name: `${participant.player?.first_name} ${participant.player?.last_name}`,
+          reason: `Division ${division.name} not configured in tournament`
+        })
+        continue
+      }
 
       const dbCategory = dbDivision.tournament_categories?.find(
-        (c: any) => c.name === category.name && c.gender === category.gender
+        (c: any) => c.name.trim().toLowerCase() === category.name.trim().toLowerCase() && c.gender === category.gender
       )
-      if (!dbCategory) continue
+      if (!dbCategory) {
+        console.error(`Mismatch debug: Category '${category.name}' (gender: ${category.gender}) not found in DB division '${dbDivision.name}' categories:`, dbDivision.tournament_categories?.map((c: any) => `${c.name} (${c.gender})`))
+        assignmentErrors.push({
+          id: participant.id,
+          name: `${participant.player?.first_name} ${participant.player?.last_name}`,
+          reason: `Category ${category.name} not configured (found: ${division.name})`
+        })
+        continue
+      }
 
       // Assign to database
       await assignParticipantDivision(participant.id, dbDivision.id, dbCategory.id)
     }
 
+    // If there were any assignment errors, STOP and return them
+    if (assignmentErrors.length > 0) {
+      return {
+        success: false,
+        error: 'Some participants could not be assigned to a division',
+        errorType: 'unassigned',
+        participants: assignmentErrors
+      }
+    }
+
     // 5. Refresh participants with division assignments
     const { data: assignedParticipants } = await getTournamentParticipants(tournamentId, { limit: 1000 })
 
-    console.log(`Total participants after assignment: ${assignedParticipants.length}`)
-    console.log('Participant assignment status:', assignedParticipants.map(p => ({
-      id: p.id,
-      name: `${p.player?.first_name} ${p.player?.last_name}`,
-      status: p.status,
-      disqualified: p.disqualified,
-      division_id: p.division_id,
-      category_id: p.category_id,
-      belt_level: p.player?.belt_level
-    })))
-
+    // Double check that everyone we expect to be assigned is actually assigned
     const participantsWithDivisions = assignedParticipants.filter(
       p => (p.status === 'verified' || p.status === 'paid') && p.division_id && p.category_id && !p.disqualified
     )
-
-    const filteredOut = assignedParticipants.filter(
-      p => !((p.status === 'verified' || p.status === 'paid') && p.division_id && p.category_id && !p.disqualified)
-    )
-
-    if (filteredOut.length > 0) {
-      console.warn(`⚠️ ${filteredOut.length} participants filtered out:`, filteredOut.map(p => ({
-        name: `${p.player?.first_name} ${p.player?.last_name}`,
-        reason: !p.division_id ? 'No division_id' :
-          !p.category_id ? 'No category_id' :
-            p.disqualified ? 'Disqualified' :
-              !(p.status === 'verified' || p.status === 'paid') ? `Status: ${p.status}` : 'Unknown'
-      })))
-    }
-
-    console.log(`Participants with divisions: ${participantsWithDivisions.length}`)
 
     // 6. Group participants by division, category, and optionally belt skill category
     const groups = new Map<string, typeof participantsWithDivisions>()
@@ -186,7 +208,7 @@ export async function generateTournamentBracket(tournamentId: string): Promise<A
       if (isOpenBelt) {
         key = `${participant.division_id}_${participant.category_id}`
       } else {
-        // Use skill category instead of raw belt level
+        // Standard: Use skill category to separate brackets (Beginner, Novice I, etc.)
         const skillCategory = getBeltSkillCategory(participant.player?.belt_level)
         key = `${participant.division_id}_${participant.category_id}_${skillCategory}`
       }
@@ -197,19 +219,6 @@ export async function generateTournamentBracket(tournamentId: string): Promise<A
       groups.get(key)!.push(participant)
     }
 
-    console.log(`${isOpenBelt ? 'Open Belt' : 'Standard'} tournament - Division/Category${isOpenBelt ? '' : '/Skill Category'} groups:`, Array.from(groups.entries()).map(([key, participants]) => ({
-      key,
-      count: participants.length,
-      participants: participants.map((p: any) => ({
-        id: p.id,
-        name: `${p.player?.first_name} ${p.player?.last_name}`,
-        division_id: p.division_id,
-        category_id: p.category_id,
-        belt_level: p.player?.belt_level,
-        skill_category: isOpenBelt ? 'N/A' : getBeltSkillCategory(p.player?.belt_level)
-      }))
-    })))
-
     // 7. Generate brackets for each group
     const allMatches: any[] = []
     let matchNumberCounter = 1
@@ -217,8 +226,6 @@ export async function generateTournamentBracket(tournamentId: string): Promise<A
     for (const [groupKey, groupParticipants] of groups.entries()) {
       // Handle single-player divisions - they automatically win their division
       if (groupParticipants.length === 1) {
-        console.log(`Single participant in group ${groupKey}: ${groupParticipants[0].player?.first_name} ${groupParticipants[0].player?.last_name} - automatic winner`)
-
         // Create a single "finals" match where the participant is already the winner
         const divisionId = groupParticipants[0].division_id
         const categoryId = groupParticipants[0].category_id
@@ -251,9 +258,7 @@ export async function generateTournamentBracket(tournamentId: string): Promise<A
         continue
       }
 
-      console.log(`Generating bracket for group ${groupKey} with ${groupParticipants.length} participants`)
       const matches = generateBracket(tournamentId, groupParticipants, matchNumberCounter)
-      console.log(`Generated ${matches.length} matches for group ${groupKey}`)
 
       // Update counter for next group
       matchNumberCounter += matches.length
@@ -272,8 +277,6 @@ export async function generateTournamentBracket(tournamentId: string): Promise<A
       allMatches.push(...matchesWithMeta)
     }
 
-    console.log(`Total matches to save: ${allMatches.length}`)
-
     if (allMatches.length === 0) {
       throw new Error('No brackets generated. Ensure participants have DOB, gender, weight/height.')
     }
@@ -285,5 +288,12 @@ export async function generateTournamentBracket(tournamentId: string): Promise<A
     revalidatePath(routes.organizer.tournamentDetail(tournamentId))
     revalidatePath(routes.organizer.tournamentBracket(tournamentId))
     revalidatePath(`/tournaments/${tournamentId}`)
-  })
+
+    return { success: true }
+  } catch (error) {
+    if (error instanceof Error) {
+      return { success: false, error: error.message, errorType: 'general' }
+    }
+    return { success: false, error: 'An unexpected error occurred', errorType: 'general' }
+  }
 }

@@ -145,6 +145,11 @@ export async function addParticipant(tournamentId: string, prevState: any, formD
       player_id: player.id,
       coach_id: team.user_id,
       status: 'verified', // Auto-verified since organizer added them
+      actual_weight: null,
+      actual_height: null,
+      disqualified: false,
+      disqualification_reason: null,
+      weighed_in_at: null
     })
 
     revalidatePath(routes.organizer.tournamentParticipants(tournamentId))

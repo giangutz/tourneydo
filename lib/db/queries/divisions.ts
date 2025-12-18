@@ -59,7 +59,15 @@ export async function getTournamentDivisions(tournamentId: string) {
     .from('tournament_divisions')
     .select(`
       *,
-      tournament_categories (*)
+      tournament_categories (
+        id,
+        name,
+        gender,
+        min_weight,
+        max_weight,
+        min_height,
+        max_height
+      )
     `)
     .eq('tournament_id', tournamentId)
     .eq('enabled', true)
@@ -70,6 +78,103 @@ export async function getTournamentDivisions(tournamentId: string) {
   }
 
   return data || []
+}
+
+/**
+ * Ensure all default divisions and categories exist for a tournament
+ * Backfills any missing entries
+ */
+export async function ensureTournamentDivisionsAndCategories(
+  tournamentId: string,
+  defaults: DivisionConfig[]
+) {
+  const supabase = createServerSupabaseClient()
+
+  // 1. Get existing divisions and categories
+  const existingDivisions = await getTournamentDivisions(tournamentId)
+
+  for (const defaultDiv of defaults) {
+    let divId: string
+    let currentDiv = existingDivisions.find(
+      (d) => d.name.toLowerCase() === defaultDiv.name.toLowerCase()
+    )
+
+    if (currentDiv) {
+      divId = currentDiv.id
+      // Update division age limits if changed
+      if (currentDiv.min_age !== defaultDiv.minAge || currentDiv.max_age !== defaultDiv.maxAge) {
+        await supabase.from('tournament_divisions')
+          .update({ min_age: defaultDiv.minAge, max_age: defaultDiv.maxAge })
+          .eq('id', divId)
+      }
+    } else {
+      // Create missing division
+      const { data, error } = await supabase
+        .from('tournament_divisions')
+        .insert({
+          tournament_id: tournamentId,
+          name: defaultDiv.name,
+          min_age: defaultDiv.minAge,
+          max_age: defaultDiv.maxAge,
+          enabled: true,
+        })
+        .select()
+        .single()
+
+      if (error) throw new Error(`Failed to create division ${defaultDiv.name}: ${error.message}`)
+      divId = data.id
+      currentDiv = { ...data, tournament_categories: [] } // Optimized structure
+    }
+
+    // Check and create/update categories
+    const existingCategories = currentDiv?.tournament_categories || []
+
+    for (const defaultCat of defaultDiv.categories) {
+      const existingCat = existingCategories.find(
+        (c: any) =>
+          c.name.toLowerCase() === defaultCat.name.toLowerCase() &&
+          c.gender === defaultCat.gender
+      )
+
+      if (!existingCat) {
+        const { error } = await supabase
+          .from('tournament_categories')
+          .insert({
+            division_id: divId,
+            name: defaultCat.name,
+            gender: defaultCat.gender,
+            min_weight: defaultCat.minWeight || null,
+            max_weight: defaultCat.maxWeight || null,
+            min_height: defaultCat.minHeight || null,
+            max_height: defaultCat.maxHeight || null,
+          })
+
+        if (error) {
+          console.error(`Failed to create category ${defaultCat.name} for division ${defaultDiv.name}:`, error)
+        }
+      } else {
+        // Update category if weight/height limits differ
+        // We check strict equality for now
+        const needsUpdate =
+          existingCat.min_weight !== (defaultCat.minWeight || null) ||
+          existingCat.max_weight !== (defaultCat.maxWeight || null) ||
+          existingCat.min_height !== (defaultCat.minHeight || null) ||
+          existingCat.max_height !== (defaultCat.maxHeight || null)
+
+        if (needsUpdate) {
+          await supabase
+            .from('tournament_categories')
+            .update({
+              min_weight: defaultCat.minWeight || null,
+              max_weight: defaultCat.maxWeight || null,
+              min_height: defaultCat.minHeight || null,
+              max_height: defaultCat.maxHeight || null,
+            } as any) // Casting as any to bypass strict type check for now if types are outdated
+            .eq('id', existingCat.id)
+        }
+      }
+    }
+  }
 }
 
 /**

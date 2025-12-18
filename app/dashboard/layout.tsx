@@ -1,4 +1,4 @@
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
+import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/app-sidebar"
 import { UserButton } from "@clerk/nextjs"
 import { ModeToggle } from "@/components/layouts/mode-toggle"
@@ -11,7 +11,7 @@ export default function DashboardLayout({
   return (
     <SidebarProvider>
       <AppSidebar />
-      <main className="w-full">
+      <SidebarInset>
         <div className="flex items-center justify-between border-b p-4">
           <SidebarTrigger />
           <div className="flex items-center gap-4">
@@ -22,7 +22,7 @@ export default function DashboardLayout({
         <div className="p-6">
           {children}
         </div>
-      </main>
+      </SidebarInset>
     </SidebarProvider>
   )
 }

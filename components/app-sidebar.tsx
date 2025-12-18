@@ -59,11 +59,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       url: "/dashboard/tournament-organizer/tournaments",
       icon: Trophy,
     },
-    {
-      title: "Athletes",
-      url: "/dashboard/tournament-organizer/athletes",
-      icon: Users,
-    },
   ]
 
   const items = role === "coach" ? coachItems : role === "tournament-organizer" ? organizerItems : []

@@ -42,7 +42,7 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
 
-const isPublicRoute = createRouteMatcher(['/sign-in(.*)', '/sign-up(.*)', '/tournaments(.*)', '/tournament(.*)'])
+const isPublicRoute = createRouteMatcher(['/sign-in(.*)', '/sign-up(.*)', '/tournaments(.*)', '/tournament(.*)', '/api/import-test', '/api/verify-import', '/api/check-stats', '/api/debug-participants'])
 
 const isOnboardingRoute = createRouteMatcher(['/onboarding'])
 

@@ -1,12 +1,10 @@
 import { notFound } from 'next/navigation'
 import { getTournamentById } from '@/lib/db/queries/tournaments'
-import { getTournamentParticipants } from '@/lib/db/queries/registrations'
 import { DashboardShell } from '@/components/layouts/dashboard-shell'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { 
   Card, 
-  CardContent, 
   CardDescription, 
   CardHeader, 
   CardTitle 
@@ -17,19 +15,19 @@ import {
   Swords, 
   Settings, 
   ArrowLeft,
-  ExternalLink
+  ExternalLink,
+  Scale
 } from 'lucide-react'
 import Link from 'next/link'
 import { routes } from '@/config/routes'
-import { Badge } from '@/components/ui/badge'
+import { PhaseProvider } from '@/components/tournaments/dashboard/phase-context'
+import { DashboardContent } from '@/components/tournaments/dashboard/dashboard-content'
 
 interface TournamentDashboardPageProps {
   params: Promise<{
     id: string
   }>
 }
-
-import { TournamentBreadcrumbs } from '@/components/tournaments/tournament-breadcrumbs'
 
 export default async function TournamentDashboardPage({ params }: TournamentDashboardPageProps) {
   const { id } = await params
@@ -39,11 +37,9 @@ export default async function TournamentDashboardPage({ params }: TournamentDash
     notFound()
   }
 
-  const { data: participants, count } = await getTournamentParticipants(id, { limit: 1000 })
-  const approvedParticipants = participants.filter(p => p.status === 'verified' || p.status === 'paid')
-
   return (
     <DashboardShell>
+      {/* ... header */}
       <PageHeader
         title={tournament.name}
         description="Tournament Dashboard"
@@ -65,91 +61,75 @@ export default async function TournamentDashboardPage({ params }: TournamentDash
         }
       />
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Status</CardTitle>
-            <Trophy className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold capitalize">{tournament.status}</div>
-            <p className="text-xs text-muted-foreground">Current tournament state</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Participants</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{count}</div>
-            <p className="text-xs text-muted-foreground">
-              {approvedParticipants.length} approved
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      <PhaseProvider tournament={tournament}>
+        <DashboardContent tournamentId={tournament.id} />
+      </PhaseProvider>
 
-      <h2 className="text-lg font-semibold mb-4">Management</h2>
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <Card className="hover:bg-muted/50 transition-colors">
-          <Link href={routes.organizer.tournamentParticipants(tournament.id)}>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Users className="mr-2 h-5 w-5" />
-                Participants
-              </CardTitle>
-              <CardDescription>Manage registrations and approvals</CardDescription>
-            </CardHeader>
+      <div className="border-t pt-8 mt-8">
+        <h2 className="text-lg font-semibold mb-4">Quick Actions</h2>
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          <Link href={routes.organizer.tournamentParticipants(tournament.id)} className="block">
+            <Card className="hover:bg-muted/50 transition-colors cursor-pointer h-full">
+              <CardHeader>
+                <CardTitle className="flex items-center text-base">
+                  <Users className="mr-2 h-5 w-5 text-primary" />
+                  Manage Participants
+                </CardTitle>
+                <CardDescription>Approvals & Edits</CardDescription>
+              </CardHeader>
+            </Card>
           </Link>
-        </Card>
 
-        <Card className="hover:bg-muted/50 transition-colors">
-          <Link href={routes.organizer.tournamentBracket(tournament.id)}>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Trophy className="mr-2 h-5 w-5" />
-                Bracket
-              </CardTitle>
-              <CardDescription>Generate and view tournament bracket</CardDescription>
-            </CardHeader>
+          <Link href={routes.organizer.tournamentBracket(tournament.id)} className="block">
+            <Card className="hover:bg-muted/50 transition-colors cursor-pointer h-full">
+              <CardHeader>
+                <CardTitle className="flex items-center text-base">
+                  <Trophy className="mr-2 h-5 w-5 text-primary" />
+                  Bracket Manager
+                </CardTitle>
+                <CardDescription>Generate & View</CardDescription>
+              </CardHeader>
+            </Card>
           </Link>
-        </Card>
 
-        <Card className="hover:bg-muted/50 transition-colors">
-          <Link href={routes.organizer.tournamentMatches(tournament.id)}>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Swords className="mr-2 h-5 w-5" />
-                Matches
-              </CardTitle>
-              <CardDescription>Live match console and results</CardDescription>
-            </CardHeader>
+          <Link href={routes.organizer.tournamentMatches(tournament.id)} className="block">
+            <Card className="hover:bg-muted/50 transition-colors cursor-pointer h-full">
+              <CardHeader>
+                <CardTitle className="flex items-center text-base">
+                  <Swords className="mr-2 h-5 w-5 text-primary" />
+                  Match Console
+                </CardTitle>
+                <CardDescription>Live Scoring</CardDescription>
+              </CardHeader>
+            </Card>
           </Link>
-        </Card>
 
-        <Card className="hover:bg-muted/50 transition-colors">
-          <Link href={routes.organizer.tournamentEdit(tournament.id)}>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Settings className="mr-2 h-5 w-5" />
-                Settings
-              </CardTitle>
-              <CardDescription>Edit tournament details</CardDescription>
-            </CardHeader>
+          <Link href={routes.organizer.tournamentEdit(tournament.id)} className="block">
+            <Card className="hover:bg-muted/50 transition-colors cursor-pointer h-full">
+              <CardHeader>
+                <CardTitle className="flex items-center text-base">
+                  <Settings className="mr-2 h-5 w-5 text-primary" />
+                  Settings
+                </CardTitle>
+                <CardDescription>Configuration</CardDescription>
+              </CardHeader>
+            </Card>
           </Link>
-        </Card>
-        <Card className="hover:bg-muted/50 transition-colors">
-          <Link href={`${routes.organizer.tournamentDetail(tournament.id)}/courts`}>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Swords className="mr-2 h-5 w-5" />
-                Courts
-              </CardTitle>
-              <CardDescription>Manage court assignments</CardDescription>
-            </CardHeader>
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mt-6">
+          <Link href={routes.organizer.weighIn(tournament.id)} className="block">
+            <Card className="hover:bg-muted/50 transition-colors cursor-pointer h-full">
+              <CardHeader>
+                <CardTitle className="flex items-center text-base">
+                  <Scale className="mr-2 h-5 w-5 text-primary" />
+                  Random Weigh-In
+                </CardTitle>
+                <CardDescription>Surprise Checks</CardDescription>
+              </CardHeader>
+            </Card>
           </Link>
-        </Card>
+        </div>
       </div>
     </DashboardShell>
   )

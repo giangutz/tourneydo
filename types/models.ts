@@ -96,6 +96,8 @@ export interface Tournament {
   organizer_id: string
   start_date: string | null
   end_date: string | null
+  weigh_in_start: string | null
+  weigh_in_end: string | null
   description: string | null
   entry_fee: number | null
   venue: string | null
@@ -130,6 +132,7 @@ export interface TournamentRegistration {
   disqualified: boolean
   disqualification_reason: string | null
   weighed_in_at: string | null
+  weigh_in_selected: boolean
   created_at: string
   updated_at: string
 }
@@ -171,12 +174,33 @@ export interface Match {
   status: MatchStatus
   next_match_id: string | null
   source_match_id: string | null
+  scheduled_start_time: string | null
+  scheduled_end_time: string | null
+  actual_start_time: string | null
+  actual_end_time: string | null
   created_at: string
   updated_at: string
 }
 
 export type MatchInsert = Omit<Match, 'created_at' | 'updated_at'> & { id?: string }
 export type MatchUpdate = Partial<Omit<Match, 'id' | 'tournament_id' | 'created_at' | 'updated_at'>>
+
+// ============================================================================
+// Expense Types
+// ============================================================================
+
+export interface TournamentExpense {
+  id: string
+  tournament_id: string
+  category: string
+  description: string | null
+  amount: number
+  created_at: string
+  updated_at: string
+}
+
+export type TournamentExpenseInsert = Omit<TournamentExpense, 'id' | 'created_at' | 'updated_at'>
+export type TournamentExpenseUpdate = Partial<Omit<TournamentExpense, 'id' | 'tournament_id' | 'created_at' | 'updated_at'>>
 
 // ============================================================================
 // Utility Types
@@ -201,3 +225,21 @@ export type WithId<T> = T & {
  * Helper type to make specific fields optional
  */
 export type PartialBy<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>
+
+// ============================================================================
+// Payment Types
+// ============================================================================
+
+export interface Payment {
+  id: string
+  tournament_id: string
+  team_id: string
+  coach_id: string
+  amount: number
+  reference_number: string
+  status: 'pending' | 'verified' | 'rejected'
+  created_at: string
+}
+
+export type PaymentInsert = Omit<Payment, 'id' | 'created_at' | 'status'>
+export type PaymentUpdate = Partial<Omit<Payment, 'id' | 'tournament_id' | 'team_id' | 'coach_id' | 'created_at'>>

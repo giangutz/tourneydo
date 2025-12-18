@@ -1,56 +1,19 @@
-export type UserRole = 'tournament-organizer' | 'coach'
-
-export interface User {
-  user_id: string
-  email: string
-  role: UserRole
-  created_at: string
-  updated_at: string
-}
-
-export interface Team {
-  id: string
-  name: string
-  user_id: string
-  created_at: string
-  updated_at: string
-}
-
-export interface Player {
-  id: string
-  first_name: string
-  last_name: string
-  email: string | null
-  dob: string | null
-  coach_id: string
-  created_at: string
-  updated_at: string
-}
-
-export interface TeamPlayer {
-  team_id: string
-  player_id: string
-  created_at: string
-}
-
-export interface Tournament {
-  id: string
-  name: string
-  organizer_id: string
-  start_date: string | null
-  end_date: string | null
-  created_at: string
-  updated_at: string
-}
-
-export interface TournamentRegistration {
-  id: string
-  tournament_id: string
-  team_id: string
-  player_id: string
-  created_at: string
-  updated_at: string
-}
+import {
+  User,
+  Team,
+  Player,
+  TeamPlayer,
+  Tournament,
+  TournamentRegistration,
+  Match,
+  MatchInsert,
+  MatchUpdate,
+  TournamentExpense,
+  TournamentExpenseInsert,
+  TournamentExpenseUpdate,
+  RegistrationInsert,
+  RegistrationUpdate
+} from '@/types/models'
 
 export type Database = {
   public: {
@@ -82,8 +45,18 @@ export type Database = {
       }
       tournament_registrations: {
         Row: TournamentRegistration
-        Insert: Omit<TournamentRegistration, 'id' | 'created_at' | 'updated_at'>
-        Update: Partial<Omit<TournamentRegistration, 'id' | 'created_at' | 'updated_at'>>
+        Insert: RegistrationInsert
+        Update: RegistrationUpdate
+      }
+      matches: {
+        Row: Match
+        Insert: MatchInsert
+        Update: MatchUpdate
+      }
+      tournament_expenses: {
+        Row: TournamentExpense
+        Insert: TournamentExpenseInsert
+        Update: TournamentExpenseUpdate
       }
     }
     Views: Record<string, never>

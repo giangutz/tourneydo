@@ -10,16 +10,21 @@ import { toast } from 'sonner'
 import { Loader2, ArrowLeftRight, MoveRight } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 
+import { getBeltSkillCategory } from '@/lib/utils'
+
 interface MatchParticipantsDialogProps {
   match: Match | null
   open: boolean
   onOpenChange: (open: boolean) => void
   participants: any[]
   divisions?: { id: string; label: string; divisionId: string | null; categoryId: string | null }[]
+  tournamentType?: 'standard' | 'open-belt'
+  skillCategory?: string
 }
 
-export function MatchParticipantsDialog({ match, open, onOpenChange, participants, divisions = [] }: MatchParticipantsDialogProps) {
+export function MatchParticipantsDialog({ match, open, onOpenChange, participants, divisions = [], tournamentType = 'standard', skillCategory }: MatchParticipantsDialogProps) {
   const router = useRouter()
+  // ... (keep state)
   const [loading, setLoading] = useState(false)
   const [player1Id, setPlayer1Id] = useState<string>('')
   const [player2Id, setPlayer2Id] = useState<string>('')
@@ -103,24 +108,31 @@ export function MatchParticipantsDialog({ match, open, onOpenChange, participant
 
   if (!match) return null
 
-  // Filter participants to only show those in the same division/category
-  // Or show all but group them? User said "only show the players in the current division".
-  // We check if participant's division_id/category_id matches the match's.
-  // If participant doesn't have division info (legacy), we might include them if they are in NO match?
-  // For now, let's try to filter strictly if data is available.
-  
+  // Filter participants to only show those in the same division/category/skill level
   const filteredParticipants = participants.filter(p => {
-    // If participant has division info, check match
+    // 1. Check division/category match
+    let matchesDivision = false
     if (p.division_id && p.category_id) {
-      return p.division_id === match.division_id && p.category_id === match.category_id
+      matchesDivision = p.division_id === match.division_id && p.category_id === match.category_id
+    } else {
+      // If no division info, consider them available? User wants specific valid players.
+      // Let's stick to strict matching if possible, or fallback if unassigned.
+      matchesDivision = (!p.division_id && !p.category_id) || (p.division_id === match.division_id && p.category_id === match.category_id)
     }
-    // If no division info, maybe include them? Or exclude?
-    // User wants to avoid mixing up. So strict filtering is safer.
-    // BUT, if we just added division_id to type but DB is not populated, everyone will disappear.
-    // Let's assume DB is populated or we fallback to showing everyone if no division info?
-    // No, user specifically asked to filter.
-    // Let's include them if they match OR if they have no division assigned (so they can be assigned).
-    return (!p.division_id && !p.category_id) || (p.division_id === match.division_id && p.category_id === match.category_id)
+
+    if (!matchesDivision) return false
+
+    // 2. Check skill category match (only for Standard tournaments)
+    if (tournamentType === 'standard' && skillCategory) {
+      // If skillCategory is provided (from the bracket group), participant MUST match it
+      // unless they don't have a belt level (maybe unknown, but safer to exclude or put in 'Unknown' bucket)
+      const pSkill = getBeltSkillCategory(p.player.belt_level)
+      if (pSkill !== skillCategory) {
+        return false
+      }
+    }
+
+    return true
   })
 
   const sortedParticipants = [...filteredParticipants].sort((a, b) => 

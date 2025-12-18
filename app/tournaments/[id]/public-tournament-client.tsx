@@ -12,6 +12,13 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { MatchDetailsDialog } from '@/components/tournaments/match-details-dialog'
 import { LiveCourtsView } from '@/components/tournaments/live-courts-view'
+import { PublicParticipantList } from '@/components/tournaments/public-participant-list'
+import { VanityMetrics, LivePulse } from '@/components/tournaments/overview/vanity-metrics'
+import { Activity, Layers } from 'lucide-react'
+import { StatCard } from '@/components/ui/stat-card'
+import { DivisionBreakdown } from '@/components/tournaments/shared/division-breakdown'
+import { BeltDistributionChart, GenderSplitChart, TeamDelegationsChart } from '@/components/tournaments/overview/charts'
+import { TournamentCountdown } from '@/components/tournaments/shared/tournament-countdown'
 
 interface PublicTournamentClientProps {
   tournament: Tournament
@@ -19,6 +26,7 @@ interface PublicTournamentClientProps {
   participants: any[]
 }
 
+import { calculateTournamentPhase } from '@/lib/utils/tournament-phases'
 import { useTournamentRealtime } from '@/hooks/use-tournament-realtime'
 
 export function PublicTournamentClient({ tournament, matches, participants }: PublicTournamentClientProps) {
@@ -34,6 +42,36 @@ export function PublicTournamentClient({ tournament, matches, participants }: Pu
   // Filter approved participants
   const approvedParticipants = participants.filter(p => p.status === 'verified' || p.status === 'paid')
 
+  // Calculate Match Stats for KPIs
+  const uniquePlayers = new Set<string>()
+  const uniqueDivisions = new Set<string>()
+  matches.forEach((m: any) => {
+      if (m.player1_id) uniquePlayers.add(m.player1_id)
+      if (m.player2_id) uniquePlayers.add(m.player2_id)
+      if (m.tournament_divisions?.name) uniqueDivisions.add(m.tournament_divisions.name)
+  })
+  
+  const totalMatches = matches.length
+  const completedMatches = matches.filter(m => m.status === 'completed').length
+  const matchesInProgress = matches.filter(m => m.status === 'in_progress').length
+  const progressVal = totalMatches > 0 ? Math.round((completedMatches / totalMatches) * 100) : 0
+
+  // Calculate Extra Stats
+  const uniqueTeams = new Set(participants.map(p => p.team_id)).size
+  const uniqueDivisionsFromParticipants = new Set(participants.map(p => p.division_id)).size
+
+  const phase = calculateTournamentPhase(tournament)
+  const isUpcoming = phase === 'upcoming' || phase === 'weigh-in' // Hide brackets during weigh-in too usually? or show brackets but locked? Let's say weigh-in implies preparation.
+  // Actually, weigh-in might mean we can show the participants list more prominently.
+  // For the tabs logic:
+  // Upcoming -> Overview, Participants
+  // Weigh-in -> Overview, Participants, (Maybe stats?)
+  // Ongoing -> Live, Brackets, Stats, etc.
+  
+  const showLiveTabs = phase === 'ongoing' || phase === 'concluded' || phase === 'weigh-in' // Allow checking stats/brackets during weigh-in if generated?
+  // Let's stick to the previous logic but using the phase:
+  const isLiveOrDone = phase === 'ongoing' || phase === 'concluded'
+
   return (
     <div className="container mx-auto py-8 max-w-7xl px-4">
       {/* Header */}
@@ -47,11 +85,12 @@ export function PublicTournamentClient({ tournament, matches, participants }: Pu
             </p>
           </div>
           <Badge variant={
-            tournament.status === 'upcoming' ? 'default' :
-            tournament.status === 'ongoing' ? 'destructive' : // Use generic or another mapped variant if 'live' isn't valid
+            phase === 'upcoming' ? 'default' :
+            phase === 'weigh-in' ? 'secondary' :
+            phase === 'ongoing' ? 'destructive' :
             'outline'
           } className="text-base px-4 py-1 self-start md:self-center capitalize">
-            {tournament.status}
+            {phase.replace('-', ' ')}
           </Badge>
         </div>
 
@@ -70,10 +109,6 @@ export function PublicTournamentClient({ tournament, matches, participants }: Pu
             <DollarSign className="h-4 w-4" />
             <span>{tournament.entry_fee ? formatCurrency(tournament.entry_fee) : 'Free Entry'}</span>
           </div>
-          <div className="flex items-center gap-2">
-            <Trophy className="h-4 w-4" />
-            <span>{(tournament.tournament_type as string) === 'round_robin' ? 'Round Robin' : 'Single Elimination'}</span>
-          </div>
         </div>
         
         {tournament.description && (
@@ -81,97 +116,193 @@ export function PublicTournamentClient({ tournament, matches, participants }: Pu
         )}
       </div>
 
-      {/* Tabs */}
+      {/* Countdown Row */}
+      {(phase === 'upcoming' || phase === 'weigh-in') && (
+        <TournamentCountdown startDate={tournament.start_date} />
+      )}
+
+      {/* Phase-Specific KPI Stats Row */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
+        {/* UPCOMING PHASE */}
+        {(phase === 'upcoming' || phase === 'weigh-in') && (
+            <>
+                {/* 1. Registrations */}
+                <StatCard
+                    title="Registrations"
+                    value={approvedParticipants.length}
+                    icon={Users}
+                    description="Confirmed Athletes"
+                />
+
+                {/* 2. Teams */}
+                <StatCard
+                    title="Teams"
+                    value={uniqueTeams}
+                    icon={Layers} // Using Layers as proxy for Teams icon if Shield not available
+                    description="Schools & Academies"
+                />
+
+                {/* 3. Divisions (Replacing Capacity) */}
+                <StatCard
+                    title="Divisions"
+                    value={uniqueDivisionsFromParticipants} // Already a number
+                    icon={Layers}
+                    description="Active Categories"
+                />
+                
+                 {/* 4. Entry Fee (New) */}
+                 <StatCard
+                    title="Entry Fee"
+                    value={tournament.entry_fee ? formatCurrency(tournament.entry_fee) : 'Free'}
+                    icon={DollarSign}
+                    description="Per Athlete"
+                />
+            </>
+        )}
+
+        {/* ONGOING PHASE */}
+        {phase === 'ongoing' && (
+            <>
+                <StatCard
+                    title="Matches In Progress"
+                    value={matchesInProgress}
+                    icon={Activity}
+                    description="Happening Now"
+                />
+                <StatCard
+                    title="Matches Completed"
+                    value={completedMatches}
+                    icon={Trophy}
+                    description={`${progressVal}% Complete`}
+                />
+                <StatCard
+                    title="Matches Remaining"
+                    value={totalMatches - completedMatches}
+                    icon={Layers}
+                    description="Upcoming"
+                />
+                 <StatCard
+                    title="Active Divisions"
+                    value={uniqueDivisions.size}
+                    icon={Users}
+                    description="Contested Categories"
+                />
+            </>
+        )}
+
+        {/* COMPLETED PHASE */}
+        {phase === 'concluded' && (
+             <>
+                <StatCard
+                    title="Total Matches"
+                    value={completedMatches}
+                    icon={Trophy}
+                    description="Successfully Concluded"
+                />
+                <StatCard
+                    title="Total Participants"
+                    value={approvedParticipants.length}
+                    icon={Users}
+                    description="Competed"
+                />
+                <StatCard
+                    title="Divisions"
+                    value={uniqueDivisionsFromParticipants}
+                    icon={Layers}
+                    description="Awarded"
+                />
+                 <StatCard
+                    title="Completion"
+                    value="100%"
+                    icon={Activity}
+                    description="Tournament Finished"
+                />
+            </>
+        )}
+      </div>
+
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 h-auto">
+        <TabsList className={`grid w-full h-auto grid-cols-2 ${isLiveOrDone ? 'md:grid-cols-6' : 'md:grid-cols-3'}`}>
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="live">Live Matches</TabsTrigger>
-          <TabsTrigger value="results">Recent Results</TabsTrigger>
-          <TabsTrigger value="bracket">Bracket</TabsTrigger>
+          {isLiveOrDone && (
+            <>
+              <TabsTrigger value="live">Live Matches</TabsTrigger>
+              <TabsTrigger value="bracket">Bracket</TabsTrigger>
+              <TabsTrigger value="stats">Stats</TabsTrigger>
+              <TabsTrigger value="results">Recent Results</TabsTrigger>
+            </>
+          )}
           <TabsTrigger value="participants">Participants</TabsTrigger>
         </TabsList>
 
         {/* Overview Tab */}
-        <TabsContent value="overview" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Tournament Overview</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-6 md:grid-cols-2">
-                <div className="space-y-4">
+        <TabsContent value="overview" className="space-y-6">
+          <VanityMetrics participants={approvedParticipants} />
+          
+          {tournament.status === 'ongoing' && (
+            <LivePulse matches={matches} />
+          )}
+
+          <div className="grid gap-6 md:grid-cols-7">
+            {/* Left Column: Details & Description (4/7) */}
+            <div className="md:col-span-4 space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Tournament Details</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
                   <div>
-                    <h3 className="font-semibold mb-2">Details</h3>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between border-b pb-2">
-                        <span className="text-muted-foreground">Status</span>
-                        <Badge variant={
-                          tournament.status === 'upcoming' ? 'default' :
-                          tournament.status === 'ongoing' ? 'destructive' :
-                          'outline'
-                        } className="capitalize">{tournament.status}</Badge>
+                     <h3 className="font-semibold mb-2 text-sm">Description</h3>
+                     <p className="text-sm text-muted-foreground leading-relaxed">
+                       {tournament.description || 'No description provided.'}
+                     </p>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+                    
+                    <div>
+                      <div className="text-xs text-muted-foreground font-medium uppercase">Entry Fee</div>
+                      <div className="text-sm font-medium mt-1">
+                        {tournament.entry_fee ? formatCurrency(tournament.entry_fee) : 'Free'}
                       </div>
-                      <div className="flex justify-between border-b pb-2">
-                        <span className="text-muted-foreground">Date</span>
-                        <span>
-                          {tournament.start_date ? formatShortDate(tournament.start_date) : 'TBD'}
-                          {tournament.end_date && ` - ${formatShortDate(tournament.end_date)}`}
-                        </span>
-                      </div>
-                      <div className="flex justify-between border-b pb-2">
-                        <span className="text-muted-foreground">Venue</span>
-                        <span>{tournament.venue || 'TBD'}</span>
-                      </div>
-                      <div className="flex justify-between border-b pb-2">
-                        <span className="text-muted-foreground">Entry Fee</span>
-                        <span>{tournament.entry_fee ? formatCurrency(tournament.entry_fee) : 'Free'}</span>
-                      </div>
-                      <div className="flex justify-between border-b pb-2">
-                        <span className="text-muted-foreground">Format</span>
-                        <span>{(tournament.tournament_type as string) === 'round_robin' ? 'Round Robin' : 'Single Elimination'}</span>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground font-medium uppercase">Max Capacity</div>
+                      <div className="text-sm font-medium mt-1">
+                         {tournament.max_players ? `${tournament.max_players} Players` : 'Unlimited'}
                       </div>
                     </div>
                   </div>
-                  <div>
-                    <h3 className="font-semibold mb-2">Description</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {tournament.description || 'No description provided.'}
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="space-y-4">
-                  <h3 className="font-semibold mb-2">Statistics</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <Card>
-                      <CardContent className="pt-6 text-center">
-                        <div className="text-2xl font-bold">{approvedParticipants.length}</div>
-                        <div className="text-xs text-muted-foreground">Participants</div>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardContent className="pt-6 text-center">
-                        <div className="text-2xl font-bold">{matches.length}</div>
-                        <div className="text-xs text-muted-foreground">Total Matches</div>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardContent className="pt-6 text-center">
-                        <div className="text-2xl font-bold">{matches.filter(m => m.status === 'completed').length}</div>
-                        <div className="text-xs text-muted-foreground">Completed</div>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardContent className="pt-6 text-center">
-                        <div className="text-2xl font-bold">{matches.filter(m => m.status === 'in_progress').length}</div>
-                        <div className="text-xs text-muted-foreground">Live Now</div>
-                      </CardContent>
-                    </Card>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
+
+              <TeamDelegationsChart participants={participants} />
+            </div>
+
+            {/* Right Column: Stats & Charts (3/7) */}
+            <div className="md:col-span-3 space-y-6">
+              {/* Registration Progress */}
+              <Card>
+                 <CardHeader className="pb-2">
+                   <CardTitle className="text-sm font-medium text-muted-foreground">Registration Capacity</CardTitle>
+                 </CardHeader>
+                 <CardContent>
+                   <div className="text-2xl font-bold mb-2">
+                     {approvedParticipants.length} <span className="text-muted-foreground text-sm font-normal">/ {tournament.max_players || '∞'}</span>
+                   </div>
+                   <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
+                     <div 
+                       className="h-full bg-primary" 
+                       style={{ width: `${Math.min(100, (approvedParticipants.length / (tournament.max_players || 100)) * 100)}%` }} 
+                     />
+                   </div>
+                 </CardContent>
+              </Card>
+
+              <BeltDistributionChart participants={participants} />
+              <GenderSplitChart participants={participants} />
+            </div>
+          </div>
         </TabsContent>
 
         {/* Live Matches Tab */}
@@ -195,7 +326,7 @@ export function PublicTournamentClient({ tournament, matches, participants }: Pu
           <Card>
             <CardHeader>
               <CardTitle>Recent Results</CardTitle>
-              <CardDescription>Recently concluded matches. Click details to view full scores.</CardDescription>
+              <CardDescription>Recently concluded matches.</CardDescription>
             </CardHeader>
             <CardContent>
               {matches.filter(m => m.status === 'completed').length === 0 ? (
@@ -206,7 +337,7 @@ export function PublicTournamentClient({ tournament, matches, participants }: Pu
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   {matches
                     .filter(m => m.status === 'completed')
-                    .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()) // Most recent first
+                    .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
                     .map(match => {
                        const p1 = participants.find(p => p.player_id === match.player1_id)
                        const p2 = participants.find(p => p.player_id === match.player2_id)
@@ -252,7 +383,7 @@ export function PublicTournamentClient({ tournament, matches, participants }: Pu
             <CardHeader className="px-6 pt-6 pb-4">
               <CardTitle>Tournament Bracket</CardTitle>
               <CardDescription>
-                View matches and results. Click on a match to see details.
+                View matches and results.
               </CardDescription>
             </CardHeader>
             <CardContent className="p-6 pt-0">
@@ -272,47 +403,27 @@ export function PublicTournamentClient({ tournament, matches, participants }: Pu
           </Card>
         </TabsContent>
 
+        {/* Stats Tab */}
+        <TabsContent value="stats">
+            <DivisionBreakdown matches={matches} />
+        </TabsContent>
+
         {/* Participants Tab */}
         <TabsContent value="participants">
           <Card>
             <CardHeader>
               <CardTitle>Participants</CardTitle>
               <CardDescription>
-                Registered players and teams.
+                Registered players grouped by team.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {approvedParticipants.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  No participants registered yet.
-                </div>
-              ) : (
-                <ScrollArea className="h-[600px] pr-4">
-                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    {approvedParticipants.map((p) => (
-                      <div key={p.id} className="flex items-center gap-3 p-3 rounded-lg border bg-card text-card-foreground shadow-sm">
-                        <Avatar>
-                          <AvatarFallback>{p.players.first_name[0]}{p.players.last_name[0]}</AvatarFallback>
-                        </Avatar>
-                        <div className="flex flex-col overflow-hidden">
-                          <span className="font-medium truncate">
-                            {p.players.first_name} {p.players.last_name}
-                          </span>
-                          <span className="text-xs text-muted-foreground truncate">
-                            {p.teams?.name || 'Unattached'}
-                            {p.players.belt_level && ` • ${p.players.belt_level} Belt`}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </ScrollArea>
-              )}
+              <PublicParticipantList participants={approvedParticipants} />
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
-
+      
       <MatchDetailsDialog
         open={detailsOpen}
         onOpenChange={setDetailsOpen}

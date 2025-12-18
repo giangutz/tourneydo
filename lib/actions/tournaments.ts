@@ -2,7 +2,6 @@
 
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
-import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import { routes } from '@/config/routes'
 import { TournamentInsert, TournamentUpdate } from '@/types/models'
@@ -13,19 +12,9 @@ import {
   deleteTournament as deleteTournamentQuery
 } from '@/lib/db/queries/tournaments'
 
-const tournamentSchema = z.object({
-  name: z.string().min(3, 'Name must be at least 3 characters'),
-  start_date: z.string().min(1, 'Start date is required'),
-  end_date: z.string().min(1, 'End date is required'),
-  description: z.string().optional(),
-  entry_fee: z.coerce.number().min(0, 'Entry fee must be at least 0'),
-  venue: z.string().min(1, 'Venue is required'),
-  max_players: z.coerce.number().min(1, 'Max players is required'),
-  registration_deadline: z.string().min(1, 'Registration deadline is required'),
-  courts: z.coerce.number().min(1, 'Number of courts must be at least 1').optional(),
-  status: z.enum(['draft', 'upcoming', 'ongoing', 'completed', 'cancelled']).default('upcoming'),
-  tournament_type: z.enum(['standard', 'open-belt']),
-})
+import { tournamentFormSchema } from '@/lib/validations/tournament'
+
+// Removed duplicate schema definition
 
 export type TournamentFormState = {
   error?: string
@@ -44,7 +33,7 @@ export async function createTournament(prevState: any, formData: FormData): Prom
   }
 
   const rawData = Object.fromEntries(formData.entries())
-  const validatedFields = tournamentSchema.safeParse(rawData)
+  const validatedFields = tournamentFormSchema.safeParse(rawData)
 
   if (!validatedFields.success) {
     return {
@@ -58,12 +47,14 @@ export async function createTournament(prevState: any, formData: FormData): Prom
     organizer_id: userId,
     start_date: validatedFields.data.start_date || null,
     end_date: validatedFields.data.end_date || null,
+    weigh_in_start: validatedFields.data.weigh_in_start || null,
+    weigh_in_end: validatedFields.data.weigh_in_end || null,
     description: validatedFields.data.description || null,
-    entry_fee: validatedFields.data.entry_fee || null,
+    entry_fee: validatedFields.data.entry_fee ?? null,
     venue: validatedFields.data.venue || null,
-    max_players: validatedFields.data.max_players || null,
+    max_players: validatedFields.data.max_players ?? null,
     registration_deadline: validatedFields.data.registration_deadline || null,
-    courts: validatedFields.data.courts || null,
+    courts: validatedFields.data.courts ?? null, // Use nullish coalescing for numbers as 0 is valid but schema handles null
     status: validatedFields.data.status as any,
     tournament_type: validatedFields.data.tournament_type as any,
   }
@@ -83,7 +74,7 @@ export async function createTournament(prevState: any, formData: FormData): Prom
 export async function updateTournament(id: string, prevState: any, formData: FormData): Promise<TournamentFormState> {
 
   const rawData = Object.fromEntries(formData.entries())
-  const validatedFields = tournamentSchema.safeParse(rawData)
+  const validatedFields = tournamentFormSchema.safeParse(rawData)
 
   if (!validatedFields.success) {
     return {
@@ -96,12 +87,14 @@ export async function updateTournament(id: string, prevState: any, formData: For
     name: validatedFields.data.name,
     start_date: validatedFields.data.start_date || null,
     end_date: validatedFields.data.end_date || null,
+    weigh_in_start: validatedFields.data.weigh_in_start || null,
+    weigh_in_end: validatedFields.data.weigh_in_end || null,
     description: validatedFields.data.description || null,
-    entry_fee: validatedFields.data.entry_fee || null,
+    entry_fee: validatedFields.data.entry_fee ?? null,
     venue: validatedFields.data.venue || null,
-    max_players: validatedFields.data.max_players || null,
+    max_players: validatedFields.data.max_players ?? null,
     registration_deadline: validatedFields.data.registration_deadline || null,
-    courts: validatedFields.data.courts || null,
+    courts: validatedFields.data.courts ?? null,
     status: validatedFields.data.status as any,
     tournament_type: validatedFields.data.tournament_type as any,
   }
@@ -119,6 +112,19 @@ export async function updateTournament(id: string, prevState: any, formData: For
 }
 
 export async function deleteTournament(id: string) {
+  const supabase = createServerSupabaseClient()
+
+  // Check status first
+  const { data: tournament } = await supabase
+    .from('tournaments')
+    .select('status')
+    .eq('id', id)
+    .single()
+
+  if (tournament && (tournament as any).status === 'completed') {
+    return { error: 'Cannot delete a completed tournament.' }
+  }
+
   try {
     await deleteTournamentQuery(id)
   } catch (error: any) {
@@ -126,5 +132,4 @@ export async function deleteTournament(id: string) {
   }
 
   revalidatePath(routes.organizer.tournaments)
-  redirect(routes.organizer.tournaments)
 }

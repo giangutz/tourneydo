@@ -37,6 +37,7 @@ export const routes = {
     tournamentParticipants: (id: string) => `/dashboard/tournament-organizer/tournaments/${id}/participants`,
     tournamentBracket: (id: string) => `/dashboard/tournament-organizer/tournaments/${id}/bracket`,
     tournamentMatches: (id: string) => `/dashboard/tournament-organizer/tournaments/${id}/matches`,
+    weighIn: (id: string) => `/dashboard/tournament-organizer/tournaments/${id}/weigh-in`,
     athletes: '/dashboard/tournament-organizer/athletes',
   },
 } as const

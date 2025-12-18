@@ -73,16 +73,10 @@ export function getInitials(name: string): string {
  * @returns Age in years
  */
 export function calculateAge(dob: string | Date): number {
-  const birthDate = typeof dob === 'string' ? new Date(dob) : dob
+  const birthDate = new Date(dob)
   const today = new Date()
-  let age = today.getFullYear() - birthDate.getFullYear()
-  const monthDiff = today.getMonth() - birthDate.getMonth()
-
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-    age--
-  }
-
-  return age
+  // WT Rules: Age is calculated by year difference only (current year - birth year)
+  return today.getFullYear() - birthDate.getFullYear()
 }
 
 /**
@@ -122,4 +116,24 @@ export function formatCurrency(amount: number, currency = 'PHP'): string {
     style: 'currency',
     currency,
   }).format(amount)
+}
+
+/**
+ * Map belt level to skill category for Standard tournaments
+ * White -> Beginner
+ * Yellow, Blue -> Novice I
+ * Red, Brown -> Novice II
+ * Black -> Advanced
+ */
+export function getBeltSkillCategory(beltLevel: string | null | undefined): string {
+  if (!beltLevel) return ''
+
+  const belt = beltLevel.toLowerCase()
+
+  if (belt === 'white') return 'Beginner'
+  if (belt === 'yellow' || belt === 'blue') return 'Novice I'
+  if (belt === 'red' || belt === 'brown') return 'Novice II'
+  if (belt === 'black') return 'Advanced'
+
+  return ''
 }

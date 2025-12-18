@@ -582,7 +582,7 @@ export function ParticipantList({
                 <SelectValue placeholder={limit.toString()} />
               </SelectTrigger>
               <SelectContent side="top">
-                {[10, 20, 50, 100].map((pageSize) => (
+                {[10, 20, 50, 100, 500].map((pageSize) => (
                   <SelectItem key={pageSize} value={pageSize.toString()}>
                     {pageSize}
                   </SelectItem>

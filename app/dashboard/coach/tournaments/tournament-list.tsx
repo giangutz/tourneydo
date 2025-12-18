@@ -41,6 +41,7 @@ import { EmptyState } from "@/components/ui/empty-state"
 import { toast } from "sonner"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
+import { PaymentDialog } from "@/components/tournaments/payment-dialog"
 
 interface TournamentListProps {
   tournaments: Tournament[]
@@ -200,7 +201,7 @@ export function TournamentList({ tournaments, teams, registrations, coachId }: T
               </div>
             )}
 
-            <div className="flex gap-2">
+            <div className="flex gap-2 justify-between items-center mt-2 flex-wrap">
               <Button variant="outline" size="sm" className="flex-1" asChild>
                 <Link href={`/tournaments/${tournament.id}`}>
                   <Eye className="h-4 w-4 mr-2" />
@@ -216,6 +217,29 @@ export function TournamentList({ tournaments, teams, registrations, coachId }: T
                   </Link>
                 </Button>
               )}
+
+              {/* Payment Buttons for Registered Teams */}
+              {Array.from(new Set(registrations.filter(r => r.tournament_id === tournament.id).map(r => r.team_id))).map(teamId => {
+                 const teamRegs = registrations.filter(r => r.tournament_id === tournament.id && r.team_id === teamId)
+                 // Check if payment_status is not 'paid' or status is 'verified' (maybe unpaid but verified?) 
+                 // Actually logic: If not paid, show button. 'status' is registration status (pending/verified).
+                 const unpaidRegs = teamRegs.filter(r => r.payment_status !== 'paid')
+                 const amountOwed = unpaidRegs.length * (tournament.entry_fee || 0)
+                 const teamName = teams.find(t => t.id === teamId)?.name || 'Unknown Team'
+                 
+                 if (amountOwed <= 0) return null
+
+                 return (
+                   <PaymentDialog 
+                      key={teamId}
+                      tournamentId={tournament.id}
+                      teamId={teamId}
+                      coachId={coachId}
+                      amountOwed={amountOwed}
+                      teamName={teamName}
+                   />
+                 )
+              })}
               
               <Dialog open={openDialogId === tournament.id} onOpenChange={(open) => setOpenDialogId(open ? tournament.id : null)}>
                 <DialogTrigger asChild>
