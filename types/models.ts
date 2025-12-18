@@ -123,8 +123,8 @@ export interface TournamentRegistration {
   team_id: string
   player_id: string
   coach_id: string
-  division_id?: string
-  category_id?: string
+  division_id?: string | null
+  category_id?: string | null
   status: 'pending' | 'verified' | 'paid'
   payment_status?: 'unpaid' | 'paid'
   actual_weight: number | null
