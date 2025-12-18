@@ -129,6 +129,18 @@ export default async function TournamentDashboardPage({ params }: TournamentDash
               </CardHeader>
             </Card>
           </Link>
+
+          <Link href={routes.organizer.staff(tournament.id)} className="block">
+            <Card className="hover:bg-muted/50 transition-colors cursor-pointer h-full">
+              <CardHeader>
+                <CardTitle className="flex items-center text-base">
+                  <Users className="mr-2 h-5 w-5 text-primary" />
+                  Manage Staff
+                </CardTitle>
+                <CardDescription>Invites & Roles</CardDescription>
+              </CardHeader>
+            </Card>
+          </Link>
         </div>
       </div>
     </DashboardShell>

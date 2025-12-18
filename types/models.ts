@@ -243,3 +243,23 @@ export interface Payment {
 
 export type PaymentInsert = Omit<Payment, 'id' | 'created_at' | 'status'>
 export type PaymentUpdate = Partial<Omit<Payment, 'id' | 'tournament_id' | 'team_id' | 'coach_id' | 'created_at'>>
+
+// ============================================================================
+// Staff Types
+// ============================================================================
+
+export type TournamentRole = 'admin' | 'staff' | 'official'
+
+export interface TournamentStaff {
+  id: string
+  tournament_id: string
+  user_id: string | null
+  email: string
+  role: TournamentRole
+  status: 'pending' | 'active'
+  created_at: string
+  updated_at: string
+}
+
+export type TournamentStaffInsert = Omit<TournamentStaff, 'id' | 'created_at' | 'updated_at'>
+export type TournamentStaffUpdate = Partial<Omit<TournamentStaff, 'id' | 'tournament_id' | 'created_at' | 'updated_at'>>
