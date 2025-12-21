@@ -120,7 +120,7 @@ export async function updateTeam(id: string, teamData: TeamUpdate): Promise<Team
 
   const { data, error } = await supabase
     .from('teams')
-    .update(teamData)
+    .update(teamData as any)
     .eq('id', id)
     .select()
     .single()

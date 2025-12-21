@@ -130,7 +130,7 @@ export async function ensureTournamentDivisionsAndCategories(
     const existingCategories = currentDiv?.tournament_categories || []
 
     for (const defaultCat of defaultDiv.categories) {
-      const existingCat = existingCategories.find(
+      const existingCat: any = existingCategories.find(
         (c: any) =>
           c.name.toLowerCase() === defaultCat.name.toLowerCase() &&
           c.gender === defaultCat.gender

@@ -674,12 +674,12 @@ export type Tables<
   | keyof (PublicSchema["Tables"] & PublicSchema["Views"])
   | { schema: keyof Database },
   TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-  ? keyof (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
-    Database[PublicTableNameOrOptions["schema"]]["Views"])
+  ? keyof ((Database[PublicTableNameOrOptions["schema"]] extends { Tables: infer T } ? T : never) &
+    (Database[PublicTableNameOrOptions["schema"]] extends { Views: infer V } ? V : never))
   : never = never,
 > = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
-    Database[PublicTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+  ? ((Database[PublicTableNameOrOptions["schema"]] extends { Tables: infer T } ? T : never) &
+    (Database[PublicTableNameOrOptions["schema"]] extends { Views: infer V } ? V : never))[TableName] extends {
       Row: infer R
     }
   ? R
@@ -699,10 +699,10 @@ export type TablesInsert<
   | keyof PublicSchema["Tables"]
   | { schema: keyof Database },
   TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-  ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
+  ? keyof (Database[PublicTableNameOrOptions["schema"]] extends { Tables: infer T } ? T : never)
   : never = never,
 > = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+  ? (Database[PublicTableNameOrOptions["schema"]] extends { Tables: infer T } ? T : never)[TableName] extends {
     Insert: infer I
   }
   ? I
@@ -720,10 +720,10 @@ export type TablesUpdate<
   | keyof PublicSchema["Tables"]
   | { schema: keyof Database },
   TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-  ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
+  ? keyof (Database[PublicTableNameOrOptions["schema"]] extends { Tables: infer T } ? T : never)
   : never = never,
 > = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+  ? (Database[PublicTableNameOrOptions["schema"]] extends { Tables: infer T } ? T : never)[TableName] extends {
     Update: infer U
   }
   ? U
@@ -741,10 +741,10 @@ export type Enums<
   | keyof PublicSchema["Enums"]
   | { schema: keyof Database },
   EnumName extends PublicEnumNameOrOptions extends { schema: keyof Database }
-  ? keyof Database[PublicEnumNameOrOptions["schema"]]["Enums"]
+  ? keyof (Database[PublicEnumNameOrOptions["schema"]] extends { Enums: infer E } ? E : never)
   : never = never,
 > = PublicEnumNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  ? (Database[PublicEnumNameOrOptions["schema"]] extends { Enums: infer E } ? E : never)[EnumName]
   : PublicEnumNameOrOptions extends keyof PublicSchema["Enums"]
   ? PublicSchema["Enums"][PublicEnumNameOrOptions]
   : never
@@ -756,10 +756,10 @@ export type CompositeTypes<
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
     schema: keyof Database
   }
-  ? keyof Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+  ? keyof (Database[PublicCompositeTypeNameOrOptions["schema"]] extends { CompositeTypes: infer C } ? C : never)
   : never = never,
 > = PublicCompositeTypeNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  ? (Database[PublicCompositeTypeNameOrOptions["schema"]] extends { CompositeTypes: infer C } ? C : never)[CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
   ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
   : never

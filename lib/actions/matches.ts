@@ -75,7 +75,7 @@ export async function updateMatchParticipants(
     const supabase = createServerSupabaseClient()
 
     // Get current match state
-    const { data: currentMatch, error: matchError } = await supabase
+    const { data: currentMatch, error: matchError } = await (supabase as any)
       .from('matches')
       .select('player1_id, player2_id, division_id, category_id')
       .eq('id', matchId)
@@ -86,7 +86,7 @@ export async function updateMatchParticipants(
     }
 
     // Get all matches in the same division to handle swapping
-    const { data: divisionMatches } = await supabase
+    const { data: divisionMatches } = await (supabase as any)
       .from('matches')
       .select('id, player1_id, player2_id')
       .eq('tournament_id', tournamentId)

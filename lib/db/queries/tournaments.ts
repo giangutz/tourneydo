@@ -27,7 +27,7 @@ export async function getTournamentsByOrganizerId(organizerId: string): Promise<
     throw new Error(`Failed to fetch tournaments: ${error.message}`)
   }
 
-  return data || []
+  return (data as unknown as Tournament[]) || []
 }
 
 /**
@@ -52,7 +52,7 @@ export async function getTournamentById(id: string): Promise<Tournament | null> 
     throw new Error(`Failed to fetch tournament: ${error.message}`)
   }
 
-  return data
+  return data as unknown as Tournament
 }
 
 /**
@@ -64,7 +64,7 @@ export async function getTournamentById(id: string): Promise<Tournament | null> 
 export async function createTournament(tournamentData: TournamentInsert): Promise<Tournament> {
   const supabase = createServerSupabaseClient()
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('tournaments')
     .insert(tournamentData)
     .select()
@@ -74,7 +74,7 @@ export async function createTournament(tournamentData: TournamentInsert): Promis
     throw new Error(`Failed to create tournament: ${error.message}`)
   }
 
-  return data
+  return data as unknown as Tournament
 }
 
 /**
@@ -87,7 +87,7 @@ export async function createTournament(tournamentData: TournamentInsert): Promis
 export async function updateTournament(id: string, tournamentData: TournamentUpdate): Promise<Tournament> {
   const supabase = createServerSupabaseClient()
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('tournaments')
     .update(tournamentData)
     .eq('id', id)
@@ -98,7 +98,7 @@ export async function updateTournament(id: string, tournamentData: TournamentUpd
     throw new Error(`Failed to update tournament: ${error.message}`)
   }
 
-  return data
+  return data as unknown as Tournament
 }
 
 /**
@@ -136,7 +136,7 @@ export async function getTournaments(): Promise<Tournament[]> {
     throw new Error(`Failed to fetch tournaments: ${error.message}`)
   }
 
-  return data || []
+  return (data as unknown as Tournament[]) || []
 }
 
 /**
@@ -177,7 +177,7 @@ export async function getPublicTournaments(options: {
     throw new Error(`Failed to fetch public tournaments: ${error.message}`)
   }
 
-  return data || []
+  return (data as unknown as Tournament[]) || []
 }
 
 

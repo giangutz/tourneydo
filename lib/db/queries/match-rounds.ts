@@ -4,10 +4,10 @@ export interface MatchRound {
   id: string
   match_id: string
   round_number: number
-  score_player1: number
-  score_player2: number
+  score_player1: number | null
+  score_player2: number | null
   winner_id: string | null
-  status: 'pending' | 'in_progress' | 'completed'
+  status: 'pending' | 'in_progress' | 'completed' | null
   created_at: string
   updated_at: string
 }
@@ -35,7 +35,7 @@ export async function getMatchRounds(matchId: string): Promise<MatchRound[]> {
     throw new Error(`Failed to fetch match rounds: ${error.message}`)
   }
 
-  return data || []
+  return (data as MatchRound[]) || []
 }
 
 /**
@@ -79,7 +79,7 @@ export async function updateRoundScore(
     throw new Error(`Failed to update round: ${error.message}`)
   }
 
-  return data
+  return data as MatchRound
 }
 
 /**
@@ -98,7 +98,7 @@ export async function checkAndUpdateMatchWinner(matchId: string): Promise<{
   const rounds = await getMatchRounds(matchId)
 
   // Get match details
-  const { data: match, error: matchError } = await supabase
+  const { data: match, error: matchError } = await (supabase as any)
     .from('matches')
     .select('player1_id, player2_id, next_match_id, tournament_id')
     .eq('id', matchId)
@@ -131,7 +131,7 @@ export async function checkAndUpdateMatchWinner(matchId: string): Promise<{
 
     // Update match with winner and scores (round wins)
     // Also clear court assignment when match is completed
-    await supabase
+    await (supabase as any)
       .from('matches')
       .update({
         winner_id: winnerId,
@@ -146,7 +146,7 @@ export async function checkAndUpdateMatchWinner(matchId: string): Promise<{
     if (match.next_match_id && winnerId) {
       console.log(`[ADVANCEMENT] Match ${matchId} has winner ${winnerId}, advancing to next match ${match.next_match_id}`)
 
-      const { data: nextMatch, error: nextMatchError } = await supabase
+      const { data: nextMatch, error: nextMatchError } = await (supabase as any)
         .from('matches')
         .select('player1_id, player2_id')
         .eq('id', match.next_match_id)
@@ -171,7 +171,7 @@ export async function checkAndUpdateMatchWinner(matchId: string): Promise<{
 
           console.log(`[ADVANCEMENT] Updating next match with:`, updateData)
 
-          const { error: updateError } = await supabase
+          const { error: updateError } = await (supabase as any)
             .from('matches')
             .update(updateData)
             .eq('id', match.next_match_id)

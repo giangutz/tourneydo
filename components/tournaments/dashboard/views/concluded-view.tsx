@@ -60,8 +60,8 @@ export function ConcludedView({ tournamentId }: ConcludedViewProps) {
 
     // 1. Fetch Financials (Regs + Expenses)
     const { data: regsData } = await supabase.from('tournament_registrations').select('*').eq('tournament_id', tournamentId)
-    const { data: expData } = await supabase
-      .from('tournament_expenses' as any)
+    const { data: expData } = await (supabase as any)
+      .from('tournament_expenses')
       .select('*')
       .eq('tournament_id', tournamentId)
 
@@ -107,7 +107,7 @@ export function ConcludedView({ tournamentId }: ConcludedViewProps) {
     if (!newExpense.amount || !newExpense.category || !session) return
 
     const supabase = createClerkSupabaseClient({ session })
-    const { error } = await supabase.from('tournament_expenses' as any).insert({
+    const { error } = await (supabase as any).from('tournament_expenses').insert({
       tournament_id: tournamentId,
       category: newExpense.category,
       amount: Number(newExpense.amount),

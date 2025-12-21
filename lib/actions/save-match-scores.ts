@@ -108,7 +108,7 @@ export async function saveMatchScores(
     console.log(`[SAVE SCORES] Winner check result:`, result)
 
     // Sync per-round scores to matches table for efficient querying in SVG bracket
-    await supabase.from('matches').update({
+    await (supabase as any).from('matches').update({
       score_round1_player1: scores.round1.player1,
       score_round1_player2: scores.round1.player2,
       score_round2_player1: scores.round2.player1,

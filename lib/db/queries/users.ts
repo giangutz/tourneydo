@@ -31,7 +31,7 @@ export async function getUserById(id: string): Promise<User | null> {
     throw new Error(`Failed to fetch user: ${error.message}`)
   }
 
-  return data
+  return data as unknown as User
 }
 
 /**
@@ -56,7 +56,7 @@ export async function getUserByEmail(email: string): Promise<User | null> {
     throw new Error(`Failed to fetch user: ${error.message}`)
   }
 
-  return data
+  return data as unknown as User
 }
 
 /**
@@ -68,7 +68,7 @@ export async function getUserByEmail(email: string): Promise<User | null> {
 export async function createUser(userData: UserInsert): Promise<User> {
   const supabase = createServerSupabaseClient()
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('users')
     .insert(userData)
     .select()
@@ -78,7 +78,7 @@ export async function createUser(userData: UserInsert): Promise<User> {
     throw new Error(`Failed to create user: ${error.message}`)
   }
 
-  return data
+  return data as unknown as User
 }
 
 /**
@@ -91,7 +91,7 @@ export async function createUser(userData: UserInsert): Promise<User> {
 export async function updateUser(id: string, userData: UserUpdate): Promise<User> {
   const supabase = createServerSupabaseClient()
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('users')
     .update(userData)
     .eq('user_id', id)
@@ -102,7 +102,7 @@ export async function updateUser(id: string, userData: UserUpdate): Promise<User
     throw new Error(`Failed to update user: ${error.message}`)
   }
 
-  return data
+  return data as unknown as User
 }
 
 /**
@@ -114,7 +114,7 @@ export async function updateUser(id: string, userData: UserUpdate): Promise<User
 export async function upsertUser(userData: UserInsert): Promise<User> {
   const supabase = createServerSupabaseClient()
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('users')
     .upsert(userData)
     .select()
@@ -124,5 +124,5 @@ export async function upsertUser(userData: UserInsert): Promise<User> {
     throw new Error(`Failed to upsert user: ${error.message}`)
   }
 
-  return data
+  return data as unknown as User
 }

@@ -149,7 +149,8 @@ export async function addParticipant(tournamentId: string, prevState: any, formD
       actual_height: null,
       disqualified: false,
       disqualification_reason: null,
-      weighed_in_at: null
+      weighed_in_at: null,
+      weigh_in_selected: false
     })
 
     revalidatePath(routes.organizer.tournamentParticipants(tournamentId))
@@ -252,7 +253,7 @@ export async function weighInParticipant(
       throw new Error('Division not found')
     }
 
-    const category = division.tournament_categories?.find((c: any) => c.id === registration.category_id)
+    const category: any = division.tournament_categories?.find((c: any) => c.id === registration.category_id)
 
     if (!category) {
       throw new Error('Category not found')

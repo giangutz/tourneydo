@@ -14,7 +14,7 @@ import { Payment, PaymentInsert, PaymentUpdate } from '@/types/models'
 export async function createPayment(data: PaymentInsert): Promise<Payment> {
   const supabase = createServerSupabaseClient()
 
-  const { data: payment, error } = await supabase
+  const { data: payment, error } = await (supabase as any)
     .from('payments')
     .insert(data)
     .select()
@@ -33,7 +33,7 @@ export async function createPayment(data: PaymentInsert): Promise<Payment> {
 export async function getTournamentPayments(tournamentId: string): Promise<Payment[]> {
   const supabase = createServerSupabaseClient()
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('payments')
     .select(`
       *,
@@ -59,7 +59,7 @@ export async function getTournamentPayments(tournamentId: string): Promise<Payme
 export async function getTeamPayments(teamId: string, tournamentId: string): Promise<Payment[]> {
   const supabase = createServerSupabaseClient()
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('payments')
     .select('*')
     .eq('team_id', teamId)
@@ -87,7 +87,7 @@ export async function updatePaymentStatus(
   const supabase = createServerSupabaseClient()
 
   // 1. Update Payment Status
-  const { data: payment, error: paymentError } = await supabase
+  const { data: payment, error: paymentError } = await (supabase as any)
     .from('payments')
     .update({ status })
     .eq('id', paymentId)

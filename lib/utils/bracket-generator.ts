@@ -174,10 +174,18 @@ export function generateBracket(
       score_round2_player2: 0,
       score_round3_player1: 0,
       score_round3_player2: 0,
+
+      winner_round1: null,
+      winner_round2: null,
+      winner_round3: null,
       status: 'completed' as const,
       next_match_id: null,
       source_match_id: null,
-      court_number: null
+      court_number: null,
+      scheduled_start_time: null,
+      scheduled_end_time: null,
+      actual_start_time: null,
+      actual_end_time: null
     }]
   }
 
@@ -270,10 +278,18 @@ export function generateBracket(
         score_round2_player2: 0,
         score_round3_player1: 0,
         score_round3_player2: 0,
+
+        winner_round1: null,
+        winner_round2: null,
+        winner_round3: null,
         status,
         next_match_id: nextMatchId,
         source_match_id: null,
-        court_number: null
+        court_number: null,
+        scheduled_start_time: null,
+        scheduled_end_time: null,
+        actual_start_time: null,
+        actual_end_time: null
       }
 
       matches.push(match)

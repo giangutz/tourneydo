@@ -27,7 +27,7 @@ export async function getPlayersByCoachId(coachId: string): Promise<Player[]> {
     throw new Error(`Failed to fetch players: ${error.message}`)
   }
 
-  return data || []
+  return (data as Player[]) || []
 }
 
 /**
@@ -52,7 +52,7 @@ export async function getPlayerById(id: string): Promise<Player | null> {
     throw new Error(`Failed to fetch player: ${error.message}`)
   }
 
-  return data
+  return data as Player
 }
 
 /**
@@ -74,7 +74,7 @@ export async function createPlayer(playerData: PlayerInsert): Promise<Player> {
     throw new Error(`Failed to create player: ${error.message}`)
   }
 
-  return data
+  return data as Player
 }
 
 /**
@@ -105,7 +105,7 @@ export async function updatePlayer(id: string, playerData: PlayerUpdate): Promis
     throw new Error(`Multiple players found with ID ${id}`)
   }
 
-  return data[0]
+  return data[0] as Player
 }
 
 /**
@@ -240,5 +240,5 @@ export async function searchPlayers(query: string, limit = 10): Promise<Player[]
     throw new Error(`Failed to search players: ${error.message}`)
   }
 
-  return data || []
+  return (data as Player[]) || []
 }

@@ -25,10 +25,10 @@ interface MatchResultDialogProps {
 interface RoundData {
   id: string
   round_number: number
-  score_player1: number
-  score_player2: number
+  score_player1: number | null
+  score_player2: number | null
   winner_id: string | null
-  status: string
+  status: string | null
 }
 
 export function MatchResultDialog({ match, open, onOpenChange, participants }: MatchResultDialogProps) {
@@ -69,16 +69,16 @@ export function MatchResultDialog({ match, open, onOpenChange, participants }: M
       // Populate scores from existing data
       roundsData.forEach((round: RoundData) => {
         if (round.round_number === 1) {
-          setRound1Score1(round.score_player1)
-          setRound1Score2(round.score_player2)
+          setRound1Score1(round.score_player1 ?? 0)
+          setRound1Score2(round.score_player2 ?? 0)
           if (round.winner_id) setManualWinner1(round.winner_id)
         } else if (round.round_number === 2) {
-          setRound2Score1(round.score_player1)
-          setRound2Score2(round.score_player2)
+          setRound2Score1(round.score_player1 ?? 0)
+          setRound2Score2(round.score_player2 ?? 0)
           if (round.winner_id) setManualWinner2(round.winner_id)
         } else if (round.round_number === 3) {
-          setRound3Score1(round.score_player1)
-          setRound3Score2(round.score_player2)
+          setRound3Score1(round.score_player1 ?? 0)
+          setRound3Score2(round.score_player2 ?? 0)
           if (round.winner_id) setManualWinner3(round.winner_id)
         }
       })
@@ -431,20 +431,6 @@ export function MatchResultDialog({ match, open, onOpenChange, participants }: M
 }
 
 
-interface MatchResultDialogProps {
-  match: Match | null
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  participants: any[]
-}
 
-interface RoundData {
-  id: string
-  round_number: number
-  score_player1: number
-  score_player2: number
-  winner_id: string | null
-  status: string
-}
 
 

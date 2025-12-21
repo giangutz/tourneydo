@@ -2,7 +2,7 @@
 
 import { auth, clerkClient } from '@clerk/nextjs/server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import type { UserRole } from '@/lib/supabase/types'
+import type { UserRole } from '@/types/models'
 
 interface OnboardingResult {
   success?: boolean

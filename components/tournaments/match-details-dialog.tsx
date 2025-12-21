@@ -18,10 +18,10 @@ interface MatchDetailsDialogProps {
 interface RoundData {
   id: string
   round_number: number
-  score_player1: number
-  score_player2: number
+  score_player1: number | null
+  score_player2: number | null
   winner_id: string | null
-  status: string
+  status: string | null
 }
 
 export function MatchDetailsDialog({ match, open, onOpenChange, participants }: MatchDetailsDialogProps) {
@@ -135,12 +135,12 @@ export function MatchDetailsDialog({ match, open, onOpenChange, participants }: 
                   <div className="grid grid-cols-3 gap-4 items-center">
                     <div className="text-center">
                       <div className="text-sm text-muted-foreground mb-1">{name1}</div>
-                      <div className="text-3xl font-bold">{round.score_player1}</div>
+                      <div className="text-3xl font-bold">{round.score_player1 ?? 0}</div>
                     </div>
                     <div className="text-center font-bold text-muted-foreground">VS</div>
                     <div className="text-center">
                       <div className="text-sm text-muted-foreground mb-1">{name2}</div>
-                      <div className="text-3xl font-bold">{round.score_player2}</div>
+                      <div className="text-3xl font-bold">{round.score_player2 ?? 0}</div>
                     </div>
                   </div>
                 </CardContent>

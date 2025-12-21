@@ -29,6 +29,7 @@ interface ValidationParticipant {
   reason?: string
   currentWeight?: number
   currentHeight?: number
+  age?: number
 }
 
 interface BracketValidationDialogProps {

@@ -153,7 +153,7 @@ export async function generateTournamentBracket(tournamentId: string): Promise<G
       }
 
       // Find the division and category IDs from the database
-      const dbDivision = divisions.find(d => d.name === division.name)
+      const dbDivision = divisions.find((d: any) => d.name === division.name)
       if (!dbDivision) {
         assignmentErrors.push({
           id: participant.id,
