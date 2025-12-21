@@ -10,10 +10,10 @@ function toDbMatch(match: Partial<Match> | MatchInsert): any {
   const dbMatch: any = { ...match }
 
   // Map fields
-  if ('round' in match) {
-    dbMatch.round_number = match.round
-    delete dbMatch.round
-  }
+  // if ('round' in match) {
+  //   dbMatch.round_number = match.round
+  //   delete dbMatch.round
+  // }
   if ('score_player1' in match) {
     dbMatch.player1_score = match.score_player1
     delete dbMatch.score_player1
@@ -179,7 +179,7 @@ export async function getTournamentMatches(tournamentId: string) {
       )
     `)
     .eq('tournament_id', tournamentId)
-    .order('round_number', { ascending: true })
+    .order('round', { ascending: true })
     .order('match_number', { ascending: true })
 
   if (error) {
@@ -195,7 +195,7 @@ export async function getTournamentMatches(tournamentId: string) {
 
     return {
       ...m,
-      round: m.round_number || 0,
+      round: (m as any).round || m.round_number || 0,
       score_player1: m.player1_score || 0,
       score_player2: m.player2_score || 0,
 
