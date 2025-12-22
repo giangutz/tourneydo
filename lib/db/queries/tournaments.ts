@@ -27,7 +27,14 @@ export async function getTournamentsByOrganizerId(organizerId: string): Promise<
     throw new Error(`Failed to fetch tournaments: ${error.message}`)
   }
 
-  return (data as unknown as Tournament[]) || []
+  if (!data) return []
+
+  const tournaments = data as unknown as Tournament[]
+
+  // Check and update status for each tournament
+  await Promise.all(tournaments.map(t => checkAndUpdateStatus(t)))
+
+  return tournaments
 }
 
 /**
@@ -52,7 +59,12 @@ export async function getTournamentById(id: string): Promise<Tournament | null> 
     throw new Error(`Failed to fetch tournament: ${error.message}`)
   }
 
-  return data as unknown as Tournament
+  const tournament = data as unknown as Tournament
+
+  // Check and update status
+  await checkAndUpdateStatus(tournament)
+
+  return tournament
 }
 
 /**
@@ -136,7 +148,12 @@ export async function getTournaments(): Promise<Tournament[]> {
     throw new Error(`Failed to fetch tournaments: ${error.message}`)
   }
 
-  return (data as unknown as Tournament[]) || []
+  const tournaments = (data as unknown as Tournament[]) || []
+
+  // Check and update status for each tournament
+  await Promise.all(tournaments.map(t => checkAndUpdateStatus(t)))
+
+  return tournaments
 }
 
 /**
@@ -177,8 +194,63 @@ export async function getPublicTournaments(options: {
     throw new Error(`Failed to fetch public tournaments: ${error.message}`)
   }
 
-  return (data as unknown as Tournament[]) || []
+  const tournaments = (data as unknown as Tournament[]) || []
+
+  // Check and update status for each tournament
+  await Promise.all(tournaments.map(t => checkAndUpdateStatus(t)))
+
+  return tournaments
 }
 
 
 
+/**
+ * Helper to check and update tournament status based on dates
+ */
+async function checkAndUpdateStatus(tournament: Tournament): Promise<void> {
+  const now = new Date()
+  let newStatus: 'upcoming' | 'ongoing' | 'completed' = 'upcoming'
+
+  // Safety check if dates are missing
+  if (!tournament.start_date && !tournament.end_date) return
+
+  const startDate = tournament.start_date ? new Date(tournament.start_date) : null
+  const endDate = tournament.end_date ? new Date(tournament.end_date) : null
+  const weighInStart = tournament.weigh_in_start ? new Date(tournament.weigh_in_start) : null
+
+  // Ensure end date covers the full day if needed (though usually timestamps handle this)
+  // Logic: 
+  // - Completed: End date passed
+  // - Ongoing: Weigh-in started OR Start date passed (active phase)
+  // - Upcoming: Before weigh-in/start
+
+  if (endDate && now > endDate) {
+    newStatus = 'completed'
+  } else if (
+    (weighInStart && now >= weighInStart) ||
+    (startDate && now >= startDate)
+  ) {
+    newStatus = 'ongoing'
+  } else {
+    newStatus = 'upcoming'
+  }
+
+  // Only update if status is different and not cancelled
+  // And avoid reverting 'completed' if logic says 'ongoing' but admin marked completed? 
+  // Actually, dates should differ. But let's respect manual 'cancelled'.
+  if (
+    tournament.status !== 'cancelled' &&
+    tournament.status !== newStatus
+  ) {
+    // If it was manually set to completed but dates say ongoing, do we revert? 
+    // Plan said: "If expected status != current status". 
+    // Let's assume dates are source of truth for these 3 statuses.
+
+    try {
+      await updateTournament(tournament.id, { status: newStatus })
+      tournament.status = newStatus // Update local object
+    } catch (e) {
+      console.error(`Failed to auto-update tournament ${tournament.id} status to ${newStatus}`, e)
+    }
+  }
+}
