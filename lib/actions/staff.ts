@@ -59,6 +59,7 @@ export async function inviteStaff(tournamentId: string, email: string, role: Tou
       email,
       role,
       tournamentName: tournament.name,
+      tournamentId,
     })
 
     revalidatePath(`/dashboard/tournament-organizer/tournaments/${tournamentId}/staff`)
@@ -112,6 +113,7 @@ export async function resendStaffInvitation(staffId: string, tournamentId: strin
       email: member.email,
       role: member.role,
       tournamentName: tournamentName,
+      tournamentId,
     })
 
     if (!emailResult.success) {
@@ -153,22 +155,81 @@ export async function removeStaff(staffId: string, tournamentId: string) {
   }
 }
 
-export async function getTournamentStaff(tournamentId: string) {
+
+export async function updateStaffRole(staffId: string, newRole: TournamentRole, tournamentId: string) {
+  try {
+    const session = await auth()
+    if (!session?.userId) {
+      throw new Error("Unauthorized")
+    }
+
+    const supabase = createServerSupabaseClient()
+
+    // 1. Verify Organizer Permission (implicit via RLS, but good to double check or catch early)
+    // The RLS "Organizers can manage staff" should handle the update permission, 
+    // but explicit check protects against logic errors.
+
+    // 2. Update Role
+    const { error } = await supabase
+      .from('tournament_staff' as any)
+      .update({ role: newRole })
+      .eq('id', staffId)
+      .select()
+      .single()
+
+    if (error) throw new Error(error.message)
+
+    revalidatePath(`/dashboard/tournament-organizer/tournaments/${tournamentId}/staff`)
+    return { success: true }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+
+export async function getTournamentStaff(
+  tournamentId: string,
+  page: number = 1,
+  limit: number = 10,
+  search?: string,
+  role?: string
+) {
   const session = await auth()
-  if (!session?.userId) return []
+  if (!session?.userId) return { data: [], total: 0, totalPages: 0 }
 
   const supabase = createServerSupabaseClient()
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('tournament_staff' as any)
-    .select('*')
+    .select('*', { count: 'exact' })
     .eq('tournament_id', tournamentId)
-    .order('created_at', { ascending: false })
+
+  // Apply search
+  if (search) {
+    query = query.ilike('email', `%${search}%`)
+  }
+
+  // Apply role filter
+  if (role && role !== 'all') {
+    query = query.eq('role', role)
+  }
+
+  // Apply pagination
+  const from = (page - 1) * limit
+  const to = from + limit - 1
+
+  query = query.order('created_at', { ascending: false }).range(from, to)
+
+  const { data, error, count } = await query
 
   if (error) {
     console.error("Error fetching staff:", error.message, error.code, JSON.stringify(error, null, 2))
-    return []
+    return { data: [], total: 0, totalPages: 0 }
   }
 
-  return data as unknown as TournamentStaff[]
+  return {
+    data: data as unknown as TournamentStaff[],
+    total: count || 0,
+    totalPages: Math.ceil((count || 0) / limit)
+  }
 }

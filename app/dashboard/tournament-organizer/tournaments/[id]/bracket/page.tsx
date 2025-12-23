@@ -18,9 +18,14 @@ interface BracketPageProps {
 }
 
 import { TournamentBreadcrumbs } from '@/components/tournaments/tournament-breadcrumbs'
+import { checkTournamentAccess } from '@/lib/auth/tournament-access'
 
 export default async function BracketPage({ params }: BracketPageProps) {
   const { id } = await params
+  
+  // Check access and get role
+  const access = await checkTournamentAccess(id)
+  
   const [tournament, { data: participants }, matches] = await Promise.all([
     getTournamentById(id),
     getTournamentParticipants(id, { limit: 1000 }),
@@ -30,6 +35,10 @@ export default async function BracketPage({ params }: BracketPageProps) {
   if (!tournament) {
     notFound()
   }
+
+  // Determine effective role
+  const role = access.isOrganizer ? 'admin' : (access.userRole || null)
+
 
   return (
     <DashboardShell>
@@ -50,6 +59,7 @@ export default async function BracketPage({ params }: BracketPageProps) {
         tournament={tournament} 
         participants={participants} 
         matches={matches} 
+        userRole={role}
       />
     </DashboardShell>
   )

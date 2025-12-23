@@ -25,7 +25,9 @@ export interface SideInfo {
   team?: {
     id: ID;
     name: string;
-  }
+  };
+
+  isDisqualified?: boolean;
 }
 
 export interface Game {

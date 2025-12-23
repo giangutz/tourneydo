@@ -27,8 +27,7 @@ function toDbMatch(match: Partial<Match> | MatchInsert): any {
   const nonDbFields = [
     'score_round1_player1', 'score_round1_player2', 'winner_round1',
     'score_round2_player1', 'score_round2_player2', 'winner_round2',
-    'score_round3_player1', 'score_round3_player2', 'winner_round3',
-    'court_number'
+    'score_round3_player1', 'score_round3_player2', 'winner_round3'
   ]
 
   nonDbFields.forEach(field => delete dbMatch[field])
@@ -211,16 +210,104 @@ export async function getTournamentMatches(tournamentId: string) {
       score_round3_player2: r3?.score_player2 || 0,
       winner_round3: r3?.winner_id || null,
 
-      // Ensure other fields required by Match interface are present if they differ
-      court_number: null, // DB has court_id, model expects court_number? DB types says matches has court_id. Model has court_number. 
-      // Checking Model: court_number: number | null
-      // checking DB: court_id: string | null. 
-      // This might be another mismatch. For now, setting match properties.
-
-      // The spread ...m includes created_at, id, match_number, status, etc.
-      // We need to make sure we satisfy the Match interface.
+      court_number: (m as any).court_number || null,
     } as unknown as Match
   }) || []
 
   return matches
+}
+
+/**
+ * Find active match for a participant (where they are player1 or player2)
+ */
+export async function findActiveMatchForParticipant(
+  playerId: string,
+  tournamentId: string
+): Promise<{ id: string; player1_id: string | null; player2_id: string | null; status: string; next_match_id: string | null; tournament_id: string } | null> {
+  const supabase = createServerSupabaseClient()
+
+  const { data, error } = await supabase
+    .from('matches')
+    .select('id, player1_id, player2_id, status, next_match_id, tournament_id')
+    .eq('tournament_id', tournamentId)
+    .or(`status.eq.pending,status.eq.in_progress`)
+    .or(`player1_id.eq.${playerId},player2_id.eq.${playerId}`)
+    .maybeSingle()
+
+  if (error && error.code !== 'PGRST116') { // Ignore "Row not found"
+    console.error(`Error finding active match for player ${playerId}:`, error)
+    return null
+  }
+
+  return data as { id: string; player1_id: string | null; player2_id: string | null; status: string; next_match_id: string | null; tournament_id: string } | null
+}
+
+/**
+ * Forfeit a match due to disqualification
+ */
+export async function forfeitMatch(matchId: string, disqualifiedPlayerId: string): Promise<void> {
+  const supabase = createServerSupabaseClient()
+
+  // 1. Get match details to find opponent
+  const { data: match, error: fetchError } = await supabase
+    .from('matches')
+    .select('player1_id, player2_id, next_match_id, tournament_id')
+    .eq('id', matchId)
+    .single()
+
+  if (fetchError || !match) {
+    throw new Error('Match not found')
+  }
+
+  // Type assertion needed because Supabase types don't properly narrow
+  const typedMatch = match as unknown as { player1_id: string | null; player2_id: string | null; next_match_id: string | null; tournament_id: string }
+
+  const winnerId = typedMatch.player1_id === disqualifiedPlayerId ? typedMatch.player2_id : typedMatch.player1_id
+
+  if (!winnerId) {
+    // If there is no opponent (e.g. empty bracket slot), just complete the match? 
+    // Or just leave it. Assuming actual match context here.
+    return
+  }
+
+  console.log(`[FORFEIT] Match ${matchId}: Forfeiting player ${disqualifiedPlayerId}, Winner is ${winnerId}`)
+
+  // 2. Update match status
+  const { error: updateError } = await supabase
+    .from('matches')
+    .update({
+      status: 'completed',
+      winner_id: winnerId,
+      tournament_id: typedMatch.tournament_id,
+      // For IBJJF/common logic, scores often stay 0 or marked special. 
+      // We will leave scores as is or set to 0. 
+      // We aren't setting win_reason column as it doesn't exist yet, relying on logic/logs.
+    })
+    .eq('id', matchId)
+
+  if (updateError) {
+    throw new Error(`Failed to forfeit match: ${updateError.message}`)
+  }
+
+  // 3. Advance the winner
+  if (typedMatch.next_match_id) {
+    const { data: nextMatch } = await supabase
+      .from('matches')
+      .select('player1_id, player2_id, tournament_id')
+      .eq('id', typedMatch.next_match_id)
+      .single()
+
+    if (nextMatch) {
+      // Type assertion for nextMatch as well
+      const typedNextMatch = nextMatch as unknown as { player1_id: string | null; player2_id: string | null; tournament_id: string }
+
+      // Determine slot
+      const updateData = typedNextMatch.player1_id === null
+        ? { player1_id: winnerId, tournament_id: typedNextMatch.tournament_id }
+        : { player2_id: winnerId, tournament_id: typedNextMatch.tournament_id }
+
+      await supabase.from('matches').update(updateData).eq('id', typedMatch.next_match_id)
+      console.log(`[FORFEIT] Advanced winner ${winnerId} to ${typedMatch.next_match_id}`)
+    }
+  }
 }

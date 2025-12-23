@@ -1,4 +1,4 @@
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { getTournamentsByOrganizerId } from '@/lib/db/queries/tournaments'
 import { auth } from "@clerk/nextjs/server"
 import {
   Card,
@@ -15,13 +15,9 @@ export default async function TournamentOrganizerDashboard() {
   const { userId } = await auth()
   if (!userId) return null
 
-  const supabase = createServerSupabaseClient()
-
-  // Fetch stats
-  const { count: tournamentCount } = await supabase
-    .from("tournaments")
-    .select("*", { count: "exact", head: true })
-    .eq("organizer_id", userId)
+  // Fetch all accessible tournaments to get accurate count
+  const tournaments = await getTournamentsByOrganizerId(userId)
+  const tournamentCount = tournaments.length
 
   return (
     <div className="space-y-6">

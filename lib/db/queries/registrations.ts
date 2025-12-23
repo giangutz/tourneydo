@@ -7,6 +7,7 @@
 
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { RegistrationInsert, TournamentRegistration, TournamentRegistrationInsert } from '@/types/models'
+import { error } from 'console'
 
 /**
  * Register a team for a tournament
@@ -128,6 +129,7 @@ export type GetParticipantsOptions = {
   belt?: string
   status?: string
   weighInStatus?: string
+  weighInSelected?: boolean
   sort?: string
   order?: 'asc' | 'desc'
 }
@@ -148,6 +150,7 @@ export async function getTournamentParticipants(
     belt,
     status,
     weighInStatus,
+    weighInSelected,
     sort = 'created_at',
     order = 'desc'
   } = options
@@ -210,6 +213,10 @@ export async function getTournamentParticipants(
     } else if (weighInStatus === 'not-required') {
       queryBuilder = queryBuilder.is('weighed_in_at', null).not('status', 'in', '("verified","paid")')
     }
+  }
+
+  if (weighInSelected !== undefined) {
+    queryBuilder = queryBuilder.eq('weigh_in_selected', weighInSelected)
   }
 
   // Apply sorting

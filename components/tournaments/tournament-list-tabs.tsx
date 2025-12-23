@@ -29,12 +29,20 @@ interface TournamentListTabsProps {
   userId: string
 }
 
-export function TournamentListTabs({ tournaments }: TournamentListTabsProps) {
+export function TournamentListTabs({ tournaments, userId }: TournamentListTabsProps) {
   const [isDeleting, setIsDeleting] = useState(false)
   
+  // Deduplicate tournaments by ID (in case of duplicate records in DB)
+  const uniqueTournaments = tournaments.reduce((acc, tournament) => {
+    if (!acc.find(t => t.id === tournament.id)) {
+      acc.push(tournament)
+    }
+    return acc
+  }, [] as typeof tournaments)
+  
   // Categorize tournaments
-  const pastTournaments = tournaments.filter(t => t.status === 'completed' || t.status === 'cancelled')
-  const activeTournaments = tournaments.filter(t => t.status !== 'completed' && t.status !== 'cancelled')
+  const pastTournaments = uniqueTournaments.filter(t => t.status === 'completed' || t.status === 'cancelled')
+  const activeTournaments = uniqueTournaments.filter(t => t.status !== 'completed' && t.status !== 'cancelled')
 
   const handleDelete = async (id: string, name: string) => {
     setIsDeleting(true)
@@ -52,92 +60,96 @@ export function TournamentListTabs({ tournaments }: TournamentListTabsProps) {
     }
   }
 
-  const TournamentCard = ({ tournament, isPast = false }: { tournament: Tournament, isPast?: boolean }) => (
-    <Card>
-      <CardHeader>
-        <div className="flex justify-between items-start gap-2">
-          <div>
-            <CardTitle>{tournament.name}</CardTitle>
-            <CardDescription className="mt-1 flex items-center gap-2">
-              <Calendar className="h-3 w-3" />
-              {tournament.start_date ? formatShortDate(tournament.start_date) : 'Date TBD'}
-            </CardDescription>
-          </div>
-          <div className="text-xs px-2 py-1 rounded-full bg-muted font-medium capitalize">
-            {tournament.status}
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="flex gap-2 text-xs text-muted-foreground mb-4 flex-wrap">
-            {tournament.venue && (
-                 <div className="flex items-center gap-1">
-                    <MapPin className="h-3 w-3" />
-                    <span>{tournament.venue}</span>
-                 </div>
-            )}
-            <div className="flex items-center gap-1">
-                <Users className="h-3 w-3" />
-                <span>{tournament.max_players ? `${tournament.max_players} max` : 'Open'}</span>
+  const TournamentCard = ({ tournament, isPast = false }: { tournament: Tournament, isPast?: boolean }) => {
+    const isOwner = tournament.organizer_id === userId
+    
+    return (
+      <Card>
+        <CardHeader>
+          <div className="flex justify-between items-start gap-2">
+            <div>
+              <CardTitle>{tournament.name}</CardTitle>
+              <CardDescription className="mt-1 flex items-center gap-2">
+                <Calendar className="h-3 w-3" />
+                {tournament.start_date ? formatShortDate(tournament.start_date) : 'Date TBD'}
+              </CardDescription>
             </div>
-        </div>
-        
-        <div className="flex gap-2">
-          {!isPast && (
-             <Button className="flex-1" asChild>
-                <Link href={routes.organizer.tournamentDetail(tournament.id)}>
-                    Manage
-                </Link>
-             </Button>
-          )}
+            <div className="text-xs px-2 py-1 rounded-full bg-muted font-medium capitalize">
+              {tournament.status}
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-2 text-xs text-muted-foreground mb-4 flex-wrap">
+              {tournament.venue && (
+                   <div className="flex items-center gap-1">
+                      <MapPin className="h-3 w-3" />
+                      <span>{tournament.venue}</span>
+                   </div>
+              )}
+              <div className="flex items-center gap-1">
+                  <Users className="h-3 w-3" />
+                  <span>{tournament.max_players ? `${tournament.max_players} max` : 'Open'}</span>
+              </div>
+          </div>
           
-          {!isPast && (
-            <Button variant="outline" size="icon" asChild>
-                <Link href={routes.organizer.tournamentEdit(tournament.id)}>
-                    <Pencil className="h-4 w-4" />
-                </Link>
-            </Button>
-          )}
-          
-          {isPast && (
-             <Button className="flex-1" variant="secondary" asChild>
-                <Link href={routes.organizer.tournamentDetail(tournament.id)}>
-                    View Results
-                </Link>
-             </Button>
-          )}
-
-          {!isPast && (
-            <AlertDialog>
-                <AlertDialogTrigger asChild>
-                    <Button variant="outline" size="icon" className="text-destructive hover:text-destructive">
-                        <Trash2 className="h-4 w-4" />
-                    </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Tournament?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            This will permanently delete "{tournament.name}" and all registration data. This action cannot be undone.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction 
-                            className="bg-destructive hover:bg-destructive/90"
-                            onClick={() => handleDelete(tournament.id, tournament.name)}
-                            disabled={isDeleting}
-                        >
-                            {isDeleting ? 'Deleting...' : 'Delete'}
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-          )}
-        </div>
-      </CardContent>
-    </Card>
-  )
+          <div className="flex gap-2">
+            {!isPast && (
+               <Button className="flex-1" asChild>
+                  <Link href={routes.organizer.tournamentDetail(tournament.id)}>
+                      Manage
+                  </Link>
+               </Button>
+            )}
+            
+            {!isPast && isOwner && (
+              <Button variant="outline" size="icon" asChild>
+                  <Link href={routes.organizer.tournamentEdit(tournament.id)}>
+                      <Pencil className="h-4 w-4" />
+                  </Link>
+              </Button>
+            )}
+            
+            {isPast && (
+               <Button className="flex-1" variant="secondary" asChild>
+                  <Link href={routes.organizer.tournamentDetail(tournament.id)}>
+                      View Results
+                  </Link>
+               </Button>
+            )}
+  
+            {!isPast && isOwner && (
+              <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                      <Button variant="outline" size="icon" className="text-destructive hover:text-destructive">
+                          <Trash2 className="h-4 w-4" />
+                      </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                      <AlertDialogHeader>
+                          <AlertDialogTitle>Delete Tournament?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                              This will permanently delete "{tournament.name}" and all registration data. This action cannot be undone.
+                          </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction 
+                              className="bg-destructive hover:bg-destructive/90"
+                              onClick={() => handleDelete(tournament.id, tournament.name)}
+                              disabled={isDeleting}
+                          >
+                              {isDeleting ? 'Deleting...' : 'Delete'}
+                          </AlertDialogAction>
+                      </AlertDialogFooter>
+                  </AlertDialogContent>
+              </AlertDialog>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
 
   return (
     <Tabs defaultValue="active" className="w-full">

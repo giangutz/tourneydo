@@ -118,7 +118,15 @@ export function MatchResultDialog({ match, open, onOpenChange, participants }: M
   const round3Winner = r3Winner === match.player1_id ? name1 : r3Winner === match.player2_id ? name2 : null
 
   const matchDecided = player1Wins >= 2 || player2Wins >= 2
-  const overallWinner = player1Wins >= 2 ? name1 : player2Wins >= 2 ? name2 : null
+  
+  // Winner determination: calc from rounds first, fallback to DB winner if match completed (e.g. forfeit)
+  const dbWinnerName = match.winner_id ? (match.winner_id === match.player1_id ? name1 : name2) : null
+  const overallWinner = (player1Wins >= 2 ? name1 : player2Wins >= 2 ? name2 : null) || (match.status === 'completed' ? dbWinnerName : null)
+
+  // Check for DQ win
+  const loserId = match.winner_id === match.player1_id ? match.player2_id : match.player1_id
+  const loser = participants.find(p => p.player_id === loserId)
+  const isWinByDQ = loser && loser.disqualified && match.status === 'completed'
 
   const handleSaveAll = async () => {
     if (!match) return
@@ -206,7 +214,7 @@ export function MatchResultDialog({ match, open, onOpenChange, participants }: M
                   <div className="mt-4 text-center">
                     <Badge className="text-sm py-1 px-3">
                       <Trophy className="h-4 w-4 mr-1" />
-                      Winner: {overallWinner}
+                      Winner: {overallWinner} {isWinByDQ && '(Disqualification)'}
                     </Badge>
                   </div>
                 )}

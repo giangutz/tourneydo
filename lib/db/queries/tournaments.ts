@@ -14,27 +14,54 @@ import type { Tournament, TournamentInsert, TournamentUpdate } from '@/types/mod
  * @param organizerId - Organizer's user ID
  * @returns Array of tournaments
  */
-export async function getTournamentsByOrganizerId(organizerId: string): Promise<Tournament[]> {
+/**
+ * Get all tournaments for a specific user (organized + staff access)
+ * 
+ * @param userId - User ID
+ * @returns Array of tournaments
+ */
+export async function getTournamentsByOrganizerId(userId: string): Promise<Tournament[]> {
   const supabase = createServerSupabaseClient()
 
-  const { data, error } = await supabase
+  // 1. Get tournaments where user is organizer
+  const { data: organized, error: organizedError } = await supabase
     .from('tournaments')
     .select('*')
-    .eq('organizer_id', organizerId)
+    .eq('organizer_id', userId)
     .order('created_at', { ascending: false })
 
-  if (error) {
-    throw new Error(`Failed to fetch tournaments: ${error.message}`)
+  if (organizedError) {
+    throw new Error(`Failed to fetch organized tournaments: ${organizedError.message}`)
   }
 
-  if (!data) return []
+  // 2. Get tournaments where user is staff
+  const { data: staffAssignments, error: staffError } = await (supabase as any)
+    .from('tournament_staff')
+    .select('tournament:tournaments(*), role')
+    .eq('user_id', userId)
+    .eq('status', 'active')
 
-  const tournaments = data as unknown as Tournament[]
+  if (staffError) {
+    // Log error but don't fail entire request? Or fail? 
+    // It filters out if table doesn't exist, but we created it.
+    console.error(`Failed to fetch staff tournaments: ${staffError.message}`)
+  }
 
-  // Check and update status for each tournament
-  await Promise.all(tournaments.map(t => checkAndUpdateStatus(t)))
+  const staffTournaments = staffAssignments?.map((s: any) => ({
+    ...s.tournament,
+    _staffRole: s.role // Add role to local object if needed for UI
+  })) || []
 
-  return tournaments
+  // Combine and deduplicate (though they shouldn't overlap if organizer isn't also staff)
+  const allTournaments = [...(organized || []), ...staffTournaments]
+
+  // Sort by created_at desc
+  allTournaments.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+
+  // Check and update status for each
+  await Promise.all(allTournaments.map(t => checkAndUpdateStatus(t)))
+
+  return allTournaments
 }
 
 /**

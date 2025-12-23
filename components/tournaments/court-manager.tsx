@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -6,6 +6,37 @@ import { Button } from '@/components/ui/button'
 import { Match, Tournament } from '@/types/models'
 import { MatchResultDialog } from '@/components/tournaments/match-result-dialog'
 import { Badge } from '@/components/ui/badge'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { assignMatchToCourt, unassignMatch, updateMatchStatus } from '@/lib/actions/matches'
+import { disqualifyParticipant } from '@/lib/actions/participants'
+import { toast } from 'sonner'
+import { ArrowRightLeft, Trash2, XCircle } from 'lucide-react'
+import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
 
 interface CourtManagerProps {
   tournament: Tournament
@@ -16,6 +47,18 @@ interface CourtManagerProps {
 export function CourtManager({ tournament, matches, participants }: CourtManagerProps) {
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
+  
+  // State for Move/Remove actions
+  const [matchToMove, setMatchToMove] = useState<Match | null>(null)
+  const [matchToRemove, setMatchToRemove] = useState<Match | null>(null)
+  const [targetCourt, setTargetCourt] = useState<string>("")
+  const [isMoving, setIsMoving] = useState(false)
+  const [isRemoving, setIsRemoving] = useState(false)
+  
+  // DQ state
+  const [playerToDQ, setPlayerToDQ] = useState<{ playerId: string; name: string; team: string; matchId: string } | null>(null)
+  const [dqReason, setDQReason] = useState('')
+  const [isDQing, setIsDQing] = useState(false)
 
   const courts = Array.from({ length: tournament.courts || 0 }, (_, i) => i + 1)
 
@@ -37,36 +80,106 @@ export function CourtManager({ tournament, matches, participants }: CourtManager
 
   const handleStartMatch = async (match: Match) => {
     try {
-      // Import dynamically to avoid server/client issues if possible, or just use the action
-      const { updateMatchStatus } = await import('@/lib/actions/matches')
       const result = await updateMatchStatus(match.id, match.tournament_id, 'in_progress')
       if (!result.success) {
-        // toast.error(result.error) - toast not imported yet
-        console.error(result.error)
+        toast.error(result.error)
+      } else {
+        toast.success("Match started")
       }
     } catch (error) {
-      console.error('Failed to start match', error)
+      toast.error('Failed to start match')
     }
   }
 
-  const handleRemoveFromQueue = async (match: Match) => {
+  const handleConfirmMove = async () => {
+    if (!matchToMove || !targetCourt) return
+
+    setIsMoving(true)
     try {
-      const { assignMatchToCourt } = await import('@/lib/actions/matches')
-      // Assign to court 0 or null to remove? The action likely expects a valid court number.
-      // We might need a specific action to unassign, or just update the match directly.
-      // Let's assume passing 0 or handling it in a new action is best.
-      // Actually, let's use a direct update for now or a specific unassign action.
-      // For now, let's try to update the match to have no court.
+      const courtNum = parseInt(targetCourt)
       
-      // Since assignMatchToCourt takes a number, and 0 might be invalid or "unassigned".
-      // Let's check assignMatchToCourt implementation or create a new one.
-      // For now, I'll use a placeholder and we might need to add `unassignMatch` action.
+      // Determine status based on target court occupancy
+      const isOccupied = matches.some(m => m.court_number === courtNum && m.status === 'in_progress')
+      const status = isOccupied ? 'scheduled' : 'in_progress'
+
+      const result = await assignMatchToCourt(matchToMove.id, matchToMove.tournament_id, courtNum, status)
       
-      const { unassignMatch } = await import('@/lib/actions/matches')
-      await unassignMatch(match.id, match.tournament_id)
+      if (result.success) {
+        toast.success(`Match moved to Court ${targetCourt}`)
+        setMatchToMove(null)
+        setTargetCourt("")
+      } else {
+        toast.error(result.error)
+      }
     } catch (error) {
-      console.error('Failed to remove from queue', error)
+      toast.error('Failed to move match')
+    } finally {
+      setIsMoving(false)
     }
+  }
+
+  const handleConfirmRemove = async () => {
+    if (!matchToRemove) return
+
+    setIsRemoving(true)
+    try {
+      const result = await unassignMatch(matchToRemove.id, matchToRemove.tournament_id)
+      
+      if (result.success) {
+        toast.success("Match removed from court")
+        setMatchToRemove(null)
+      } else {
+        toast.error(result.error)
+      }
+    } catch (error) {
+      toast.error('Failed to remove match')
+    } finally {
+      setIsRemoving(false)
+    }
+  }
+
+  const handleConfirmDQ = async () => {
+    if (!playerToDQ || !dqReason.trim()) {
+      toast.error('Please provide a reason for disqualification')
+      return
+    }
+    
+    setIsDQing(true)
+    try {
+      const registration = participants.find(p => p.player_id === playerToDQ.playerId)
+      if (!registration) {
+        toast.error('Player registration not found')
+        return
+      }
+      
+      const result = await disqualifyParticipant(registration.id, tournament.id, dqReason)
+      
+      if (result.success) {
+        toast.success(`${playerToDQ.name} disqualified. Match forfeited automatically.`)
+        setPlayerToDQ(null)
+        setDQReason('')
+      } else {
+        toast.error(result.error || 'Failed to disqualify player')
+      }
+    } catch (error) {
+      toast.error('An error occurred during disqualification')
+    } finally {
+      setIsDQing(false)
+    }
+  }
+
+  // Helper to check availability for the Move dialog
+  const getAvailableCourts = () => {
+    return courts.map(courtNum => {
+      const courtMatches = matches.filter(m => m.court_number === courtNum)
+      const isOccupied = courtMatches.some(m => m.status === 'in_progress')
+      const queueSize = courtMatches.filter(m => m.status === 'scheduled').length
+      return {
+        courtNum,
+        isOccupied,
+        queueSize
+      }
+    })
   }
 
   if (!tournament.courts || tournament.courts === 0) {
@@ -92,11 +205,7 @@ export function CourtManager({ tournament, matches, participants }: CourtManager
           const currentMatch = courtMatches.find(m => m.status === 'in_progress')
           const queuedMatches = courtMatches
             .filter(m => m.status === 'scheduled')
-            .sort((a, b) => {
-              // Sort by match number or creation time if needed
-              // For now assuming match_number is a good proxy for order
-              return (a.match_number || 0) - (b.match_number || 0)
-            })
+            .sort((a, b) => (a.match_number || 0) - (b.match_number || 0))
 
           return (
             <Card key={courtNumber} className={currentMatch ? 'border-primary' : ''}>
@@ -119,35 +228,89 @@ export function CourtManager({ tournament, matches, participants }: CourtManager
                       
                       <div className="space-y-4">
                         {/* Player 1 */}
-                        <div className="flex flex-col items-center p-2 bg-background rounded border">
-                          <span className="font-bold text-lg">
-                            {getPlayerDisplay(currentMatch.player1_id).name}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {getPlayerDisplay(currentMatch.player1_id).team}
-                          </span>
+                        <div className="flex items-center justify-between p-2 bg-background rounded border">
+                          <div className="flex flex-col flex-1">
+                            <span className="font-bold text-lg">
+                              {getPlayerDisplay(currentMatch.player1_id).name}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {getPlayerDisplay(currentMatch.player1_id).team}
+                            </span>
+                          </div>
+                          {currentMatch.player1_id && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                              title="Disqualify player"
+                              onClick={() => setPlayerToDQ({
+                                playerId: currentMatch.player1_id!,
+                                name: getPlayerDisplay(currentMatch.player1_id).name,
+                                team: getPlayerDisplay(currentMatch.player1_id).team || 'Unattached',
+                                matchId: currentMatch.id
+                              })}
+                            >
+                              <XCircle className="h-4 w-4" />
+                            </Button>
+                          )}
                         </div>
 
                         <div className="text-center font-bold text-muted-foreground text-sm">VS</div>
 
                         {/* Player 2 */}
-                        <div className="flex flex-col items-center p-2 bg-background rounded border">
-                          <span className="font-bold text-lg">
-                            {getPlayerDisplay(currentMatch.player2_id).name}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {getPlayerDisplay(currentMatch.player2_id).team}
-                          </span>
+                        <div className="flex items-center justify-between p-2 bg-background rounded border">
+                          <div className="flex flex-col flex-1">
+                            <span className="font-bold text-lg">
+                              {getPlayerDisplay(currentMatch.player2_id).name}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {getPlayerDisplay(currentMatch.player2_id).team}
+                            </span>
+                          </div>
+                          {currentMatch.player2_id && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                              title="Disqualify player"
+                              onClick={() => setPlayerToDQ({
+                                playerId: currentMatch.player2_id!,
+                                name: getPlayerDisplay(currentMatch.player2_id).name,
+                                team: getPlayerDisplay(currentMatch.player2_id).team || 'Unattached',
+                                matchId: currentMatch.id
+                              })}
+                            >
+                              <XCircle className="h-4 w-4" />
+                            </Button>
+                          )}
                         </div>
                       </div>
                     </div>
                     
-                    <Button 
-                      className="w-full"
-                      onClick={() => handleScoreMatch(currentMatch)}
-                    >
-                      Score Match
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button 
+                        className="flex-1"
+                        onClick={() => handleScoreMatch(currentMatch)}
+                      >
+                        Score
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        title="Move to another court"
+                        onClick={() => setMatchToMove(currentMatch)}
+                      >
+                        <ArrowRightLeft className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="icon"
+                        title="Remove from court"
+                        onClick={() => setMatchToRemove(currentMatch)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 ) : (
                   <div className="flex h-40 items-center justify-center rounded-md border border-dashed mb-6">
@@ -181,7 +344,7 @@ export function CourtManager({ tournament, matches, participants }: CourtManager
                           
                           {/* Queue Actions */}
                           <div className="flex gap-2 mt-2">
-                            {idx === 0 && !currentMatch && (
+                            {idx === 0 && !currentMatch ? (
                               <Button 
                                 size="sm" 
                                 className="w-full h-7 text-xs"
@@ -189,12 +352,21 @@ export function CourtManager({ tournament, matches, participants }: CourtManager
                               >
                                 Start Match
                               </Button>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="w-full h-7 text-xs"
+                                onClick={() => setMatchToMove(match)}
+                              >
+                                Move
+                              </Button>
                             )}
                             <Button 
                               size="sm" 
                               variant="ghost" 
                               className="w-full h-7 text-xs text-destructive hover:text-destructive"
-                              onClick={() => handleRemoveFromQueue(match)}
+                              onClick={() => setMatchToRemove(match)}
                             >
                               Remove
                             </Button>
@@ -216,6 +388,102 @@ export function CourtManager({ tournament, matches, participants }: CourtManager
         onOpenChange={setDialogOpen}
         participants={participants}
       />
+
+      {/* Move Match Dialog */}
+      <Dialog open={!!matchToMove} onOpenChange={(open) => !open && setMatchToMove(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Move Match to Another Court</DialogTitle>
+            <DialogDescription>
+              Select a new court for Match #{matchToMove?.match_number}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Select value={targetCourt} onValueChange={setTargetCourt}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select target court" />
+              </SelectTrigger>
+              <SelectContent>
+                {getAvailableCourts().map(({ courtNum, isOccupied, queueSize }) => (
+                  <SelectItem 
+                    key={courtNum} 
+                    value={courtNum.toString()}
+                    disabled={courtNum === matchToMove?.court_number}
+                  >
+                    Court {courtNum} {isOccupied ? `(Live + ${queueSize} in queue)` : `(Free + ${queueSize} in queue)`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMatchToMove(null)}>Cancel</Button>
+            <Button onClick={handleConfirmMove} disabled={!targetCourt || isMoving}>
+              {isMoving ? 'Moving...' : 'Move Match'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Remove Confirmation Dialog */}
+      <AlertDialog open={!!matchToRemove} onOpenChange={(open) => !open && setMatchToRemove(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Match from Court?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove Match #{matchToRemove?.match_number} from Court {matchToRemove?.court_number} and return it to the unassigned pool. It will not delete the match.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmRemove} className="bg-destructive hover:bg-destructive/90">
+              {isRemoving ? 'Removing...' : 'Remove Match'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* DQ Confirmation Dialog */}
+      <AlertDialog open={!!playerToDQ} onOpenChange={(open) => {
+        if (!open) {
+          setPlayerToDQ(null)
+          setDQReason('')
+        }
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Disqualify Player?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You are about to disqualify <strong>{playerToDQ?.name}</strong> ({playerToDQ?.team}).
+              <br /><br />
+              <span className="text-destructive font-semibold">This will automatically forfeit the match and advance the opponent to the next round.</span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4">
+            <Label htmlFor="dq-reason" className="text-sm font-medium">
+              Reason for Disqualification <span className="text-destructive">*</span>
+            </Label>
+            <Textarea
+              id="dq-reason"
+              placeholder="e.g., Weight violation, Unsportsmanlike conduct, No-show..."
+              value={dqReason}
+              onChange={(e) => setDQReason(e.target.value)}
+              className="mt-2 min-h-[80px]"
+              disabled={isDQing}
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDQing}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleConfirmDQ} 
+              className="bg-destructive hover:bg-destructive/90"
+              disabled={isDQing || !dqReason.trim()}
+            >
+              {isDQing ? 'Disqualifying...' : 'Confirm Disqualification'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   )
 }

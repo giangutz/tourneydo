@@ -51,9 +51,77 @@ interface WeighInListProps {
   tournamentId: string
 }
 
+import { startTransition, useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { Loader2, Download } from 'lucide-react'
+import { toast } from 'sonner'
+
 export function WeighInList({ participants, divisions, tournamentId }: WeighInListProps) {
+  const [isExporting, setIsExporting] = useState(false)
+
   // Filter for selected participants
   const selectedParticipants = participants.filter((p: Participant) => p.weigh_in_selected)
+
+  const handleExportCSV = async () => {
+    setIsExporting(true)
+    try {
+      // Import action dynamically
+      const { exportParticipants } = await import('@/lib/actions/participants')
+       
+      const filters = {
+        weighInSelected: true,
+        limit: 10000 
+      }
+
+      const result = await exportParticipants(tournamentId, filters)
+       
+      if (result.success) {
+        if (result.data) {
+          // Convert to CSV
+          const headers = ['First Name', 'Last Name', 'Team', 'Division', 'Category', 'Max Weight', 'Status', 'Weigh-In Status', 'Actual Weight', 'Actual Height']
+          const rows = result.data.map((p: any) => {
+              const div = divisions.find((d: Division) => d.id === p.division_id)
+              const cat = div?.tournament_categories.find((c: any) => c.id === p.category_id)
+              return [
+                p.player?.first_name || '',
+                p.player?.last_name || '',
+                p.team?.name || '',
+                div?.name || '',
+                cat?.name || '',
+                cat?.max_weight || 'Open',
+                p.status,
+                p.weighed_in_at ? 'Completed' : 'Pending',
+                p.actual_weight || '',
+                p.actual_height || ''
+              ]
+          })
+            
+          const csvContent = [
+            headers.join(','),
+            ...rows.map((row: any[]) => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+          ].join('\n')
+            
+          const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+          const url = URL.createObjectURL(blob)
+          const link = document.createElement('a')
+          link.setAttribute('href', url)
+          link.setAttribute('download', `random_weigh_in_export_${new Date().toISOString().split('T')[0]}.csv`)
+          link.style.visibility = 'hidden'
+          document.body.appendChild(link)
+          link.click()
+          document.body.removeChild(link)
+            
+          toast.success(`Exported ${rows.length} participants`)
+        }
+      } else {
+        toast.error(result.error || 'Failed to export participants')
+      }
+    } catch (error) {
+      toast.error('An error occurred during export')
+    } finally {
+      setIsExporting(false)
+    }
+  }
 
   if (selectedParticipants.length === 0) {
     return (
@@ -80,13 +148,20 @@ export function WeighInList({ participants, divisions, tournamentId }: WeighInLi
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Prescheduled Weigh-Ins</CardTitle>
-        <CardDescription>
-          Surprise check list for today.
-        </CardDescription>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <div>
+          <CardTitle>Prescheduled Weigh-Ins</CardTitle>
+          <CardDescription>
+            Surprise check list for today.
+          </CardDescription>
+        </div>
+        <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={isExporting}>
+            {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />} 
+            {isExporting ? 'Exporting...' : 'Export CSV'}
+        </Button>
       </CardHeader>
       <CardContent>
+
         <Table>
           <TableHeader>
             <TableRow>

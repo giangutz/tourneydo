@@ -6,6 +6,7 @@ interface SendStaffInvitationParams {
   email: string
   role: string
   tournamentName: string
+  tournamentId: string
   inviterName?: string
 }
 
@@ -13,6 +14,7 @@ export async function sendStaffInvitationEmail({
   email,
   role,
   tournamentName,
+  tournamentId,
   inviterName = 'The Organizer',
 }: SendStaffInvitationParams) {
   if (!process.env.RESEND_API_KEY) {
@@ -26,11 +28,11 @@ export async function sendStaffInvitationEmail({
       <h2>You've been invited!</h2>
       <p>Hello,</p>
       <p><strong>${inviterName}</strong> has invited you to help manage the tournament <strong>"${tournamentName}"</strong> as a <strong>${role}</strong>.</p>
-      <p>Please log in to the dashboard to access the tournament management tools.</p>
+      <p>Click the button below to accept your invitation and access the tournament management tools.</p>
       <div style="margin: 30px 0;">
-        <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard/tournament-organizer" style="background-color: #000; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 4px;">Go to Dashboard</a>
+        <a href="${process.env.NEXT_PUBLIC_APP_URL}/invitations/accept?email=${encodeURIComponent(email)}&tournament=${tournamentId}" style="background-color: #000; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">Accept Invitation</a>
       </div>
-      <p style="color: #666; font-size: 14px;">If you don't have an account yet, please sign up with this email address.</p>
+      <p style="color: #666; font-size: 14px;">If you don't have an account yet, you'll be guided through the sign-up process.</p>
     </div>
   `
 

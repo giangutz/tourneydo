@@ -23,12 +23,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Progress } from '@/components/ui/progress'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Calculator, FileText, Printer, Ticket } from 'lucide-react'
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+
+import { TournamentRole } from '@/types/models'
 
 interface BracketPageClientProps {
   tournament: Tournament
   participants: any[]
   matches: Match[]
+  userRole?: TournamentRole | 'admin' | null
 }
 
 import { useTournamentRealtime } from '@/hooks/use-tournament-realtime'
@@ -50,7 +61,7 @@ function getBeltSkillCategory(beltLevel: string | null | undefined): string {
 
 const SKILL_ORDER = ['Beginner', 'Novice I', 'Novice II', 'Advanced', 'Unknown']
 
-export function BracketPageClient({ tournament, participants, matches }: BracketPageClientProps) {
+export function BracketPageClient({ tournament, participants, matches, userRole }: BracketPageClientProps) {
   useTournamentRealtime(tournament.id)
   const router = useRouter()
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null)
@@ -178,10 +189,35 @@ export function BracketPageClient({ tournament, participants, matches }: Bracket
   return (
     <div className="space-y-6 w-full max-w-full overflow-hidden">
       <div className="flex justify-end">
-        <Button onClick={handleGenerate} disabled={generating}>
-          {generating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          {matches.length > 0 ? 'Regenerate Bracket' : 'Generate Bracket'}
-        </Button>
+          <div className="flex gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  <Printer className="h-4 w-4" />
+                  Print / Export
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Print Options</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => window.open(`/print/tournament/${tournament.id}?mode=brackets`, '_blank')}>
+                  <FileText className="mr-2 h-4 w-4" />
+                  Print Brackets
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => window.open(`/print/tournament/${tournament.id}?mode=slips`, '_blank')}>
+                  <Ticket className="mr-2 h-4 w-4" />
+                  Print Match Slips
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {userRole !== 'bracket_manager' && (
+              <Button onClick={handleGenerate} disabled={generating}>
+                {generating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {matches.length > 0 ? 'Regenerate Bracket' : 'Generate Bracket'}
+              </Button>
+            )}
+          </div>
       </div>
 
       {matches.length > 0 && (
@@ -234,6 +270,8 @@ export function BracketPageClient({ tournament, participants, matches }: Bracket
           onEditMatch={handleEditMatch}
           courts={tournament.courts || 0}
           tournamentType={tournament.tournament_type as 'standard' | 'open-belt'}
+          canScore={userRole !== 'bracket_manager'}
+          canManageParticipants={userRole !== 'bracket_manager'}
         />
       )}
 

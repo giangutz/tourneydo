@@ -144,7 +144,14 @@ export default class BracketGame extends React.PureComponent<BracketGameProps> {
                     fontStyle: side.seed && side.seed.sourcePool ? 'italic' : undefined,
                     fontWeight: isWinner ? 'bold' : 'normal'
                   }}>
-              {isBye ? 'BYE' : playerName}
+              {isBye ? 'BYE' : (
+                <>
+                  {side.isDisqualified && <tspan fill="#ef4444" fontWeight="bold">(DQ) </tspan>}
+                  <tspan style={{ textDecoration: side.isDisqualified ? 'line-through' : 'none', opacity: side.isDisqualified ? 0.7 : 1 }}>
+                    {playerName}
+                  </tspan>
+                </>
+              )}
             </text>
             
             {/* Team name - only show if not a BYE */}

@@ -248,7 +248,7 @@ export type PaymentUpdate = Partial<Omit<Payment, 'id' | 'tournament_id' | 'team
 // Staff Types
 // ============================================================================
 
-export type TournamentRole = 'admin' | 'staff' | 'official'
+export type TournamentRole = 'admin' | 'staff' | 'official' | 'bracket_manager' | 'registration_manager' | 'weigh_in_staff'
 
 export interface TournamentStaff {
   id: string

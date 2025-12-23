@@ -11,6 +11,16 @@ interface Participant {
   team?: {
     name: string;
   };
+  disqualified?: boolean;
+}
+
+/**
+ * Check if a player is disqualified
+ */
+function isPlayerDisqualified(playerId: string | null, participants: Participant[]): boolean {
+  if (!playerId) return false;
+  const participant = participants.find(p => p.player_id === playerId);
+  return !!participant?.disqualified;
 }
 
 /**
@@ -115,7 +125,8 @@ export function transformMatchToGame(
     team: match.player1_id ? {
       id: match.player1_id,
       name: getTeamName(match.player1_id, participants)
-    } : undefined
+    } : undefined,
+    isDisqualified: isPlayerDisqualified(match.player1_id, participants)
   };
 
   // Construct SideInfo for Visitor (Bottom)
@@ -135,7 +146,8 @@ export function transformMatchToGame(
     team: match.player2_id ? {
       id: match.player2_id,
       name: getTeamName(match.player2_id, participants)
-    } : undefined
+    } : undefined,
+    isDisqualified: isPlayerDisqualified(match.player2_id, participants)
   };
 
   return {

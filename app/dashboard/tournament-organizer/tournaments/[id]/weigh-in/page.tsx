@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { routes } from '@/config/routes'
 import { ArrowLeft } from 'lucide-react'
+import { RealtimeListener } from '@/components/tournaments/realtime-listener'
 
 interface WeighInPageProps {
   params: Promise<{
@@ -64,6 +65,7 @@ export default async function WeighInPage({ params }: WeighInPageProps) {
         divisions={divisions}
         tournamentId={tournament.id}
       />
+      <RealtimeListener tournamentId={tournament.id} />
     </DashboardShell>
   )
 }

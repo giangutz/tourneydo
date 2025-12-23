@@ -14,17 +14,28 @@ interface StaffPageProps {
   params: Promise<{
     id: string
   }>
+  searchParams: Promise<{
+    page?: string
+    search?: string
+    role?: string
+  }>
 }
 
-export default async function StaffPage({ params }: StaffPageProps) {
+export default async function StaffPage({ params, searchParams }: StaffPageProps) {
   const { id } = await params
+  const { page, search, role } = await searchParams
+  
+  const currentPage = Number(page) || 1
+  const query = search || ''
+  const roleFilter = role || 'all'
+
   const tournament = await getTournamentById(id)
   
   if (!tournament) {
     notFound()
   }
 
-  const staff = await getTournamentStaff(id)
+  const { data: staff, totalPages } = await getTournamentStaff(id, currentPage, 10, query, roleFilter)
 
   return (
     <DashboardShell>
@@ -52,7 +63,12 @@ export default async function StaffPage({ params }: StaffPageProps) {
                     Users with access to manage this tournament.
                 </p>
             </div>
-            <StaffList staff={staff} tournamentId={tournament.id} />
+            <StaffList 
+                staff={staff} 
+                tournamentId={tournament.id} 
+                totalPages={totalPages}
+                currentPage={currentPage}
+            />
         </div>
       </div>
     </DashboardShell>

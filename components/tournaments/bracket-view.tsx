@@ -5,7 +5,7 @@ import { Match } from '@/types/models'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from '@/components/ui/select'
-import { Trophy, Search } from 'lucide-react'
+import { Trophy, Search, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
@@ -28,11 +28,25 @@ interface BracketViewProps {
   onEditMatch?: (match: Match) => void
   courts?: number
   tournamentType?: 'standard' | 'open-belt'
+  canScore?: boolean
+  canManageParticipants?: boolean
 }
 
-export function BracketView({ matches, participants, onMatchClick, isOrganizer = false, onEditMatch, courts = 0, tournamentType = 'standard' }: BracketViewProps) {
+export function BracketView({ 
+  matches, 
+  participants, 
+  onMatchClick, 
+  isOrganizer = false, 
+  onEditMatch, 
+  courts = 0, 
+  tournamentType = 'standard',
+  canScore = true,
+  canManageParticipants = true
+}: BracketViewProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedDivision, setSelectedDivision] = useState<string>('all')
+  const [currentPage, setCurrentPage] = useState(1)
+  const ITEMS_PER_PAGE = 5
   const [assigningMatch, setAssigningMatch] = useState<Match | null>(null)
   const [selectedCourt, setSelectedCourt] = useState<string>('')
   const [isAssigning, setIsAssigning] = useState(false)
@@ -480,6 +494,17 @@ export function BracketView({ matches, participants, onMatchClick, isOrganizer =
     return sortedGroups
   }, [filteredGroups, tournamentType])
 
+  // Reset page when filters change
+  useMemo(() => {
+    setCurrentPage(1)
+  }, [searchQuery, selectedDivision])
+
+  // Pagination Logic
+  const totalPages = Math.ceil(groupedBrackets.length / ITEMS_PER_PAGE)
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
+  const endIndex = startIndex + ITEMS_PER_PAGE
+  const paginatedBrackets = groupedBrackets.slice(startIndex, endIndex)
+
   return (
     <div className="space-y-6">
       {/* Search and Filter Controls */}
@@ -529,7 +554,6 @@ export function BracketView({ matches, participants, onMatchClick, isOrganizer =
         </CardContent>
       </Card>
 
-      {/* Brackets */}
       {filteredGroups.length === 0 ? (
         <Card>
           <CardContent className="py-12">
@@ -544,7 +568,7 @@ export function BracketView({ matches, participants, onMatchClick, isOrganizer =
         </Card>
       ) : (
         <div className="space-y-8">
-          {groupedBrackets.map((displayGroup) => (
+          {paginatedBrackets.map((displayGroup) => (
             <div key={displayGroup.label} className="space-y-6 pt-4 first:pt-0">
                <div className="flex items-center gap-2">
                  <h3 className="font-bold text-xl text-primary">{displayGroup.label}</h3>
@@ -581,9 +605,9 @@ export function BracketView({ matches, participants, onMatchClick, isOrganizer =
                           {divisionLabel}
                         </CardTitle>
                       </CardHeader>
-                      <CardContent className="p-0 bg-white dark:bg-zinc-900 border-none max-w-full">
+                      <CardContent className="p-0 bg-white dark:bg-zinc-900 border-none max-w-full relative">
                         {/* Container with overflow-auto for horizontal scrolling ONLY within the card */}
-                        <div className="w-full overflow-x-auto pb-2">
+                        <div className="w-full overflow-x-auto pb-2 scrollbar-thin">
                           <div className="min-w-max p-6">
                             <BracketGenerator 
                               games={games}
@@ -597,11 +621,12 @@ export function BracketView({ matches, participants, onMatchClick, isOrganizer =
                                 }
                               }}
                               isOrganizer={isOrganizer}
-                              onEditMatch={isOrganizer ? handleEditMatch : undefined}
-                              onSwitchSides={isOrganizer ? (match) => handleSwitchSides(match, skillLevel) : undefined}
+                              onEditMatch={(isOrganizer && canScore) ? handleEditMatch : undefined}
+                              onSwitchSides={(isOrganizer && canManageParticipants) ? (match) => handleSwitchSides(match, skillLevel) : undefined}
                               hoveredTeamId={hoveredTeamId}
                               onHoveredTeamIdChange={setHoveredTeamId}
                             />
+                            
                           </div>
                         </div>
                       </CardContent>
@@ -611,6 +636,36 @@ export function BracketView({ matches, participants, onMatchClick, isOrganizer =
                </div>
             </div>
           ))}
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between border-t pt-4">
+              <div className="text-sm text-muted-foreground">
+                Showing {startIndex + 1}-{Math.min(endIndex, groupedBrackets.length)} of {groupedBrackets.length} divisions
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <div className="text-sm font-medium">
+                  Page {currentPage} of {totalPages}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -621,6 +676,23 @@ export function BracketView({ matches, participants, onMatchClick, isOrganizer =
             <DialogTitle>Assign Match to Court</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            {assigningMatch && (
+              <div className="bg-muted p-4 rounded-md">
+                <div className="text-sm text-muted-foreground mb-2">Match #{assigningMatch.match_number}</div>
+                <div className="flex items-center justify-between gap-4">
+                  <div className="font-semibold text-right flex-1">
+                    {getPlayerDisplay(assigningMatch.player1_id).name}
+                  </div>
+                  <div className="text-xs font-bold text-muted-foreground bg-background px-2 py-1 rounded border">
+                    VS
+                  </div>
+                  <div className="font-semibold text-left flex-1">
+                    {getPlayerDisplay(assigningMatch.player2_id).name}
+                  </div>
+                </div>
+              </div>
+            )}
+            
             <div>
               <Label>Select Court</Label>
               <Select value={selectedCourt} onValueChange={setSelectedCourt}>

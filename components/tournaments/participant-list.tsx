@@ -32,7 +32,7 @@ import { AddParticipantDialog } from './add-participant-dialog'
 import { EditParticipantDialog } from './edit-participant-dialog'
 import { WeighInDialog } from './weigh-in-dialog'
 import { Team } from '@/types/models'
-import { Pencil, MoreHorizontal, Search, Check, X, DollarSign, Loader2, Scale, CheckCircle2, AlertTriangle, ArrowUpDown, Filter, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react'
+import { Pencil, MoreHorizontal, Search, Check, X, DollarSign, Loader2, Scale, CheckCircle2, AlertTriangle, ArrowUpDown, Filter, ChevronLeft, ChevronRight, Trash2, Download } from 'lucide-react'
 import { updateParticipantStatus, bulkWeighIn, deleteParticipant, bulkDeleteParticipants } from '@/lib/actions/participants'
 import { DeleteConfirmDialog } from './delete-confirm-dialog'
 import { toast } from 'sonner'
@@ -283,6 +283,72 @@ export function ParticipantList({
   // For belts, we can hardcode standard BJJ belts or fetch from DB. For now, hardcoded is safer or use unique from current page + standard.
   const standardBelts = ['White', 'Yellow', 'Blue', 'Red', 'Brown', 'Black']
 
+
+  const handleExportCSV = async () => {
+    setIsUpdating(true)
+    try {
+       // Import action dynamically
+       const { exportParticipants } = await import('@/lib/actions/participants')
+       
+       const filters = {
+          query: searchQuery,
+          teamId: filterTeam,
+          belt: filterBelt,
+          status: filterStatus,
+          weighInStatus: filterWeighIn,
+          sort: sortKey,
+          order: sortDirection as 'asc' | 'desc'
+       }
+
+       const result = await exportParticipants(tournamentId, filters)
+       
+       if (result.success) {
+          if (result.data) {
+             // Convert to CSV
+             const headers = ['First Name', 'Last Name', 'Team', 'Belt', 'Gender', 'DOB', 'Weight (Reg)', 'Height (Reg)', 'Status', 'Weigh-In Status', 'Actual Weight', 'Actual Height']
+             const rows = result.data.map((p: any) => [
+                p.player?.first_name || '',
+                p.player?.last_name || '',
+                p.team?.name || '',
+                p.player?.belt_level || '',
+                p.player?.gender || '',
+                p.player?.dob || '',
+                p.player?.weight || '',
+                p.player?.height || '',
+                p.status,
+                p.weighed_in_at ? 'Completed' : 'Pending',
+                p.actual_weight || '',
+                p.actual_height || ''
+             ])
+             
+             const csvContent = [
+                headers.join(','),
+                ...rows.map((row: any[]) => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+             ].join('\n')
+             
+             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+             const url = URL.createObjectURL(blob)
+             const link = document.createElement('a')
+             link.setAttribute('href', url)
+             link.setAttribute('download', `participants_export_${new Date().toISOString().split('T')[0]}.csv`)
+             link.style.visibility = 'hidden'
+             document.body.appendChild(link)
+             link.click()
+             document.body.removeChild(link)
+             
+             toast.success(`Exported ${rows.length} participants`)
+          }
+       } else {
+          toast.error(result.error || 'Failed to export participants')
+       }
+    } catch (error) {
+       toast.error('An error occurred during export')
+    } finally {
+       setIsUpdating(false)
+    }
+  }
+
+  // Bulk Delete Confirmation
   return (
     <div className="space-y-4">
       {/* Search and Actions */}
@@ -297,6 +363,11 @@ export function ParticipantList({
           />
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
+          <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={isUpdating}>
+            {isUpdating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />} 
+            {isUpdating ? 'Exporting...' : 'Export CSV'}
+          </Button>
+
           {selectedIds.length > 0 && (
             <div className="flex items-center gap-2 mr-2">
               <span className="text-sm text-muted-foreground whitespace-nowrap">

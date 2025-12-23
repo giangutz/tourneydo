@@ -84,9 +84,10 @@ export default clerkMiddleware(async (auth, req) => {
     if (req.nextUrl.pathname.startsWith('/dashboard/coach') && role !== 'coach') {
       return NextResponse.redirect(new URL('/dashboard/tournament-organizer', req.url))
     }
-    if (req.nextUrl.pathname.startsWith('/dashboard/tournament-organizer') && role !== 'tournament-organizer') {
-      return NextResponse.redirect(new URL('/dashboard/coach', req.url))
-    }
+    // Allow coaches to access organizer routes (as they might be staff)
+    // if (req.nextUrl.pathname.startsWith('/dashboard/tournament-organizer') && role !== 'tournament-organizer') {
+    //   return NextResponse.redirect(new URL('/dashboard/coach', req.url))
+    // }
   }
 
   return NextResponse.next()

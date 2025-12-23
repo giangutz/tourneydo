@@ -358,11 +358,32 @@ export async function disqualifyParticipant(
       throw new Error('Unauthorized')
     }
 
-    const { updateDisqualification } = await import('@/lib/db/queries/registrations')
+    const { updateDisqualification, getRegistrationById } = await import('@/lib/db/queries/registrations')
+    const { findActiveMatchForParticipant, forfeitMatch } = await import('@/lib/db/queries/matches')
 
+    // 1. Update DQ status in registration
     await updateDisqualification(registrationId, true, reason)
 
+    // 2. Auto-forfeit active match
+    try {
+      const reg = await getRegistrationById(registrationId)
+      if (reg.player_id) {
+        // Find if they are in an active match
+        const activeMatch = await findActiveMatchForParticipant(reg.player_id, tournamentId)
+
+        if (activeMatch) {
+          console.log(`[DQ AUTO-ACTION] Found active match ${activeMatch.id} for disqualified player ${reg.player_id}`)
+          await forfeitMatch(activeMatch.id, reg.player_id)
+        }
+      }
+    } catch (err) {
+      console.error('[DQ AUTO-ACTION ERROR]', err)
+      // We don't fail the whole action if forfeit fails, just log it. 
+      // The participant is technically disqualified already in step 1.
+    }
+
     revalidatePath(routes.organizer.tournamentParticipants(tournamentId))
+    revalidatePath(routes.organizer.tournamentBracket(tournamentId))
   })
 }
 
@@ -476,5 +497,31 @@ export async function bulkDeleteParticipants(
     }
 
     revalidatePath(routes.organizer.tournamentDetail(tournamentId))
+  })
+}
+
+/**
+ * Export participants for a tournament (fetch all matching filters)
+ */
+export async function exportParticipants(
+  tournamentId: string,
+  filters: any
+): Promise<ActionResult<any[]>> {
+  return safeAction(async () => {
+    const { userId } = await auth()
+    if (!userId) {
+      throw new Error('Unauthorized')
+    }
+
+    const { getTournamentParticipants } = await import('@/lib/db/queries/registrations')
+
+    // Fetch all records (high limit)
+    const result = await getTournamentParticipants(tournamentId, {
+      ...filters,
+      limit: 10000,
+      page: 1
+    })
+
+    return result.data
   })
 }

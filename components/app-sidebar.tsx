@@ -61,7 +61,15 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     },
   ]
 
-  const items = role === "coach" ? coachItems : role === "tournament-organizer" ? organizerItems : []
+  const isOrganizerRoute = pathname?.startsWith("/dashboard/tournament-organizer")
+  
+  // Use organizer items if on organizer route OR role is organizer
+  // Use coach items only if on coach route/neutral AND role is coach
+  const items = isOrganizerRoute 
+    ? organizerItems 
+    : role === "coach" 
+      ? coachItems 
+      : organizerItems
 
   return (
     <Sidebar {...props}>
@@ -69,11 +77,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <div className="flex items-center gap-2 px-4 py-2">
           <Image src="/td-blue.svg" alt="TourneyDo Logo" width={32} height={32} className="h-8 w-8" />
           <div className="font-semibold">TourneyDo</div>
+          {/* Debug: {pathname} of {role} */}
         </div>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>{role === "coach" ? "Coach" : "Tournament Organizer"}</SidebarGroupLabel>
+          <SidebarGroupLabel>{isOrganizerRoute ? "Tournament Organizer" : role === "coach" ? "Coach" : "Tournament Organizer"}</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {items.map((item) => (
