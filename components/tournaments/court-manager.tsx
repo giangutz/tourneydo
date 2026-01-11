@@ -34,9 +34,10 @@ import {
 import { assignMatchToCourt, unassignMatch, updateMatchStatus } from '@/lib/actions/matches'
 import { disqualifyParticipant } from '@/lib/actions/participants'
 import { toast } from 'sonner'
-import { ArrowRightLeft, Trash2, XCircle } from 'lucide-react'
+import { ArrowRightLeft, Trash2, XCircle, Monitor } from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
+import { LiveDisplayMode } from '@/components/tournaments/live-display-mode'
 
 interface CourtManagerProps {
   tournament: Tournament
@@ -59,6 +60,9 @@ export function CourtManager({ tournament, matches, participants }: CourtManager
   const [playerToDQ, setPlayerToDQ] = useState<{ playerId: string; name: string; team: string; matchId: string } | null>(null)
   const [dqReason, setDQReason] = useState('')
   const [isDQing, setIsDQing] = useState(false)
+  
+  // Live display mode state
+  const [liveDisplayMode, setLiveDisplayMode] = useState(false)
 
   const courts = Array.from({ length: tournament.courts || 0 }, (_, i) => i + 1)
 
@@ -197,8 +201,32 @@ export function CourtManager({ tournament, matches, participants }: CourtManager
     )
   }
 
+  // Render live display mode if active
+  if (liveDisplayMode) {
+    return (
+      <LiveDisplayMode
+        tournament={tournament}
+        matches={matches}
+        participants={participants}
+        onClose={() => setLiveDisplayMode(false)}
+      />
+    )
+  }
+
   return (
     <>
+      {/* Live Display Toggle Button */}
+      <div className="mb-4 flex justify-end">
+        <Button
+          onClick={() => setLiveDisplayMode(true)}
+          variant="outline"
+          className="gap-2"
+        >
+          <Monitor className="h-4 w-4" />
+          Live Display Mode
+        </Button>
+      </div>
+
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {courts.map((courtNumber) => {
           const courtMatches = matches.filter(m => m.court_number === courtNumber)

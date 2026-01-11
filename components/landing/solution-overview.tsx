@@ -1,72 +1,94 @@
 'use client'
 
-import { Card, CardContent } from '@/components/ui/card'
-import { Network, Scale, MonitorPlay } from 'lucide-react'
+import { Layout, CheckCircle2, Trophy, Monitor } from 'lucide-react'
 
 export function SolutionOverview() {
-  const solutions = [
+  const steps = [
     {
-      icon: Network,
-      title: 'Automated Bracket Generation',
-      description: 'Smart seeding algorithm ensures fair matchups in single elimination format',
-      features: ['One-click bracket creation', 'Team distance optimization', 'WTF division support']
+      title: "Smart Brackets & Registration",
+      description: "Stop manually seeding players. Our algorithm automatically creates fair, balanced brackets based on age, weight, and rank. Registration handles payments and divisions effortlessly.",
+      icon: Layout,
+      points: ["One-click bracket generation", "Automatic conflict avoidance", "Instant participant assignment"],
+      imageBg: "bg-blue-100"
     },
     {
-      icon: Scale,
-      title: 'Digital Weigh-In Management',
-      description: 'Track weights in real-time with automatic disqualification for violations',
-      features: ['Real-time weight tracking', 'Auto-DQ for violations', 'Surprise check lists']
+      title: "Digital Weigh-In Management",
+      description: "Eliminate the bottleneck at the scales. Staff can use any tablet or phone to weigh-in athletes, updating their status instantly across the entire tournament.",
+      icon: CheckCircle2,
+      points: ["Real-time weight verification", "Auto-disqualification logic", "Digital weight cards"],
+      imageBg: "bg-indigo-100" 
     },
     {
-      icon: MonitorPlay,
-      title: 'Live Match Console',
-      description: 'Manage multiple courts simultaneously with instant updates',
-      features: ['Multi-court management', 'Real-time scoring', 'Instant DQ handling']
+      title: "Live Match Deployment",
+      description: "Keep the tournament moving. Push matches to specific courts, display live scores on large screens, and let spectators follow along on their phones.",
+      icon: Monitor,
+      points: ["Drag-and-drop court management", "Live scoreboard display", "Real-time medal tracking"],
+      imageBg: "bg-sky-100"
     }
   ]
 
   return (
-    <section className="py-20 bg-white">
+    <section className="py-24 bg-slate-50 overflow-hidden">
       <div className="container mx-auto px-4">
-        <div className="text-center max-w-3xl mx-auto mb-16">
-          <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
-            One Platform, <span className="text-blue-600">Complete Control</span>
-          </h2>
-          <p className="text-xl text-gray-600">
-            Everything you need to run professional Taekwondo tournaments
-          </p>
+        
+        <div className="text-center max-w-3xl mx-auto mb-20">
+            <h2 className="text-4xl md:text-5xl font-bold text-slate-900 mb-6">
+                A Unified Platform for <span className="text-primary">Modern Tournaments</span>
+            </h2>
+            <p className="text-lg text-slate-600">
+                Replace your stack of disconnected apps with one seamless operating system.
+            </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-          {solutions.map((solution, index) => (
-            <Card 
-              key={index} 
-              className="border-2 hover:border-blue-200 hover:shadow-xl transition-all group"
-            >
-              <CardContent className="p-8">
-                <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-6 group-hover:scale-110 transition-transform">
-                  <solution.icon className="w-8 h-8 text-blue-600" />
+        <div className="space-y-32">
+          {steps.map((step, index) => (
+            <div key={index} className={`flex flex-col lg:flex-row items-center gap-12 lg:gap-20 ${index % 2 === 1 ? 'lg:flex-row-reverse' : ''}`}>
+              
+              {/* Text Side */}
+              <div className="flex-1 space-y-8">
+                <div className="flex items-center gap-4">
+                    <div className="h-12 w-12 rounded-xl bg-white shadow-sm flex items-center justify-center border border-slate-100">
+                        <step.icon className="w-6 h-6 text-primary" />
+                    </div>
+                    <span className="text-sm font-bold tracking-wider text-slate-500 uppercase">Step 0{index + 1}</span>
                 </div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-3">
-                  {solution.title}
+                
+                <h3 className="text-3xl md:text-4xl font-bold text-slate-900">
+                    {step.title}
                 </h3>
-                <p className="text-gray-600 mb-6">
-                  {solution.description}
+                <p className="text-lg text-slate-600 leading-relaxed">
+                    {step.description}
                 </p>
-                <ul className="space-y-2">
-                  {solution.features.map((feature, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm text-gray-600">
-                      <svg className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                      {feature}
-                    </li>
-                  ))}
+
+                <ul className="space-y-4 pt-2">
+                    {step.points.map((point, i) => (
+                        <li key={i} className="flex items-center gap-3">
+                            <CheckCircle2 className="w-5 h-5 text-green-500 flex-shrink-0" />
+                            <span className="text-slate-700 font-medium">{point}</span>
+                        </li>
+                    ))}
                 </ul>
-              </CardContent>
-            </Card>
+              </div>
+
+              {/* Visual Side */}
+              <div className="flex-1 w-full">
+                <div className={`relative rounded-3xl overflow-hidden aspect-video shadow-2xl border-4 border-white ${step.imageBg}`}>
+                    {/* Abstract Representation of UI */}
+                     <div className="absolute inset-x-8 top-8 bottom-0 bg-white rounded-t-xl shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)] p-6 space-y-4 opacity-90">
+                        <div className="h-4 w-1/3 bg-slate-100 rounded-lg animate-pulse" />
+                        <div className="h-32 w-full bg-slate-50 rounded-xl border border-slate-100" />
+                        <div className="flex gap-4">
+                            <div className="h-20 w-1/2 bg-blue-50/50 rounded-lg border border-blue-50" />
+                            <div className="h-20 w-1/2 bg-blue-50/50 rounded-lg border border-blue-50" />
+                        </div>
+                     </div>
+                </div>
+              </div>
+
+            </div>
           ))}
         </div>
+
       </div>
     </section>
   )

@@ -5,17 +5,21 @@ import { FeatureShowcase } from '@/components/landing/feature-showcase'
 import { PricingSection } from '@/components/landing/pricing-section'
 import { FinalCTA } from '@/components/landing/final-cta'
 import { LandingFooter } from '@/components/landing/landing-footer'
+import { SiteHeader } from '@/components/layouts/site-header'
 
 export default function LandingPage() {
   return (
-    <main className="min-h-screen">
-      <HeroSection />
-      <ProblemStatement />
-      <SolutionOverview />
-      <FeatureShowcase />
-      <PricingSection />
-      <FinalCTA />
+    <div className="min-h-screen flex flex-col">
+      <SiteHeader />
+      <main className="flex-1">
+        <HeroSection />
+        <ProblemStatement />
+        <SolutionOverview />
+        <FeatureShowcase />
+        <PricingSection />
+        <FinalCTA />
+      </main>
       <LandingFooter />
-    </main>
+    </div>
   )
 }
