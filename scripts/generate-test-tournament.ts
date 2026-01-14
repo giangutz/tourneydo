@@ -405,9 +405,11 @@ async function main() {
           if (newPlayer) {
             playerId = newPlayer.id
             results.playersCreated++
-            playerMap.set(row.name, playerId)
+            if (playerId) {
+              playerMap.set(row.name, playerId)
+            }
 
-            if (teamId) {
+            if (teamId && playerId) {
               await supabase.from('team_players').insert({ team_id: teamId, player_id: playerId })
             }
           }

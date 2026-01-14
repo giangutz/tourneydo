@@ -102,6 +102,7 @@ export async function POST(request: NextRequest) {
       disqualified: false,
       disqualification_reason: null,
       weighed_in_at: null,
+      weighed_in_by: null,
       weigh_in_selected: false,
     })
 
