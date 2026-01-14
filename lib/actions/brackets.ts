@@ -291,9 +291,32 @@ export async function generateTournamentBracket(tournamentId: string): Promise<G
 
     return { success: true }
   } catch (error) {
-    if (error instanceof Error) {
-      return { success: false, error: error.message, errorType: 'general' }
-    }
     return { success: false, error: 'An unexpected error occurred', errorType: 'general' }
+  }
+}
+
+/**
+ * Delete tournament bracket (remove all matches)
+ */
+export async function deleteTournamentBracket(tournamentId: string): Promise<ActionResult> {
+  try {
+    const { userId } = await auth()
+
+    if (!userId) {
+      throw new Error('Unauthorized')
+    }
+
+    const { deleteTournamentMatches } = await import('@/lib/db/queries/matches')
+    await deleteTournamentMatches(tournamentId)
+
+    revalidatePath(routes.organizer.tournamentDetail(tournamentId))
+    revalidatePath(routes.organizer.tournamentBracket(tournamentId))
+
+    return { success: true, data: undefined }
+  } catch (error) {
+    if (error instanceof Error) {
+      return { success: false, error: error.message }
+    }
+    return { success: false, error: 'Failed to delete bracket' }
   }
 }

@@ -72,3 +72,154 @@ export async function sendStaffInvitationEmail({
     return { success: false, error: error.message || 'Failed to send email' }
   }
 }
+
+interface SendPaymentApprovalParams {
+  email: string
+  coachName: string
+  tournamentName: string
+  teamName: string
+  amount: number
+  referenceNumber: string
+}
+
+export async function sendPaymentApprovalEmail({
+  email,
+  coachName,
+  tournamentName,
+  teamName,
+  amount,
+  referenceNumber,
+}: SendPaymentApprovalParams) {
+  if (!process.env.RESEND_API_KEY) {
+    console.warn('RESEND_API_KEY is not set. Skipping email.')
+    return { success: false, error: 'Missing API Key' }
+  }
+
+  const subject = `Payment Approved for ${tournamentName}`
+  const html = `
+    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+      <h2 style="color: #16a34a;">Payment Approved ✓</h2>
+      <p>Hello ${coachName},</p>
+      <p>Your payment for <strong>${tournamentName}</strong> has been approved!</p>
+      
+      <div style="background-color: #f0fdf4; border-left: 4px solid #16a34a; padding: 16px; margin: 20px 0;">
+        <p style="margin: 0;"><strong>Team:</strong> ${teamName}</p>
+        <p style="margin: 8px 0 0 0;"><strong>Amount:</strong> ₱${amount.toFixed(2)}</p>
+        <p style="margin: 8px 0 0 0;"><strong>Reference:</strong> ${referenceNumber}</p>
+      </div>
+      
+      <p>Your team's registration status has been updated to <strong>Paid</strong>.</p>
+      <p>Thank you for your prompt payment!</p>
+      
+      <p style="color: #666; font-size: 14px; margin-top: 30px;">If you have any questions, please contact the tournament organizer.</p>
+    </div>
+  `
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from: process.env.RESEND_FROM_EMAIL || 'Acme Tournaments <onboarding@resend.dev>',
+      to: email,
+      subject: subject,
+      html: html,
+    })
+
+    if (error) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('--- DEV MODE EMAIL FALLBACK ---')
+        console.log(`To: ${email}`)
+        console.log(`Subject: ${subject}`)
+        console.log('--- HTML CONTENT ---')
+        console.log(html)
+        console.log('--- END EMAIL CONTENT ---')
+        console.warn(`Original Resend Error: ${error.message}`)
+        return { success: true, data: { id: 'dev-mode-fallback' }, warning: 'Dev Mode: Email logged to console.' }
+      }
+      console.error('Resend Error:', error)
+      return { success: false, error: error.message }
+    }
+
+    return { success: true, data }
+  } catch (error: any) {
+    console.error('Failed to send email:', error)
+    return { success: false, error: error.message || 'Failed to send email' }
+  }
+}
+
+interface SendPaymentRejectionParams {
+  email: string
+  coachName: string
+  tournamentName: string
+  teamName: string
+  amount: number
+  referenceNumber: string
+  rejectionReason: string
+}
+
+export async function sendPaymentRejectionEmail({
+  email,
+  coachName,
+  tournamentName,
+  teamName,
+  amount,
+  referenceNumber,
+  rejectionReason,
+}: SendPaymentRejectionParams) {
+  if (!process.env.RESEND_API_KEY) {
+    console.warn('RESEND_API_KEY is not set. Skipping email.')
+    return { success: false, error: 'Missing API Key' }
+  }
+
+  const subject = `Payment Rejected for ${tournamentName}`
+  const html = `
+    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+      <h2 style="color: #dc2626;">Payment Rejected</h2>
+      <p>Hello ${coachName},</p>
+      <p>Unfortunately, your payment for <strong>${tournamentName}</strong> has been rejected.</p>
+      
+      <div style="background-color: #fef2f2; border-left: 4px solid #dc2626; padding: 16px; margin: 20px 0;">
+        <p style="margin: 0;"><strong>Team:</strong> ${teamName}</p>
+        <p style="margin: 8px 0 0 0;"><strong>Amount:</strong> ₱${amount.toFixed(2)}</p>
+        <p style="margin: 8px 0 0 0;"><strong>Reference:</strong> ${referenceNumber}</p>
+      </div>
+      
+      <div style="background-color: #fff7ed; border-left: 4px solid #f59e0b; padding: 16px; margin: 20px 0;">
+        <p style="margin: 0; font-weight: bold;">Reason for Rejection:</p>
+        <p style="margin: 8px 0 0 0;">${rejectionReason}</p>
+      </div>
+      
+      <p>Please review the rejection reason above and submit a new payment with the correct information.</p>
+      <p>If you have any questions, please contact the tournament organizer.</p>
+      
+      <p style="color: #666; font-size: 14px; margin-top: 30px;">Thank you for your understanding.</p>
+    </div>
+  `
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from: process.env.RESEND_FROM_EMAIL || 'Acme Tournaments <onboarding@resend.dev>',
+      to: email,
+      subject: subject,
+      html: html,
+    })
+
+    if (error) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('--- DEV MODE EMAIL FALLBACK ---')
+        console.log(`To: ${email}`)
+        console.log(`Subject: ${subject}`)
+        console.log('--- HTML CONTENT ---')
+        console.log(html)
+        console.log('--- END EMAIL CONTENT ---')
+        console.warn(`Original Resend Error: ${error.message}`)
+        return { success: true, data: { id: 'dev-mode-fallback' }, warning: 'Dev Mode: Email logged to console.' }
+      }
+      console.error('Resend Error:', error)
+      return { success: false, error: error.message }
+    }
+
+    return { success: true, data }
+  } catch (error: any) {
+    console.error('Failed to send email:', error)
+    return { success: false, error: error.message || 'Failed to send email' }
+  }
+}

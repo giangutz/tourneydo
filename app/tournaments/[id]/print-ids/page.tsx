@@ -56,6 +56,8 @@ export default async function PrintIDsPage({ params, searchParams }: PrintIDsPag
   let filteredParticipants = participants
   if (teamId) {
     filteredParticipants = participants.filter(p => p.team_id === teamId)
+  } else if (coachId) {
+    filteredParticipants = participants.filter(p => p.coach_id === coachId)
   }
 
   // Get team name if filtering by team
@@ -95,7 +97,7 @@ export default async function PrintIDsPage({ params, searchParams }: PrintIDsPag
     })
   }
 
-  const totalCards = coachesToPrint.size + (coachId ? 0 : filteredParticipants.length)
+  const totalCards = coachesToPrint.size + filteredParticipants.length
 
   // Helper to get division label for a participant
   const getParticipantDivision = (participant: any): string => {
@@ -181,8 +183,8 @@ export default async function PrintIDsPage({ params, searchParams }: PrintIDsPag
                 </CardTitle>
                 <CardDescription>
                   {coachesToPrint.size > 0 && `${coachesToPrint.size} coach ${coachesToPrint.size === 1 ? 'card' : 'cards'}`}
-                  {coachesToPrint.size > 0 && !coachId && filteredParticipants.length > 0 && ' and '}
-                  {!coachId && filteredParticipants.length > 0 && `${filteredParticipants.length} athlete ${filteredParticipants.length === 1 ? 'card' : 'cards'}`}
+                  {coachesToPrint.size > 0 && filteredParticipants.length > 0 && ' and '}
+                  {filteredParticipants.length > 0 && `${filteredParticipants.length} athlete ${filteredParticipants.length === 1 ? 'card' : 'cards'}`}
                   {' '}prepared for printing. Click the print button above to print all cards.
                 </CardDescription>
               </CardHeader>
@@ -205,7 +207,7 @@ export default async function PrintIDsPage({ params, searchParams }: PrintIDsPag
             ))}
 
             {/* Athletes */}
-            {(!coachId) && filteredParticipants.map(p => (
+            {filteredParticipants.map(p => (
               <div key={p.id} className="print:inline-block print:m-1 break-inside-avoid">
                 <IDCard
                   name={`${p.player?.first_name} ${p.player?.last_name}`}

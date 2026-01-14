@@ -17,10 +17,22 @@ interface WeighInPageProps {
   params: Promise<{
     id: string
   }>
+  searchParams: Promise<{
+    page?: string
+    query?: string
+    status?: string
+    divisionId?: string
+    categoryId?: string
+  }>
 }
 
-export default async function WeighInPage({ params }: WeighInPageProps) {
+export default async function WeighInPage({ params, searchParams }: WeighInPageProps) {
   const { id } = await params
+  const { page, query, status, divisionId, categoryId } = await searchParams
+  
+  const currentPage = Number(page) || 1
+  const limit = 20 // Reasonable page size for weigh-in list
+
   const tournament = await getTournamentById(id)
 
   if (!tournament) {
@@ -29,7 +41,15 @@ export default async function WeighInPage({ params }: WeighInPageProps) {
 
   // Fetch data in parallel
   const [participantsRes, divisions] = await Promise.all([
-    getTournamentParticipants(id, { limit: 2000 }),
+    getTournamentParticipants(id, { 
+      limit, 
+      page: currentPage,
+      query,
+      weighInStatus: status, // Mapping 'status' param to weighInStatus logic
+      divisionId: divisionId === 'all' ? undefined : divisionId,
+      categoryId: categoryId === 'all' ? undefined : categoryId,
+      weighInSelected: true // Only show selected participants for weigh-in page
+    }),
     getTournamentDivisions(id)
   ])
 
@@ -55,7 +75,7 @@ export default async function WeighInPage({ params }: WeighInPageProps) {
                 Back to Dashboard
               </Link>
             </Button>
-            <WeighInGenerator tournamentId={tournament.id} disabled={!hasBrackets} />
+            <WeighInGenerator tournamentId={tournament.id} />
           </div>
         }
       />
@@ -64,6 +84,9 @@ export default async function WeighInPage({ params }: WeighInPageProps) {
         participants={participantsRes.data}
         divisions={divisions}
         tournamentId={tournament.id}
+        page={currentPage}
+        totalPages={participantsRes.totalPages}
+        totalCount={participantsRes.count}
       />
       <RealtimeListener tournamentId={tournament.id} />
     </DashboardShell>

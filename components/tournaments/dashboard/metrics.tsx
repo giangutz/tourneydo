@@ -39,8 +39,8 @@ export function DashboardMetrics({ participants, matches, entryFee }: DashboardM
   // 4. Revenue Collected
   // Reuse logic from RevenueStats but minimal card format
   const totalRevenue = verifiedPaid.reduce((acc, curr) => acc + (1 * entryFee), 0) // rough calc
-  // More accurate: Check payment_status='paid' or status='paid'
-  const paidParticipants = participants.filter(p => p.status === 'paid' || p.payment_status === 'paid')
+  // Count paid participants
+  const paidParticipants = participants.filter(p => p.status === 'paid')
   const collectedRevenue = paidParticipants.length * entryFee
   const projectedRevenue = participants.length * entryFee
   const revenueGoalPercent = projectedRevenue > 0 ? Math.round((collectedRevenue / projectedRevenue) * 100) : 0

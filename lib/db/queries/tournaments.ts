@@ -168,7 +168,7 @@ export async function getTournaments(): Promise<Tournament[]> {
   const { data, error } = await supabase
     .from('tournaments')
     .select('*')
-    .eq('status', 'upcoming') // Assuming we only want upcoming tournaments
+    // .eq('status', 'upcoming') // Removed to allow all tournaments
     .order('start_date', { ascending: true })
 
   if (error) {
@@ -265,19 +265,22 @@ async function checkAndUpdateStatus(tournament: Tournament): Promise<void> {
   // Only update if status is different and not cancelled
   // And avoid reverting 'completed' if logic says 'ongoing' but admin marked completed? 
   // Actually, dates should differ. But let's respect manual 'cancelled'.
+  // Only update if status is different and not cancelled
+  // And avoid reverting 'completed' if logic says 'ongoing' but admin marked completed? 
+  // Actually, dates should differ. But let's respect manual 'cancelled'.
   if (
     tournament.status !== 'cancelled' &&
     tournament.status !== newStatus
   ) {
-    // If it was manually set to completed but dates say ongoing, do we revert? 
-    // Plan said: "If expected status != current status". 
-    // Let's assume dates are source of truth for these 3 statuses.
+    // Optimistically update local object so UI is correct immediately
+    tournament.status = newStatus
 
     try {
       await updateTournament(tournament.id, { status: newStatus })
-      tournament.status = newStatus // Update local object
     } catch (e) {
       console.error(`Failed to auto-update tournament ${tournament.id} status to ${newStatus}`, e)
+      // We don't revert local change because we want the UI to reflect the calculated status based on dates
+      // even if the DB persistence failed temporarily.
     }
   }
 }

@@ -16,7 +16,7 @@ import {
 import { useUser } from "@clerk/nextjs"
 import { usePathname } from "next/navigation"
 import Link from "next/link"
-import { Calendar, Users, Trophy, LayoutDashboard, Shield } from "lucide-react"
+import { Calendar, Users, Trophy, LayoutDashboard, Shield, CreditCard } from "lucide-react"
 import Image from "next/image"
 
 
@@ -45,6 +45,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       title: "Tournaments",
       url: "/dashboard/coach/tournaments",
       icon: Trophy,
+    },
+    {
+      title: "Payments",
+      url: "/dashboard/coach/payments",
+      icon: CreditCard,
     },
   ]
 

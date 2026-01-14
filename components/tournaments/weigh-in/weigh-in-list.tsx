@@ -3,6 +3,7 @@
 import { 
   Table, 
   TableBody, 
+ 
   TableCell, 
   TableHead, 
   TableHeader, 
@@ -26,6 +27,7 @@ interface Participant {
   disqualified: boolean
   disqualification_reason: string | null
   actual_weight: number | null
+  actual_height: number | null
   player?: {
     first_name: string
     last_name: string
@@ -41,6 +43,7 @@ interface Division {
   tournament_categories: Array<{
     id: string
     name: string
+    gender: string
     max_weight?: number | null
   }>
 }
@@ -49,18 +52,85 @@ interface WeighInListProps {
   participants: any[] 
   divisions: any[]
   tournamentId: string
+  page: number
+  totalPages: number
+  totalCount: number
 }
 
-import { startTransition, useState } from 'react'
+import { startTransition, useState, useEffect } from 'react'
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { Loader2, Download } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Loader2, Download, Trash2, Search, ArrowLeft, ArrowRight, X } from 'lucide-react'
 import { toast } from 'sonner'
+import { useDebounce } from 'use-debounce'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { deleteWeighInChecklist } from '@/lib/actions/participants'
 
-export function WeighInList({ participants, divisions, tournamentId }: WeighInListProps) {
+export function WeighInList({ participants, divisions, tournamentId, page, totalPages, totalCount }: WeighInListProps) {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
   const [isExporting, setIsExporting] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
-  // Filter for selected participants
-  const selectedParticipants = participants.filter((p: Participant) => p.weigh_in_selected)
+  // URL State management
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('query') || '')
+  const [debouncedQuery] = useDebounce(searchQuery, 300)
+  const statusFilter = searchParams.get('status') || 'all'
+  const divisionFilter = searchParams.get('divisionId') || 'all'
+  const categoryFilter = searchParams.get('categoryId') || 'all'
+
+  // Sync debounced search to URL
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams)
+    if (debouncedQuery) {
+      params.set('query', debouncedQuery)
+    } else {
+      params.delete('query')
+    }
+    params.set('page', '1') // Reset page on search
+    router.replace(`${pathname}?${params.toString()}`)
+  }, [debouncedQuery, pathname, router]) // Intentionally excluded searchParams to avoid loop, though careful dependency management needed.
+
+  // Update Filters
+  const updateFilter = (key: string, value: string) => {
+    const params = new URLSearchParams(searchParams)
+    if (value && value !== 'all') {
+      params.set(key, value)
+    } else {
+      params.delete(key)
+    }
+    // Reset category if division changes
+    if (key === 'divisionId') {
+      params.delete('categoryId')
+    }
+    params.set('page', '1')
+    router.replace(`${pathname}?${params.toString()}`)
+  }
+
+  // Pagination
+  const handlePageChange = (newPage: number) => {
+    const params = new URLSearchParams(searchParams)
+    params.set('page', newPage.toString())
+    router.push(`${pathname}?${params.toString()}`)
+  }
+
+  // Get categories for current division filter
+  const activeDivision = divisions.find(d => d.id === divisionFilter)
+  const availableCategories = activeDivision ? activeDivision.tournament_categories : []
 
   const handleExportCSV = async () => {
     setIsExporting(true)
@@ -123,7 +193,61 @@ export function WeighInList({ participants, divisions, tournamentId }: WeighInLi
     }
   }
 
-  if (selectedParticipants.length === 0) {
+  const handleDeleteList = async () => {
+    setIsDeleting(true)
+    try {
+      const result = await deleteWeighInChecklist(tournamentId)
+      if (result.success) {
+        toast.success("Weigh-in checklist deleted")
+        router.refresh()
+      } else {
+        toast.error(result.error || "Failed to delete checklist")
+      }
+    } catch (error) {
+       console.error("Delete error:", error)
+       toast.error("An unexpected error occurred")
+    } finally {
+      setIsDeleting(false)
+      setDeleteDialogOpen(false)
+    }
+  }
+
+  // Render format helper
+  const getCategoryLabel = (cat: any, divisionName: string) => {
+    const isAdult = divisionName?.toLowerCase().includes('senior')
+    let genderPrefix = ''
+    
+    if (cat.gender === 'male') {
+        genderPrefix = isAdult ? 'Men' : 'Boys'
+    } else if (cat.gender === 'female') {
+        genderPrefix = isAdult ? 'Women' : 'Girls'
+    }
+
+     let label = cat.name
+     if (genderPrefix) {
+         label = `${genderPrefix} - ${label}`
+     }
+     if (cat.max_weight) {
+        label += ` (Under ${cat.max_weight}kg)`
+     } else if (cat.min_weight) {
+        label += ` (Over ${cat.min_weight}kg)`
+     } else if (cat.max_height) {
+        label += ` (Under ${cat.max_height}cm)`
+     }
+     return label
+  }
+
+  const getCategoryDetails = (divisionId?: string, categoryId?: string) => {
+    const div = divisions.find((d: Division) => d.id === divisionId)
+    const cat = div?.tournament_categories.find((c: any) => c.id === categoryId)
+    return {
+      divisionName: div?.name || 'Unknown',
+      categoryName: cat ? getCategoryLabel(cat, div?.name) : 'Unknown', // Use same label format
+      maxWeight: cat?.max_weight
+    }
+  }
+
+  if (participants.length === 0 && !searchQuery && statusFilter === 'all' && divisionFilter === 'all') {
     return (
       <Card>
         <CardHeader>
@@ -136,31 +260,108 @@ export function WeighInList({ participants, divisions, tournamentId }: WeighInLi
     )
   }
 
-  const getCategoryDetails = (divisionId?: string, categoryId?: string) => {
-    const div = divisions.find((d: Division) => d.id === divisionId)
-    const cat = div?.tournament_categories.find((c: any) => c.id === categoryId)
-    return {
-      divisionName: div?.name || 'Unknown',
-      categoryName: cat?.name || 'Unknown',
-      maxWeight: cat?.max_weight
-    }
-  }
-
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <div>
-          <CardTitle>Prescheduled Weigh-Ins</CardTitle>
-          <CardDescription>
-            Surprise check list for today.
-          </CardDescription>
-        </div>
-        <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={isExporting}>
-            {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />} 
-            {isExporting ? 'Exporting...' : 'Export CSV'}
-        </Button>
+      <CardHeader>
+         <div className="flex flex-col gap-4">
+            <div className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Prescheduled Weigh-Ins</CardTitle>
+                  <CardDescription>
+                    Surprise check list for today. ({totalCount} participants)
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    disabled={isExporting || isDeleting}
+                    className="text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/20"
+                    onClick={() => setDeleteDialogOpen(true)}
+                  >
+                    {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                    Delete List
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={isExporting || isDeleting}>
+                      {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />} 
+                      {isExporting ? 'Exporting...' : 'Export CSV'}
+                  </Button>
+                </div>
+            </div>
+
+            {/* Filters */}
+            <div className="flex flex-wrap items-center gap-3">
+                <div className="relative flex-1 min-w-[200px] max-w-xs">
+                   <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                   <Input 
+                      placeholder="Search athlete..." 
+                      className="pl-8" 
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                   />
+                </div>
+                
+                <Select value={statusFilter} onValueChange={(val) => updateFilter('status', val)}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="completed">Passed/Completed</SelectItem> 
+                    <SelectItem value="not-required">Failed/DQ</SelectItem> 
+                  </SelectContent>
+                </Select>
+
+                <Select value={divisionFilter} onValueChange={(val) => updateFilter('divisionId', val)}>
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue placeholder="Select Division" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Divisions</SelectItem>
+                    {divisions
+                        .filter(d => ['Cadet', 'Junior', 'Senior'].some(term => d.name.includes(term)))
+                        .map(d => (
+                        <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={categoryFilter} onValueChange={(val) => updateFilter('categoryId', val)} disabled={divisionFilter === 'all'}>
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder="Select Category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    {(() => {
+                        // Deduplicate categories by label
+                        const uniqueCategories = new Map();
+                        availableCategories.forEach((c: any) => {
+                            const label = getCategoryLabel(c, activeDivision?.name || '');
+                            // Use Label + Gender as key to differentiate same weights but different gender (though label already includes gender now)
+                            if (!uniqueCategories.has(label)) {
+                                uniqueCategories.set(label, c);
+                            } else {
+                                const existing = uniqueCategories.get(label);
+                                if (!existing.max_weight && c.max_weight) {
+                                    uniqueCategories.set(label, c);
+                                }
+                            }
+                        });
+                        
+                        // Convert back to array and sort by weight/name
+                        return Array.from(uniqueCategories.values()).map((c: any) => (
+                            <SelectItem key={c.id} value={c.id}>
+                                {getCategoryLabel(c, activeDivision?.name || '')}
+                            </SelectItem>
+                        ));
+                    })()}
+                  </SelectContent>
+                </Select>
+            </div>
+         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
 
         <Table>
           <TableHeader>
@@ -173,11 +374,11 @@ export function WeighInList({ participants, divisions, tournamentId }: WeighInLi
             </TableRow>
           </TableHeader>
           <TableBody>
-            {selectedParticipants.map((p: Participant) => {
+            {participants.map((p: Participant) => {
               const details = getCategoryDetails(p.division_id, p.category_id)
               const fullName = p.player 
                 ? `${p.player.first_name} ${p.player.last_name}`
-                : `${p.first_name} ${p.last_name}` // Fallback if flattened
+                : `${p.first_name} ${p.last_name}`
               const teamName = p.team?.name || p.team_name || '-'
 
               let statusBadge = <Badge variant="outline"><Clock className="mr-1 h-3 w-3" /> Pending</Badge>
@@ -186,7 +387,7 @@ export function WeighInList({ participants, divisions, tournamentId }: WeighInLi
               } else if (p.weighed_in_at && !p.disqualified) {
                  statusBadge = <Badge variant="default" className="bg-green-600 hover:bg-green-700"><CheckCircle2 className="mr-1 h-3 w-3" /> Passed</Badge>
               } else if (p.disqualified) {
-                 statusBadge = <Badge variant="destructive">Disqualified (Other)</Badge>
+                 statusBadge = <Badge variant="destructive">Disqualified</Badge>
               }
 
               return (
@@ -210,14 +411,76 @@ export function WeighInList({ participants, divisions, tournamentId }: WeighInLi
                       maxWeight={details.maxWeight}
                       tournamentId={tournamentId}
                       currentWeight={p.actual_weight}
+                      currentHeight={p.actual_height}
                     />
                   </TableCell>
                 </TableRow>
               )
             })}
+            {participants.length === 0 && (
+                <TableRow>
+                    <TableCell colSpan={5} className="h-24 text-center">
+                        No participants found matching your filters.
+                    </TableCell>
+                </TableRow>
+            )}
           </TableBody>
         </Table>
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+            <div className="flex items-center justify-between py-4">
+                <div className="text-sm text-muted-foreground">
+                    Page {page} of {totalPages}
+                </div>
+                <div className="flex items-center space-x-2">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handlePageChange(page - 1)}
+                        disabled={page <= 1}
+                    >
+                        <ArrowLeft className="h-4 w-4 mr-2" />
+                        Previous
+                    </Button>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handlePageChange(page + 1)}
+                        disabled={page >= totalPages}
+                    >
+                        Next
+                        <ArrowRight className="h-4 w-4 ml-2" />
+                    </Button>
+                </div>
+            </div>
+        )}
       </CardContent>
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Weigh-in List?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove all participants from the surprise weigh-in checklist. 
+              Their actual weigh-in data (if completed) will be preserved.
+              You can generate a new random list afterwards.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={(e) => {
+                e.preventDefault()
+                handleDeleteList()
+              }}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? "Deleting..." : "Delete List"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   )
 }

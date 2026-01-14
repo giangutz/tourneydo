@@ -1,5 +1,6 @@
 import { notFound, redirect } from 'next/navigation'
 import { getTournamentById } from '@/lib/db/queries/tournaments'
+import { getPendingPaymentsByTournament } from '@/lib/db/queries/payments'
 import { checkTournamentAccess } from '@/lib/auth/tournament-access'
 import { DashboardShell } from '@/components/layouts/dashboard-shell'
 import { PageHeader } from '@/components/ui/page-header'
@@ -25,6 +26,7 @@ import { PhaseProvider } from '@/components/tournaments/dashboard/phase-context'
 import { DashboardContent } from '@/components/tournaments/dashboard/dashboard-content'
 import { TournamentRole } from '@/types/models'
 import { RealtimeListener } from '@/components/tournaments/realtime-listener'
+import { PaymentSubmissionsCard } from '@/components/tournaments/payment-submissions-card'
 
 interface TournamentDashboardPageProps {
   params: Promise<{
@@ -42,7 +44,10 @@ export default async function TournamentDashboardPage({ params }: TournamentDash
     redirect('/dashboard/tournament-organizer')
   }
 
-  const tournament = await getTournamentById(id)
+  const [tournament, pendingPayments] = await Promise.all([
+    getTournamentById(id),
+    getPendingPaymentsByTournament(id)
+  ])
 
   if (!tournament) {
     notFound()
@@ -160,6 +165,10 @@ export default async function TournamentDashboardPage({ params }: TournamentDash
                 </CardHeader>
               </Card>
             </Link>
+          )}
+
+          {canManageSettings && (
+            <PaymentSubmissionsCard pendingPayments={pendingPayments} />
           )}
 
           {canManageSettings && (

@@ -24,8 +24,26 @@ export async function registerTeam(tournamentId: string, teamId: string, playerI
       throw new Error("Failed to fetch tournament details")
     }
 
+
     if (tournament.registration_deadline && new Date(tournament.registration_deadline) < new Date()) {
       throw new Error("Registration deadline has passed")
+    }
+
+    // Check for duplicate player registrations
+    const supabase = createServerSupabaseClient()
+    const { data: existingRegs, error: checkError } = await supabase
+      .from('tournament_registrations')
+      .select('player_id, players(first_name, last_name)')
+      .eq('tournament_id', tournamentId)
+      .in('player_id', playerIds)
+
+    if (checkError) throw new Error("Failed to check existing registrations")
+
+    if (existingRegs && existingRegs.length > 0) {
+      const duplicates = existingRegs.map(r =>
+        `${(r as any).players?.first_name} ${(r as any).players?.last_name}`
+      ).join(', ')
+      throw new Error(`The following players are already registered: ${duplicates}`)
     }
 
     await registerTeamForTournament(tournamentId, teamId, userId, playerIds)

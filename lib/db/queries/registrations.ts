@@ -130,6 +130,8 @@ export type GetParticipantsOptions = {
   status?: string
   weighInStatus?: string
   weighInSelected?: boolean
+  divisionId?: string
+  categoryId?: string
   sort?: string
   order?: 'asc' | 'desc'
 }
@@ -151,6 +153,8 @@ export async function getTournamentParticipants(
     status,
     weighInStatus,
     weighInSelected,
+    divisionId,
+    categoryId,
     sort = 'created_at',
     order = 'desc'
   } = options
@@ -183,6 +187,10 @@ export async function getTournamentParticipants(
           last_name,
           email
         )
+      ),
+      weighed_in_by_user:users!tournament_registrations_weighed_in_by_fkey (
+        first_name,
+        last_name
       )
     `, { count: 'exact' })
     .eq('tournament_id', tournamentId)
@@ -190,6 +198,14 @@ export async function getTournamentParticipants(
   // Apply filters
   if (teamId && teamId !== 'all') {
     queryBuilder = queryBuilder.eq('team_id', teamId)
+  }
+
+  if (divisionId && divisionId !== 'all') {
+    queryBuilder = queryBuilder.eq('division_id', divisionId)
+  }
+
+  if (categoryId && categoryId !== 'all') {
+    queryBuilder = queryBuilder.eq('category_id', categoryId)
   }
 
   if (status && status !== 'all') {
@@ -252,7 +268,8 @@ export async function getTournamentParticipants(
   const transformedData = data?.map(item => ({
     ...item,
     player: item.players,
-    team: item.teams
+    team: item.teams,
+    weighed_in_by_user: item.weighed_in_by_user
   })) || []
 
   return {
@@ -364,7 +381,8 @@ export async function createRegistration(data: TournamentRegistrationInsert): Pr
 export async function updateWeighIn(
   registrationId: string,
   actualWeight: number | null,
-  actualHeight: number | null
+  actualHeight: number | null,
+  weighedInBy: string
 ): Promise<void> {
   const supabase = createServerSupabaseClient()
 
@@ -373,7 +391,8 @@ export async function updateWeighIn(
     .update({
       actual_weight: actualWeight,
       actual_height: actualHeight,
-      weighed_in_at: new Date().toISOString()
+      weighed_in_at: new Date().toISOString(),
+      weighed_in_by: weighedInBy
     })
     .eq('id', registrationId)
 
@@ -466,5 +485,78 @@ export async function getRegistrationById(registrationId: string) {
     ...data,
     player: data.players,
     team: data.teams
+  }
+}
+
+/**
+ * Get total registrations count for all tournaments organized by a user
+ */
+export async function getTotalRegistrationsByOrganizerId(organizerId: string): Promise<number> {
+  const supabase = createServerSupabaseClient()
+
+  const { count, error } = await supabase
+    .from('tournament_registrations')
+    .select('*, tournaments!inner(organizer_id)', { count: 'exact', head: true })
+    .eq('tournaments.organizer_id', organizerId)
+
+  if (error) {
+    throw new Error(`Failed to count total registrations: ${error.message}`)
+  }
+
+  return count || 0
+}
+
+/**
+ * Get recent registrations for all tournaments organized by a user
+ */
+export async function getRecentRegistrationsByOrganizerId(organizerId: string, limit: number = 5) {
+  const supabase = createServerSupabaseClient()
+
+  const { data, error } = await supabase
+    .from('tournament_registrations')
+    .select(`
+      id,
+      created_at,
+      status,
+      players (
+        first_name,
+        last_name
+      ),
+      tournaments!inner (
+        id,
+        name,
+        organizer_id
+      )
+    `)
+    .eq('tournaments.organizer_id', organizerId)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (error) {
+    throw new Error(`Failed to fetch recent registrations: ${error.message}`)
+  }
+
+  return data || []
+}
+
+/**
+ * Clear weigh-in selection for all participants in a tournament
+ */
+export async function clearWeighInSelected(tournamentId: string): Promise<void> {
+  const supabase = createServerSupabaseClient()
+
+  const { error } = await supabase
+    .from('tournament_registrations')
+    .update({
+      weigh_in_selected: false,
+      weighed_in_at: null,
+      actual_weight: null,
+      actual_height: null,
+      weighed_in_by: null
+    })
+    .eq('tournament_id', tournamentId)
+
+  if (error) {
+    throw new Error(`Failed to clear weigh-in selection: ${error.message}`)
   }
 }

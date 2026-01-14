@@ -21,7 +21,7 @@ export function OutstandingBalances({ participants, entryFee }: { participants: 
     if (!['pending', 'verified', 'paid'].includes(p.status)) return // Only count valid registrations
     
     // Check if paid
-    const isPaid = p.status === 'paid' || p.payment_status === 'paid'
+    const isPaid = p.status === 'paid'
     if (isPaid) return 
 
     const teamName = p.team?.name || 'Unattached'

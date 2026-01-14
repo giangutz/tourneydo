@@ -7,7 +7,6 @@ interface Props {
   entryFee: number
   participants: {
     status: string
-    payment_status?: string
   }[]
 }
 
@@ -15,9 +14,8 @@ export function RevenueStats({ entryFee, participants }: Props) {
   const active = participants.filter(p => ['pending', 'verified', 'paid'].includes(p.status))
   const totalProjected = active.length * entryFee
   
-  // Assuming 'paid' status or payment_status='paid' means collected
-  // If payment_status is available, use it, otherwise fallback to status='paid'
-  const paidCount = participants.filter(p => p.payment_status === 'paid' || p.status === 'paid').length
+  // Count paid registrations
+  const paidCount = participants.filter(p => p.status === 'paid').length
   const totalCollected = paidCount * entryFee
 
   const formatMoney = (amount: number) => 

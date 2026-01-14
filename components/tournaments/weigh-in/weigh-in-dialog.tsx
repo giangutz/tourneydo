@@ -30,6 +30,7 @@ import { Scale } from 'lucide-react'
 
 const weighInSchema = z.object({
   weight: z.coerce.number().min(0, "Weight must be positive"),
+  height: z.coerce.number().min(0, "Height must be positive").optional(),
 })
 
 interface WeighInDialogProps {
@@ -38,6 +39,7 @@ interface WeighInDialogProps {
   maxWeight?: number | null
   tournamentId: string
   currentWeight?: number | null
+  currentHeight?: number | null
 }
 
 export function WeighInDialog({ 
@@ -45,7 +47,8 @@ export function WeighInDialog({
   participantName, 
   maxWeight, 
   tournamentId,
-  currentWeight
+  currentWeight,
+  currentHeight
 }: WeighInDialogProps) {
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -54,12 +57,13 @@ export function WeighInDialog({
     resolver: zodResolver(weighInSchema) as Resolver<z.infer<typeof weighInSchema>>,
     defaultValues: {
       weight: currentWeight || 0,
+      height: currentHeight || 0,
     },
   })
 
   function onSubmit(values: z.infer<typeof weighInSchema>) {
     startTransition(async () => {
-      const result = await submitWeighInResult(registrationId, values.weight, tournamentId)
+      const result = await submitWeighInResult(registrationId, values.weight, tournamentId, values.height)
       
       if (!result.success) {
         toast.error(result.message)
@@ -85,7 +89,8 @@ export function WeighInDialog({
         <DialogHeader>
           <DialogTitle>Weigh In - {participantName}</DialogTitle>
           <DialogDescription>
-            Enter the measured weight for the participant.
+            Enter the measured weight (and height if needed) for the participant.
+          </DialogDescription>
             {maxWeight && (
               <div className="mt-2 p-2 bg-muted rounded-md text-xs">
                 <div>Max Weight: <span className="font-semibold">{maxWeight}kg</span></div>
@@ -93,23 +98,37 @@ export function WeighInDialog({
                 <div>Disqualification Limit: <span className="font-semibold text-destructive">{limit?.toFixed(2)}kg</span></div>
               </div>
             )}
-          </DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="weight"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Actual Weight (kg)</FormLabel>
-                  <FormControl>
-                    <Input type="number" step="0.01" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="weight"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Actual Weight (kg)</FormLabel>
+                    <FormControl>
+                      <Input type="number" step="0.01" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="height"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Actual Height (cm)</FormLabel>
+                    <FormControl>
+                      <Input type="number" step="0.1" placeholder="Optional" {...field} value={field.value || ''} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
             <DialogFooter>
               <Button type="submit" disabled={isPending}>
                 {isPending && <span className="loading loading-spinner loading-xs mr-2"></span>}

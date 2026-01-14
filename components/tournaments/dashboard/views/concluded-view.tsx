@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useSession } from '@clerk/nextjs'
 import { createClerkSupabaseClient } from '@/lib/supabase/client'
 import { KPICard } from '../kpi-card'
-import { DollarSign, Trophy, UserCheck, Calculator } from 'lucide-react'
+import { DollarSign, Trophy, UserCheck, Calculator, Pencil, Trash2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { 
   Table, 
@@ -24,6 +24,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import type { Database } from '@/lib/supabase/types'
@@ -49,8 +59,11 @@ export function ConcludedView({ tournamentId }: ConcludedViewProps) {
   
   // Expense Modal State
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false)
+  const [editingExpense, setEditingExpense] = useState<{id: string, category: string, amount: number, description: string | null} | null>(null)
   const [newExpense, setNewExpense] = useState({ category: '', amount: '', description: '' })
-  const [expenses, setExpenses] = useState<{category: string, amount: number, description: string | null}[]>([])
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [expenseToDelete, setExpenseToDelete] = useState<string | null>(null)
+  const [expenses, setExpenses] = useState<{id: string, category: string, amount: number, description: string | null}[]>([])
 
   const fetchData = async () => {
     if (!session) return
@@ -69,7 +82,7 @@ export function ConcludedView({ tournamentId }: ConcludedViewProps) {
     const exp = expData as any[] | null
 
     // Calculate Revenue
-    const revenue = (regs?.filter((r) => r.payment_status === 'paid').length || 0) * 50 
+    const revenue = (regs?.filter((r) => r.status === 'paid').length || 0) * 50 
     
     // Calculate Expenses
     const expenseTotal = exp?.reduce((sum: number, e: any) => sum + Number(e.amount), 0) || 0
@@ -107,18 +120,74 @@ export function ConcludedView({ tournamentId }: ConcludedViewProps) {
     if (!newExpense.amount || !newExpense.category || !session) return
 
     const supabase = createClerkSupabaseClient({ session })
-    const { error } = await (supabase as any).from('tournament_expenses').insert({
-      tournament_id: tournamentId,
-      category: newExpense.category,
-      amount: Number(newExpense.amount),
-      description: newExpense.description
+    
+    if (editingExpense) {
+      // Update existing expense
+      const { error } = await (supabase as any).from('tournament_expenses')
+        .update({
+          category: newExpense.category,
+          amount: Number(newExpense.amount),
+          description: newExpense.description
+        })
+        .eq('id', editingExpense.id)
+      
+      if (!error) {
+        setNewExpense({ category: '', amount: '', description: '' })
+        setEditingExpense(null)
+        setIsExpenseModalOpen(false)
+        fetchData()
+      }
+    } else {
+      // Insert new expense
+      const { error } = await (supabase as any).from('tournament_expenses').insert({
+        tournament_id: tournamentId,
+        category: newExpense.category,
+        amount: Number(newExpense.amount),
+        description: newExpense.description
+      })
+
+      if (!error) {
+        setNewExpense({ category: '', amount: '', description: '' })
+        setIsExpenseModalOpen(false)
+        fetchData()
+      }
+    }
+  }
+
+  const handleEditExpense = (expense: typeof expenses[0]) => {
+    setEditingExpense(expense)
+    setNewExpense({
+      category: expense.category,
+      amount: String(expense.amount),
+      description: expense.description || ''
     })
+    setIsExpenseModalOpen(true)
+  }
+
+  const handleDeleteExpense = async () => {
+    if (!session || !expenseToDelete) return
+
+    const supabase = createClerkSupabaseClient({ session })
+    const { error } = await (supabase as any).from('tournament_expenses')
+      .delete()
+      .eq('id', expenseToDelete)
 
     if (!error) {
-      setNewExpense({ category: '', amount: '', description: '' })
-      setIsExpenseModalOpen(false)
-      fetchData() // Refresh
+      setDeleteDialogOpen(false)
+      setExpenseToDelete(null)
+      fetchData()
     }
+  }
+
+  const openDeleteDialog = (expenseId: string) => {
+    setExpenseToDelete(expenseId)
+    setDeleteDialogOpen(true)
+  }
+
+  const handleCloseExpenseModal = () => {
+    setIsExpenseModalOpen(false)
+    setEditingExpense(null)
+    setNewExpense({ category: '', amount: '', description: '' })
   }
 
 
@@ -130,19 +199,19 @@ export function ConcludedView({ tournamentId }: ConcludedViewProps) {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <KPICard 
           title="Net Profit" 
-          value={`$${stats.netProfit}`}
+          value={`₱${stats.netProfit.toLocaleString()}`}
           icon={<DollarSign className="h-4 w-4 text-green-500" />}
           trend={`${stats.netProfit > 0 ? '+' : ''}${Math.round((stats.netProfit / (stats.totalRevenue || 1)) * 100)}% Margin`}
           trendDirection={stats.netProfit > 0 ? 'up' : 'down'}
         />
         <KPICard 
           title="Total Revenue" 
-          value={`$${stats.totalRevenue}`}
+          value={`₱${stats.totalRevenue.toLocaleString()}`}
           icon={<DollarSign className="h-4 w-4 text-blue-500" />}
         />
         <KPICard 
           title="Total Expenses" 
-          value={`$${stats.totalExpenses}`}
+          value={`₱${stats.totalExpenses.toLocaleString()}`}
           icon={<Calculator className="h-4 w-4 text-orange-500" />}
         />
         <KPICard 
@@ -153,13 +222,13 @@ export function ConcludedView({ tournamentId }: ConcludedViewProps) {
       </div>
 
       <div className="flex justify-end">
-        <Dialog open={isExpenseModalOpen} onOpenChange={setIsExpenseModalOpen}>
+        <Dialog open={isExpenseModalOpen} onOpenChange={handleCloseExpenseModal}>
           <DialogTrigger asChild>
             <Button variant="outline"><Calculator className="mr-2 h-4 w-4" /> Add Expense</Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Add Tournament Expense</DialogTitle>
+              <DialogTitle>{editingExpense ? 'Edit' : 'Add'} Tournament Expense</DialogTitle>
               <DialogDescription>
                 Track venue costs, medals, staffing, etc. to calculate true profit.
               </DialogDescription>
@@ -179,7 +248,7 @@ export function ConcludedView({ tournamentId }: ConcludedViewProps) {
               </div>
             </div>
             <DialogFooter>
-              <Button onClick={handleAddExpense}>Save Expense</Button>
+              <Button onClick={handleAddExpense}>{editingExpense ? 'Update' : 'Save'} Expense</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -223,22 +292,47 @@ export function ConcludedView({ tournamentId }: ConcludedViewProps) {
             <CardTitle>Expense Breakdown</CardTitle>
           </CardHeader>
           <CardContent>
-             <Table>
+              <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Category</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {expenses.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={2} className="text-center text-muted-foreground">No expenses recorded</TableCell>
+                      <TableCell colSpan={3} className="text-center text-muted-foreground">No expenses recorded</TableCell>
                     </TableRow>
                   ) : expenses.map((e, i) => (
                     <TableRow key={i}>
-                      <TableCell>{e.category}</TableCell>
-                      <TableCell className="text-right">${e.amount}</TableCell>
+                      <TableCell>
+                        <div className="font-medium">{e.category}</div>
+                        {e.description && (
+                          <div className="text-xs text-muted-foreground">{e.description}</div>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right font-medium">₱{e.amount.toLocaleString()}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditExpense(e)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openDeleteDialog(e.id)}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -246,6 +340,23 @@ export function ConcludedView({ tournamentId }: ConcludedViewProps) {
           </CardContent>
         </Card>
       </div>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Expense?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this expense? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setExpenseToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteExpense} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

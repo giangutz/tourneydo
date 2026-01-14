@@ -21,7 +21,19 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Eye, PhilippinePeso } from "lucide-react"
+import { 
+  Eye, 
+  PhilippinePeso, 
+  Calendar, 
+  MapPin, 
+  Trophy, 
+  Users, 
+  Clock, 
+  Printer, 
+  Search,
+  Loader2, 
+  Check 
+} from "lucide-react"
 import Link from "next/link"
 import {
   Select,
@@ -31,12 +43,11 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { formatShortDate, formatCurrency } from "@/lib/utils"
-import { Calendar, MapPin, Trophy, Users, Clock, Printer } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
 import { registerTeam } from "./actions"
 import { getTeamPlayers } from "@/lib/actions/teams"
 import { useRouter } from "next/navigation"
-import { Loader2, Check } from "lucide-react"
 import { EmptyState } from "@/components/ui/empty-state"
 import { toast } from "sonner"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -123,19 +134,62 @@ export function TournamentList({ tournaments, teams, registrations, coachId }: T
     }
   }
 
-  if (tournaments.length === 0) {
-    return (
-      <EmptyState
-        icon={Trophy}
-        title="No tournaments found"
-        description="There are no upcoming tournaments available for registration at the moment."
-      />
-    )
-  }
+  const [searchQuery, setSearchQuery] = useState("")
+  const [statusFilter, setStatusFilter] = useState<string>("upcoming")
+
+  // Filter tournaments
+  const filteredTournaments = tournaments.filter(t => {
+    // Search
+    if (searchQuery && !t.name.toLowerCase().includes(searchQuery.toLowerCase())) {
+      return false
+    }
+    // Status
+    if (statusFilter !== "all" && t.status !== statusFilter) {
+      return false
+    }
+    return true
+  })
 
   return (
-    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-      {tournaments.map((tournament) => (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row gap-4 justify-between items-center">
+        <div className="relative w-full sm:w-[300px]">
+           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+           <Input
+            placeholder="Search tournaments..."
+            className="pl-8"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+           <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="upcoming">Upcoming</SelectItem>
+              <SelectItem value="ongoing">Ongoing</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
+              <SelectItem value="all">All Tournaments</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {filteredTournaments.length === 0 ? (
+        <EmptyState
+          icon={Trophy}
+          title="No tournaments found"
+          description={
+            statusFilter === "all" 
+              ? "No tournaments match your search." 
+              : `No ${statusFilter} tournaments found.`
+          }
+        />
+      ) : (
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {filteredTournaments.map((tournament) => (
         <Card key={tournament.id} className="flex flex-col">
           <CardHeader>
             <CardTitle className="line-clamp-1">{tournament.name}</CardTitle>
@@ -218,28 +272,33 @@ export function TournamentList({ tournaments, teams, registrations, coachId }: T
                 </Button>
               )}
 
-              {/* Payment Buttons for Registered Teams */}
-              {Array.from(new Set(registrations.filter(r => r.tournament_id === tournament.id).map(r => r.team_id))).map(teamId => {
-                 const teamRegs = registrations.filter(r => r.tournament_id === tournament.id && r.team_id === teamId)
-                 // Check if payment_status is not 'paid' or status is 'verified' (maybe unpaid but verified?) 
-                 // Actually logic: If not paid, show button. 'status' is registration status (pending/verified).
-                 const unpaidRegs = teamRegs.filter(r => r.payment_status !== 'paid')
-                 const amountOwed = unpaidRegs.length * (tournament.entry_fee || 0)
-                 const teamName = teams.find(t => t.id === teamId)?.name || 'Unknown Team'
-                 
-                 if (amountOwed <= 0) return null
+              {/* Payment Button with Team Selection */}
+              {(() => {
+                const tournamentTeams = Array.from(new Set(registrations.filter(r => r.tournament_id === tournament.id).map(r => r.team_id)))
+                
+                const unpaidTeams = tournamentTeams.map(teamId => {
+                   const teamRegs = registrations.filter(r => r.tournament_id === tournament.id && r.team_id === teamId)
+                   const unpaidRegs = teamRegs.filter(r => r.status !== 'paid')
+                   const amountOwed = unpaidRegs.length * (tournament.entry_fee || 0)
+                   const teamName = teams.find(t => t.id === teamId)?.name || 'Unknown Team'
+                   
+                   return {
+                     teamId,
+                     teamName,
+                     amountOwed
+                   }
+                }).filter(t => t.amountOwed > 0)
 
-                 return (
-                   <PaymentDialog 
-                      key={teamId}
-                      tournamentId={tournament.id}
-                      teamId={teamId}
-                      coachId={coachId}
-                      amountOwed={amountOwed}
-                      teamName={teamName}
-                   />
-                 )
-              })}
+                if (unpaidTeams.length === 0) return null
+
+                return (
+                  <PaymentDialog 
+                    tournamentId={tournament.id}
+                    coachId={coachId}
+                    unpaidTeams={unpaidTeams}
+                  />
+                )
+              })()}
               
               <Dialog open={openDialogId === tournament.id} onOpenChange={(open) => setOpenDialogId(open ? tournament.id : null)}>
                 <DialogTrigger asChild>
@@ -334,6 +393,8 @@ export function TournamentList({ tournaments, teams, registrations, coachId }: T
           </CardFooter>
         </Card>
       ))}
+        </div>
+      )}
     </div>
   )
 }

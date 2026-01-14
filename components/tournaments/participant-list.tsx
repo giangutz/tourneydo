@@ -66,6 +66,10 @@ interface Participant {
   }
   division_id?: string | null
   category_id?: string | null
+  weighed_in_by_user?: {
+    first_name: string | null
+    last_name: string | null
+  } | null
 }
 
 interface ParticipantListProps {
@@ -459,7 +463,7 @@ export function ParticipantList({
           <SelectContent>
             <SelectItem value="all">All Weigh-In</SelectItem>
             <SelectItem value="completed">Completed</SelectItem>
-            <SelectItem value="pending">Pending (Verified/Paid)</SelectItem>
+            <SelectItem value="pending">Not Weighed In (Pending)</SelectItem>
             <SelectItem value="not-required">Not Required Yet</SelectItem>
           </SelectContent>
         </Select>
@@ -572,6 +576,11 @@ export function ParticipantList({
                               <div>Weighed in</div>
                               {participant.actual_weight && <div>Weight: {participant.actual_weight}kg</div>}
                               {participant.actual_height && <div>Height: {participant.actual_height}cm</div>}
+                              {participant.weighed_in_by_user && (
+                                <div className="mt-1 pt-1 border-t border-border/50 text-muted-foreground">
+                                  by {participant.weighed_in_by_user.first_name || ''} {participant.weighed_in_by_user.last_name || ''}
+                                </div>
+                              )}
                             </div>
                           ) : participant.status === 'verified' || participant.status === 'paid' ? (
                             'Weigh-in required'

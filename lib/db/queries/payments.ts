@@ -82,14 +82,20 @@ export async function updatePaymentStatus(
   status: 'verified' | 'rejected',
   // Optional: pass team_id/tournament_id to update registrations efficiently
   // without re-fetching payment
-  context?: { teamId: string, tournamentId: string }
+  context?: { teamId: string, tournamentId: string },
+  reason?: string
 ): Promise<void> {
   const supabase = createServerSupabaseClient()
 
   // 1. Update Payment Status
+  const updateData: any = { status }
+  if (status === 'rejected' && reason) {
+    updateData.rejection_reason = reason
+  }
+
   const { data: payment, error: paymentError } = await (supabase as any)
     .from('payments')
-    .update({ status })
+    .update(updateData)
     .eq('id', paymentId)
     .select()
     .single()
@@ -105,7 +111,7 @@ export async function updatePaymentStatus(
 
     const { error: regError } = await supabase
       .from('tournament_registrations')
-      .update({ status: 'paid', payment_status: 'paid' }) // Update both status and payment_status
+      .update({ status: 'paid' })
       .eq('tournament_id', tid)
       .eq('team_id', teamId)
       // Only update if currently 'pending' or 'verified' (don't override cancelled etc if any)
@@ -113,8 +119,121 @@ export async function updatePaymentStatus(
 
     if (regError) {
       // Log error but don't fail the payment update? Or throw?
-      // Better to throw so UI knows partial failure
       throw new Error(`Payment verified but failed to update registrations: ${regError.message}`)
     }
   }
+}
+
+/**
+ * Get total confirmed revenue for an organizer
+ */
+export async function getTotalRevenueByOrganizerId(organizerId: string): Promise<number> {
+  const supabase = createServerSupabaseClient()
+
+  const { data, error } = await (supabase as any)
+    .from('payments')
+    .select('amount, tournaments!inner(organizer_id)')
+    .eq('tournaments.organizer_id', organizerId)
+    .eq('status', 'verified')
+
+  if (error) {
+    throw new Error(`Failed to calculate total revenue: ${error.message}`)
+  }
+
+  // Sum up the amounts using reduce with explicit typing or casting
+  const total = (data as any[] || []).reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0)
+
+  return total
+}
+
+/**
+ * Get all pending payments for an organizer
+ */
+export async function getPendingPaymentsByOrganizer(organizerId: string) {
+  const supabase = createServerSupabaseClient()
+
+  const { data, error } = await (supabase as any)
+    .from('payments')
+    .select(`
+      *,
+      tournaments!inner (
+        id,
+        name,
+        organizer_id
+      ),
+      teams (
+        id,
+        name,
+        user_id // coach_id
+      )
+    `)
+    .eq('tournaments.organizer_id', organizerId)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    throw new Error(`Failed to fetch pending payments: ${error.message}`)
+  }
+
+  return data || []
+}
+
+/**
+ * Get all pending payments for a specific tournament
+ */
+export async function getPendingPaymentsByTournament(tournamentId: string) {
+  const supabase = createServerSupabaseClient()
+
+  const { data, error } = await (supabase as any)
+    .from('payments')
+    .select(`
+      *,
+      tournaments!inner (
+        id,
+        name
+      ),
+      teams (
+        id,
+        name,
+        user_id
+      )
+    `)
+    .eq('tournament_id', tournamentId)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    throw new Error(`Failed to fetch pending payments: ${error.message}`)
+  }
+
+  return data || []
+}
+
+/**
+ * Get all payments for a coach
+ */
+export async function getCoachPayments(coachId: string) {
+  const supabase = createServerSupabaseClient()
+
+  const { data, error } = await (supabase as any)
+    .from('payments')
+    .select(`
+      *,
+      tournaments (
+        id,
+        name
+      ),
+      teams (
+        id,
+        name
+      )
+    `)
+    .eq('coach_id', coachId)
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    throw new Error(`Failed to fetch coach payments: ${error.message}`)
+  }
+
+  return data || []
 }

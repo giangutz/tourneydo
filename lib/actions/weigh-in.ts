@@ -31,26 +31,52 @@ export async function generateWeighInList(tournamentId: string): Promise<WeighIn
     return { success: false, message: 'Brackets must be generated before selecting participants for weigh-in.' }
   }
 
-  // 2. Fetch all verified registrations
-  const { data: registrations, error: regError } = await supabase
+  // 2. Reset any previous weigh-in selections to ensure consistent 20% selection
+  const { error: resetError } = await supabase
     .from('tournament_registrations')
-    .select('id, division_id, category_id')
+    .update({ weigh_in_selected: false })
+    .eq('tournament_id', tournamentId)
+    .eq('weigh_in_selected', true)
+
+  if (resetError) {
+    console.error('Failed to reset previous selections:', resetError)
+    // Don't fail the whole operation, just log it
+  }
+
+  // 3. Fetch verified registrations with division info
+  const { data: rawRegistrations, error: regError } = await supabase
+    .from('tournament_registrations')
+    .select(`
+      id, 
+      division_id, 
+      category_id,
+      tournament_divisions (
+        name
+      )
+    `)
     .eq('tournament_id', tournamentId)
     .in('status', ['verified', 'paid'])
-    .is('weigh_in_selected', false) // Only select from those not yet selected? Or reset?
-  // User said "generate button". Assume new generation.
-  // Let's filter out already selected to be safe, or just re-run.
-  // Actually, if we re-run, we might want to ADD to the list.
 
   if (regError) {
     return { success: false, message: `Failed to fetch registrations: ${regError.message}` }
   }
 
-  if (!registrations || registrations.length === 0) {
+  if (!rawRegistrations || rawRegistrations.length === 0) {
     return { success: false, message: 'No verified participants found.' }
   }
 
-  // 3. Group by category (since weight classes are in categories)
+  // Filter out "Gradeschool" divisions
+  const registrations = rawRegistrations.filter(reg => {
+    // Type assertion or check safe navigation
+    const divisionName = (reg.tournament_divisions as any)?.name || ''
+    return !divisionName.toLowerCase().includes('gradeschool')
+  })
+
+  if (registrations.length === 0) {
+    return { success: false, message: 'No eligible participants found (Gradeschool excluded).' }
+  }
+
+  // 4. Group by category
   const groupedHelper: Record<string, typeof registrations> = {}
   registrations.forEach(reg => {
     const key = `${reg.division_id}-${reg.category_id}`
@@ -58,7 +84,7 @@ export async function generateWeighInList(tournamentId: string): Promise<WeighIn
     groupedHelper[key].push(reg)
   })
 
-  // 4. Select random participants (default 20%, min 1 if count > 0)
+  // 5. Select random participants (20%, min 1 per category)
   const idsToSelect: string[] = []
   const PERCENTAGE = 0.2
 
@@ -72,7 +98,7 @@ export async function generateWeighInList(tournamentId: string): Promise<WeighIn
     selected.forEach(s => idsToSelect.push(s.id))
   })
 
-  // 5. Update database
+  // 6. Update database
   if (idsToSelect.length > 0) {
     const { error: updateError } = await supabase
       .from('tournament_registrations')
@@ -96,7 +122,8 @@ export async function generateWeighInList(tournamentId: string): Promise<WeighIn
 export async function submitWeighInResult(
   registrationId: string,
   weight: number,
-  tournamentId: string
+  tournamentId: string,
+  height?: number
 ): Promise<{ success: boolean; message: string }> {
   const supabase = createServerSupabaseClient()
 
@@ -139,6 +166,7 @@ export async function submitWeighInResult(
     .from('tournament_registrations')
     .update({
       actual_weight: weight,
+      actual_height: height || null,
       weighed_in_at: new Date().toISOString(),
       disqualified: disqualified,
       disqualification_reason: reason
@@ -149,6 +177,27 @@ export async function submitWeighInResult(
     return { success: false, message: `Failed to update weigh-in: ${updateError.message}` }
   }
 
+  // 3. Auto-forfeit match if disqualified
+  if (disqualified) {
+    try {
+      const { findActiveMatchForParticipant, forfeitMatch } = await import('@/lib/db/queries/matches')
+
+      // We need the player_id, which we can get from the registration object we fetched earlier
+      if (registration.player_id) {
+        const activeMatch = await findActiveMatchForParticipant(registration.player_id, tournamentId)
+
+        if (activeMatch) {
+          console.log(`[WEIGH-IN FAILURE] Auto-forfeiting match ${activeMatch.id} for player ${registration.player_id}`)
+          await forfeitMatch(activeMatch.id, registration.player_id)
+        }
+      }
+    } catch (err) {
+      console.error('[WEIGH-IN FAILURE] Failed to auto-forfeit match:', err)
+      // Don't fail the whole action, just log it. The participant is already DQ'd in registration.
+    }
+  }
+
   revalidatePath(`/dashboard/tournament-organizer/tournaments/${tournamentId}/weigh-in`)
-  return { success: true, message: disqualified ? 'Participant disqualified.' : 'Weigh-in verified successfully.' }
+  revalidatePath(`/dashboard/tournament-organizer/tournaments/${tournamentId}/bracket`)
+  return { success: true, message: disqualified ? 'Participant disqualified and match forfeited.' : 'Weigh-in verified successfully.' }
 }

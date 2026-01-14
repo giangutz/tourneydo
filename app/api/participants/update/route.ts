@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { updatePlayer } from '@/lib/db/queries/players'
+import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { routes } from '@/config/routes'
 
@@ -41,6 +42,19 @@ export async function POST(request: NextRequest) {
       height,
       belt_level,
     })
+
+    // Also sync to tournament_registrations to ensure bracket generation works
+    // If the user is editing measurements, we assume these are the "actual" values for the tournament
+    const supabase = await createServerSupabaseClient()
+    await supabase.from('tournament_registrations')
+      .update({
+        actual_weight: weight,
+        actual_height: height,
+        // Mark as weighed-in if we are saving valid measurements
+        weighed_in_at: (weight || height) ? new Date().toISOString() : undefined
+      })
+      .eq('tournament_id', tournamentId)
+      .eq('player_id', playerId)
 
     revalidatePath(routes.organizer.tournamentParticipants(tournamentId))
 

@@ -14,12 +14,12 @@ function toDbMatch(match: Partial<Match> | MatchInsert): any {
   //   dbMatch.round_number = match.round
   //   delete dbMatch.round
   // }
+  // NOTE: The DB columns score_player1 and score_player2 DO NOT EXIST on the matches table.
+  // Scores are stored in match_rounds. We must remove them from the insert payload.
   if ('score_player1' in match) {
-    dbMatch.player1_score = match.score_player1
     delete dbMatch.score_player1
   }
   if ('score_player2' in match) {
-    dbMatch.player2_score = match.score_player2
     delete dbMatch.score_player2
   }
 
@@ -35,6 +35,22 @@ function toDbMatch(match: Partial<Match> | MatchInsert): any {
   return dbMatch
 }
 
+/**
+ * Delete all matches for a tournament
+ */
+export async function deleteTournamentMatches(tournamentId: string): Promise<void> {
+  const supabase = createServerSupabaseClient()
+
+  const { error } = await supabase
+    .from('matches')
+    .delete()
+    .eq('tournament_id', tournamentId)
+
+  if (error) {
+    throw new Error(`Failed to delete tournament matches: ${error.message}`)
+  }
+}
+
 export async function saveBracket(tournamentId: string, matches: MatchInsert[]): Promise<void> {
   const supabase = createServerSupabaseClient()
 
@@ -43,14 +59,7 @@ export async function saveBracket(tournamentId: string, matches: MatchInsert[]):
   const dbMatches = matches.map(toDbMatch)
 
   // 1. Clear existing matches
-  const { error: deleteError } = await supabase
-    .from('matches')
-    .delete()
-    .eq('tournament_id', tournamentId)
-
-  if (deleteError) {
-    throw new Error(`Failed to clear existing bracket: ${deleteError.message}`)
-  }
+  await deleteTournamentMatches(tournamentId)
 
   // 2. Insert new matches
   const { data, error: insertError } = await supabase
@@ -195,8 +204,8 @@ export async function getTournamentMatches(tournamentId: string) {
     return {
       ...m,
       round: (m as any).round || m.round_number || 0,
-      score_player1: m.player1_score || 0,
-      score_player2: m.player2_score || 0,
+      score_player1: (m as any).score_player1 || 0,
+      score_player2: (m as any).score_player2 || 0,
 
       score_round1_player1: r1?.score_player1 || 0,
       score_round1_player2: r1?.score_player2 || 0,
@@ -230,7 +239,7 @@ export async function findActiveMatchForParticipant(
     .from('matches')
     .select('id, player1_id, player2_id, status, next_match_id, tournament_id')
     .eq('tournament_id', tournamentId)
-    .or(`status.eq.pending,status.eq.in_progress`)
+    .or(`status.eq.pending,status.eq.in_progress,status.eq.scheduled`)
     .or(`player1_id.eq.${playerId},player2_id.eq.${playerId}`)
     .maybeSingle()
 
@@ -248,10 +257,10 @@ export async function findActiveMatchForParticipant(
 export async function forfeitMatch(matchId: string, disqualifiedPlayerId: string): Promise<void> {
   const supabase = createServerSupabaseClient()
 
-  // 1. Get match details to find opponent
+  // 1. Get match details to find opponent and match_number
   const { data: match, error: fetchError } = await supabase
     .from('matches')
-    .select('player1_id, player2_id, next_match_id, tournament_id')
+    .select('id, match_number, player1_id, player2_id, next_match_id, tournament_id')
     .eq('id', matchId)
     .single()
 
@@ -260,7 +269,7 @@ export async function forfeitMatch(matchId: string, disqualifiedPlayerId: string
   }
 
   // Type assertion needed because Supabase types don't properly narrow
-  const typedMatch = match as unknown as { player1_id: string | null; player2_id: string | null; next_match_id: string | null; tournament_id: string }
+  const typedMatch = match as unknown as { id: string; match_number: number; player1_id: string | null; player2_id: string | null; next_match_id: string | null; tournament_id: string }
 
   const winnerId = typedMatch.player1_id === disqualifiedPlayerId ? typedMatch.player2_id : typedMatch.player1_id
 
@@ -293,21 +302,54 @@ export async function forfeitMatch(matchId: string, disqualifiedPlayerId: string
   if (typedMatch.next_match_id) {
     const { data: nextMatch } = await supabase
       .from('matches')
-      .select('player1_id, player2_id, tournament_id')
+      .select('id, player1_id, player2_id, tournament_id')
       .eq('id', typedMatch.next_match_id)
       .single()
 
     if (nextMatch) {
-      // Type assertion for nextMatch as well
-      const typedNextMatch = nextMatch as unknown as { player1_id: string | null; player2_id: string | null; tournament_id: string }
+      // Find sibling match (the other feeder) to determine slot
+      // The rule is: Lower match_number feeds player1, Higher match_number feeds player2
 
-      // Determine slot
-      const updateData = typedNextMatch.player1_id === null
-        ? { player1_id: winnerId, tournament_id: typedNextMatch.tournament_id }
-        : { player2_id: winnerId, tournament_id: typedNextMatch.tournament_id }
+      const { data: feederMatches } = await supabase
+        .from('matches')
+        .select('id, match_number')
+        .eq('next_match_id', typedMatch.next_match_id)
+        .order('match_number', { ascending: true })
+
+      let targetSlot = 'player1_id' // Default
+
+      if (feederMatches && feederMatches.length === 2) {
+        // If we are the second match (higher number), we go to player2
+        if (feederMatches[1].id === typedMatch.id) {
+          targetSlot = 'player2_id'
+        }
+      } else {
+        // Fallback or single feeder? 
+        // If we only found 1 (us), we can't be sure, but standard logic implies:
+        // Match numbers: [Odd] -> P1, [Even] -> P2 (relative to structure)
+        // Simple heuristic: If (match_number % 2 === 1) -> P1? 
+        // No, match numbers are global: 4, 5, 6, 7. 
+        // 4->P1, 5->P2. 6->P1, 7->P2.
+        // So (match_number % 2 === 0) -> P1 or P2?
+        // 4 (even) -> P1. 5 (odd) -> P2.
+        // It's (match_number % 2 === 0) ? P1 : P2 ? 
+        // Wait, startMatchNumber can be anything.
+        // Let's stick to the feederMatches logic. If fetch fails, fallback to existing behavior.
+
+        // Fallback: If player1 is taken and not us, take player2.
+        const typedNextMatch = nextMatch as unknown as { player1_id: string | null; player2_id: string | null; tournament_id: string }
+        if (typedNextMatch.player1_id !== null && typedNextMatch.player1_id !== winnerId) {
+          targetSlot = 'player2_id'
+        }
+      }
+
+      // Prepare update
+      const updateData = targetSlot === 'player1_id'
+        ? { player1_id: winnerId, tournament_id: nextMatch.tournament_id }
+        : { player2_id: winnerId, tournament_id: nextMatch.tournament_id }
 
       await supabase.from('matches').update(updateData).eq('id', typedMatch.next_match_id)
-      console.log(`[FORFEIT] Advanced winner ${winnerId} to ${typedMatch.next_match_id}`)
+      console.log(`[FORFEIT] Advanced winner ${winnerId} to ${typedMatch.next_match_id} (${targetSlot})`)
     }
   }
 }

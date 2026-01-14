@@ -54,10 +54,10 @@ export function BracketValidationDialog({
       case 'unweighed':
         return {
           title: "Incomplete Weigh-Ins",
-          description: "The following verified participants have not completed their weigh-in. All participants must complete weigh-in before brackets can be generated.",
-          actionLabel: "Go to Weigh-In Page",
-          actionIcon: <Scale className="mr-2 h-4 w-4" />,
-          actionPath: `/dashboard/tournament-organizer/tournaments/${tournamentId}/weigh-in`
+          description: "The following participants have missing weigh-in data (weight or height). You can quick edit them here or manage them in the Participants page.",
+          actionLabel: "Go to Participants Page",
+          actionIcon: <Users className="mr-2 h-4 w-4" />,
+          actionPath: `/dashboard/tournament-organizer/tournaments/${tournamentId}/participants`
         }
       case 'unassigned':
         return {
@@ -182,19 +182,17 @@ export function BracketValidationDialog({
                 const isEditing = editingIds.has(participant.id)
                 const age = participant.age || 0
                 const isHeightBased = age < 12
-                // Fallback logic if age is unknown: show both or default? Let's show relevant based on division hint if possible, but age is best.
                 
                 return (
                   <TableRow key={participant.id}>
                     <TableCell className="font-medium">{participant.name}</TableCell>
                     <TableCell className="text-muted-foreground text-sm">{participant.reason}</TableCell>
-                    
-                    {/* Measurement Column */}
+
                     <TableCell>
-                      {errorType === 'unassigned' ? (
+                      {['unassigned', 'unweighed'].includes(errorType) ? (
                         isEditing ? (
                           <div className="flex gap-2 items-center">
-                            {(isHeightBased) ? (
+                            {(isHeightBased || errorType === 'unweighed') && (
                                 <div className="flex flex-col gap-1 w-24">
                                     <span className="text-[10px] text-muted-foreground">Height (cm)</span>
                                     <Input 
@@ -202,9 +200,12 @@ export function BracketValidationDialog({
                                       className="h-7 text-sm" 
                                       value={editValues[participant.id]?.height ?? ''} 
                                       onChange={e => handleInputChange(participant.id, 'height', e.target.value)}
+                                      placeholder={participant.currentHeight?.toString()}
                                     />
                                 </div>
-                            ) : (
+                            )}
+                            
+                            {(!isHeightBased || errorType === 'unweighed' || errorType === 'unassigned') && (
                                 <div className="flex flex-col gap-1 w-24">
                                     <span className="text-[10px] text-muted-foreground">Weight (kg)</span>
                                     <Input 
@@ -212,18 +213,20 @@ export function BracketValidationDialog({
                                       className="h-7 text-sm" 
                                       value={editValues[participant.id]?.weight ?? ''} 
                                       onChange={e => handleInputChange(participant.id, 'weight', e.target.value)}
+                                      placeholder={participant.currentWeight?.toString()}
                                     />
                                 </div>
                             )}
                           </div>
                         ) : (
                           <div className="text-sm">
-                             {/* Show relevant measurement only */}
-                             {isHeightBased 
-                               ? (participant.currentHeight ? `${participant.currentHeight}cm` : '-')
-                               : (participant.currentWeight ? `${participant.currentWeight}kg` : '-')
-                             }
-                             <span className="text-xs text-muted-foreground ml-2">(Age: {age})</span>
+                             {/* Show relevant measurements */}
+                             <div className="flex gap-2">
+                               {participant.currentWeight && <span>{participant.currentWeight}kg</span>}
+                               {participant.currentHeight && <span>{participant.currentHeight}cm</span>}
+                               {!participant.currentWeight && !participant.currentHeight && <span className="text-muted-foreground">-</span>}
+                             </div>
+                             <span className="text-xs text-muted-foreground">(Age: {age})</span>
                           </div>
                         )
                       ) : (
@@ -232,8 +235,8 @@ export function BracketValidationDialog({
                     </TableCell>
 
                     <TableCell>
-                      {/* For unassigned, show Toggle button */}
-                      {errorType === 'unassigned' ? (
+                      {/* Allow Quick Edit for both types */}
+                      {['unassigned', 'unweighed'].includes(errorType) && (
                         <Button 
                           size="sm" 
                           variant={isEditing ? "secondary" : "outline"}
@@ -241,20 +244,6 @@ export function BracketValidationDialog({
                         >
                           {isEditing ? "Undo" : "Quick Edit"}
                         </Button>
-                      ) : (
-                        /* For unweighed, keep redirect */
-                        errorType === 'unweighed' ? (
-                           <Button 
-                            size="sm" 
-                            variant="outline"
-                            onClick={() => {
-                              router.push(`/dashboard/tournament-organizer/tournaments/${tournamentId}/weigh-in`)
-                              onOpenChange(false)
-                            }}
-                           >
-                             Weigh-In
-                           </Button>
-                        ) : null
                       )}
                     </TableCell>
                   </TableRow>

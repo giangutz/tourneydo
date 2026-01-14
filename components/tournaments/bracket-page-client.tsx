@@ -23,7 +23,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Progress } from '@/components/ui/progress'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { ChevronLeft, ChevronRight, Calculator, FileText, Printer, Ticket } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Calculator, FileText, Printer, Ticket, Trash2 } from 'lucide-react'
+import { deleteTournamentBracket } from '@/lib/actions/brackets'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -76,7 +87,37 @@ export function BracketPageClient({ tournament, participants, matches, userRole 
   // Validation Error State
   const [validationErrorOpen, setValidationErrorOpen] = useState(false)
   const [validationErrorType, setValidationErrorType] = useState<'unweighed' | 'unassigned' | 'general'>('general')
+
   const [validationParticipants, setValidationParticipants] = useState<{id: string, name: string, reason?: string}[]>([])
+
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
+  const handleDeleteBracket = async () => {
+    console.log("handleDeleteBracket called")
+    setDeleting(true)
+    try {
+      console.log("Calling server action deleteTournamentBracket...")
+      const result = await deleteTournamentBracket(tournament.id)
+      console.log("Server action result:", result)
+      
+      if (result.success) {
+        toast.success("Bracket deleted successfully")
+        console.log("Refreshing router...")
+        router.refresh()
+        window.location.reload()
+      } else {
+        console.error("Delete failed:", result.error)
+        toast.error(result.error || "Failed to delete bracket")
+      }
+    } catch (error) {
+       console.error("Unexpected error in handleDeleteBracket:", error)
+       toast.error("An unexpected error occurred")
+    } finally {
+      setDeleting(false)
+      setDeleteDialogOpen(false)
+    }
+  }
 
   const handleGenerate = async () => {
     setGenerating(true)
@@ -211,8 +252,23 @@ export function BracketPageClient({ tournament, participants, matches, userRole 
               </DropdownMenuContent>
             </DropdownMenu>
 
+            {userRole !== 'bracket_manager' && matches.length > 0 && (
+               <Button 
+                variant="destructive" 
+                onClick={() => {
+                  console.log("Delete button clicked, opening dialog")
+                  setDeleteDialogOpen(true)
+                }}
+                disabled={generating || deleting}
+                className="gap-2"
+              >
+                {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                Delete Bracket
+              </Button>
+            )}
+
             {userRole !== 'bracket_manager' && (
-              <Button onClick={handleGenerate} disabled={generating}>
+              <Button onClick={handleGenerate} disabled={generating || deleting}>
                 {generating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {matches.length > 0 ? 'Regenerate Bracket' : 'Generate Bracket'}
               </Button>
@@ -303,6 +359,30 @@ export function BracketPageClient({ tournament, participants, matches, userRole 
         participants={validationParticipants}
         tournamentId={tournament.id}
       />
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the current bracket and all match data. 
+              You will need to re-generate the bracket to start over.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={(e) => {
+                e.preventDefault()
+                handleDeleteBracket()
+              }}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? "Deleting..." : "Delete Bracket"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

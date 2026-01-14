@@ -150,6 +150,7 @@ export async function addParticipant(tournamentId: string, prevState: any, formD
       disqualified: false,
       disqualification_reason: null,
       weighed_in_at: null,
+      weighed_in_by: null,
       weigh_in_selected: false
     })
 
@@ -240,7 +241,7 @@ export async function weighInParticipant(
     // If participant is not yet assigned to a division, just save the measurements
     // Division assignment will happen later based on these measurements
     if (!registration.division_id || !registration.category_id) {
-      await updateWeighIn(registrationId, actualWeight, actualHeight)
+      await updateWeighIn(registrationId, actualWeight, actualHeight, userId)
       revalidatePath(routes.organizer.tournamentParticipants(tournamentId))
       return { needsAction: false }
     }
@@ -279,7 +280,7 @@ export async function weighInParticipant(
 
     // If within limits, save and return success
     if (validation.valid) {
-      await updateWeighIn(registrationId, actualWeight, actualHeight)
+      await updateWeighIn(registrationId, actualWeight, actualHeight, userId)
       revalidatePath(routes.organizer.tournamentParticipants(tournamentId))
       return { needsAction: false }
     }
@@ -296,7 +297,7 @@ export async function weighInParticipant(
 
     // Save the actual measurements even though they're out of range
     // This allows organizer to make a decision
-    await updateWeighIn(registrationId, actualWeight, actualHeight)
+    await updateWeighIn(registrationId, actualWeight, actualHeight, userId)
     revalidatePath(routes.organizer.tournamentParticipants(tournamentId))
 
     return {
@@ -430,7 +431,7 @@ export async function bulkWeighIn(
       const reg = await getRegistrationById(id)
       if (reg.player) {
         // Use declared weight/height as actual
-        await updateWeighIn(id, reg.player.weight, reg.player.height)
+        await updateWeighIn(id, reg.player.weight, reg.player.height, userId)
       }
     }))
 
@@ -523,5 +524,26 @@ export async function exportParticipants(
     })
 
     return result.data
+  })
+}
+
+/**
+ * Delete the entire random weigh-in checklist
+ */
+export async function deleteWeighInChecklist(
+  tournamentId: string
+): Promise<ActionResult<void>> {
+  return safeAction(async () => {
+    const { userId } = await auth()
+    if (!userId) {
+      throw new Error('Unauthorized')
+    }
+
+    const { clearWeighInSelected } = await import('@/lib/db/queries/registrations')
+
+    await clearWeighInSelected(tournamentId)
+
+    revalidatePath(routes.organizer.tournamentParticipants(tournamentId))
+    revalidatePath(`/dashboard/tournament-organizer/tournaments/${tournamentId}/weigh-in`)
   })
 }

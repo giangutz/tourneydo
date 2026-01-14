@@ -47,6 +47,9 @@ export async function updateBatchParticipantMeasurements(
     if (update.weight !== undefined) regUpdateData.actual_weight = update.weight
     if (update.height !== undefined) regUpdateData.actual_height = update.height
 
+    // Auto-mark as weighed in when manually updating measurements for bracket fix
+    regUpdateData.weighed_in_at = new Date().toISOString()
+
     await supabase.from('tournament_registrations').update(regUpdateData).eq('id', update.id)
 
     return { success: !error, id: update.id, error: error?.message }

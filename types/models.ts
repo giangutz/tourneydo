@@ -126,12 +126,12 @@ export interface TournamentRegistration {
   division_id?: string | null
   category_id?: string | null
   status: 'pending' | 'verified' | 'paid'
-  payment_status?: 'unpaid' | 'paid'
   actual_weight: number | null
   actual_height: number | null
   disqualified: boolean
   disqualification_reason: string | null
   weighed_in_at: string | null
+  weighed_in_by: string | null
   weigh_in_selected: boolean
   created_at: string
   updated_at: string
@@ -238,10 +238,11 @@ export interface Payment {
   amount: number
   reference_number: string
   status: 'pending' | 'verified' | 'rejected'
+  rejection_reason: string | null
   created_at: string
 }
 
-export type PaymentInsert = Omit<Payment, 'id' | 'created_at' | 'status'>
+export type PaymentInsert = Omit<Payment, 'id' | 'created_at' | 'status' | 'rejection_reason'>
 export type PaymentUpdate = Partial<Omit<Payment, 'id' | 'tournament_id' | 'team_id' | 'coach_id' | 'created_at'>>
 
 // ============================================================================
