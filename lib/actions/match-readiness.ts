@@ -14,7 +14,7 @@ import {
   initializeMatchReadiness
 } from '@/lib/db/queries/match-readiness'
 import { getMatchById } from '@/lib/db/queries/matches'
-import { ActionResult } from '@/types/actions'
+import { ActionResult } from '@/types/api'
 import { ReadinessStatus } from '@/types/models'
 
 /**
@@ -77,7 +77,8 @@ export async function toggleAthleteCalledStatus(
     revalidatePath(`/dashboard/tournament-organizer/tournaments/${match.tournament_id}/matches`)
 
     return {
-      success: true
+      success: true,
+      data: undefined
     }
   } catch (error) {
     console.error('Failed to toggle athlete readiness:', error)
@@ -120,7 +121,8 @@ export async function initializeMatchReadinessAction(
     await initializeMatchReadiness(matchId)
 
     return {
-      success: true
+      success: true,
+      data: undefined
     }
   } catch (error) {
     console.error('Failed to initialize match readiness:', error)

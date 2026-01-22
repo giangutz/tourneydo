@@ -22,7 +22,7 @@ interface RegistrationClientProps {
   teams: Team[]
   players: Player[]
   divisions: any[]
-  existingRegistrations: Map<string, TournamentRegistration>
+  existingRegistrations: Map<string, any> // Query returns joined data, not strict TournamentRegistration
   coachId: string
 }
 

@@ -10,28 +10,17 @@ import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, getBeltSkillCategory, getCategoryDisplayName } from '@/lib/utils'
 
 interface DivisionBreakdownProps {
   matches: Match[]
-}
-
-function getBeltSkillCategory(beltLevel: string | null | undefined): string {
-  if (!beltLevel) return 'Unknown'
-  const belt = beltLevel.toLowerCase()
-  
-  if (belt.includes('white') || belt.includes('orange')) return 'Beginner'
-  if (belt.includes('yellow') || belt.includes('green') || belt.includes('blue')) return 'Novice I'
-  if (belt.includes('red') || belt.includes('brown')) return 'Novice II'
-  if (belt.includes('black') || belt.includes('poom') || belt.includes('dan')) return 'Advanced'
-  
-  return 'Unknown'
+  participants?: any[]
 }
 
 const SKILL_ORDER = ['Beginner', 'Novice I', 'Novice II', 'Advanced', 'Unknown']
 const ITEMS_PER_PAGE = 5
 
-export function DivisionBreakdown({ matches }: DivisionBreakdownProps) {
+export function DivisionBreakdown({ matches, participants = [] }: DivisionBreakdownProps) {
   const [skillFilter, setSkillFilter] = useState<string>('all')
   const [selectedDivision, setSelectedDivision] = useState<string>('')
   const [currentPage, setCurrentPage] = useState(1)
@@ -58,14 +47,46 @@ export function DivisionBreakdown({ matches }: DivisionBreakdownProps) {
       if (!divName || !catName) return
       
       // Determine skill level from either player's belt
-      const p1Belt = match.player1?.belt_level
-      const p2Belt = match.player2?.belt_level
-      const skill = getBeltSkillCategory(p1Belt) !== 'Unknown' 
-        ? getBeltSkillCategory(p1Belt) 
-        : getBeltSkillCategory(p2Belt)
+      // For single-player matches (BYE), we only have one player
+      let skill = ''
       
-      // Skip matches where skill level cannot be determined
-      if (skill === 'Unknown') return
+      // Helper to get belt from participants array (fallback)
+      const getBeltFromParticipants = (playerId: string | null): string | null => {
+        if (!playerId || participants.length === 0) return null
+        const participant = participants.find((p: any) => p.player_id === playerId)
+        return participant?.player?.belt_level || null
+      }
+      
+      // Try to get skill from player1
+      if (match.player1_id) {
+        let p1Belt = match.player1?.belt_level
+        // Fallback to participants if belt not in match data
+        if (!p1Belt) {
+          p1Belt = getBeltFromParticipants(match.player1_id)
+        }
+        if (p1Belt) {
+          skill = getBeltSkillCategory(p1Belt)
+        }
+      }
+      
+      // If still empty, try player2
+      if (!skill && match.player2_id) {
+        let p2Belt = match.player2?.belt_level
+        // Fallback to participants if belt not in match data
+        if (!p2Belt) {
+          p2Belt = getBeltFromParticipants(match.player2_id)
+        }
+        if (p2Belt) {
+          skill = getBeltSkillCategory(p2Belt)
+        }
+      }
+      
+      // If still empty, mark as Unknown for display
+      if (!skill) {
+        skill = 'Unknown'
+      }
+      
+      // Include all matches - organizers need to see everything
       
       if (!divisionStats[divName]) {
         divisionStats[divName] = { players: new Set(), matches: 0, rows: new Map() }
@@ -75,10 +96,13 @@ export function DivisionBreakdown({ matches }: DivisionBreakdownProps) {
       if (match.player2_id) divisionStats[divName].players.add(match.player2_id)
       divisionStats[divName].matches++
       
-      const rowKey = `${catName}-${skill}`
+      // Normalize category name for display
+      const normalizedCatName = getCategoryDisplayName(catName)
+      
+      const rowKey = `${normalizedCatName}-${skill}`
       if (!divisionStats[divName].rows.has(rowKey)) {
         divisionStats[divName].rows.set(rowKey, {
-          category: catName,
+          category: normalizedCatName,
           skill: skill,
           playerCount: new Set(),
           matchCount: 0,

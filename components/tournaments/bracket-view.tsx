@@ -12,7 +12,7 @@ import { transformMatchToGame } from '@/lib/utils/bracket-data-transformer'
 import { Game } from '@/lib/types/bracket-models'
 import { MatchResultDialog } from './match-result-dialog'
 import { MatchParticipantsDialog } from './match-participants-dialog'
-import { getBeltSkillCategory } from '@/lib/utils'
+import { getBeltSkillCategory, getDivisionCategorySkillLabel } from '@/lib/utils'
 
 
 interface BracketViewProps {
@@ -180,31 +180,6 @@ export function BracketView({
       name: `${p.player.first_name} ${p.player.last_name}`,
       team: p.team?.name || 'Unattached'
     }
-  }
-
-  const getDivisionLabel = (division: any, category: any, skillLevel?: string) => {
-    if (!division || !category) return 'General'
-    
-    // Normalize category name (FEATHER -> Feather)
-    const categoryName = category.name.charAt(0).toUpperCase() + category.name.slice(1).toLowerCase()
-    
-    // Determine if it's a youth division (Cadet or Gradeschool)
-    const isYouth = division.name.toLowerCase().includes('cadet') || division.name.toLowerCase().includes('gradeschool')
-    
-    // Determine gender label
-    let genderLabel = ''
-    if (category.gender === 'male') {
-      genderLabel = isYouth ? 'Boys' : 'Men'
-    } else if (category.gender === 'female') {
-      genderLabel = isYouth ? 'Girls' : 'Women'
-    } else {
-      genderLabel = 'Mixed'
-    }
-
-    // Add skill level for Standard tournaments
-    const skillLevelLabel = (tournamentType === 'standard' && skillLevel) ? ` ${skillLevel}` : ''
-    
-    return `${division.name} ${genderLabel} ${skillLevelLabel} - ${categoryName}`.trim()
   }
 
   // Helper to get sort priority for divisions
@@ -568,7 +543,7 @@ export function BracketView({
                     }
                   }
                   
-                  const divisionLabel = getDivisionLabel(group.division, group.category, skillLevel)
+                  const divisionLabel = getDivisionCategorySkillLabel(group.division, group.category, skillLevel || undefined)
                   const games = groupGames[key] || []
 
                   return (

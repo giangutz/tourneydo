@@ -203,11 +203,12 @@ export async function updateTournament(id: string, prevState: any, formData: For
     // Same logic as create logic to ensure consistency when settings change
 
     // 1. Ensure Defaults & Restore if needed (essential if switching Gender back to Mixed)
-    const { ensureTournamentDivisionsAndCategories, updateDivisionStatus, getAllTournamentDivisions, removeCategoriesByGender } = await import('@/lib/db/queries/divisions')
+    const { restoreDefaultCategoriesSafely, updateDivisionStatus, getAllTournamentDivisions, removeCategoriesByGender } = await import('@/lib/db/queries/divisions')
     const { DEFAULT_DIVISIONS } = await import('@/lib/constants/divisions')
 
     // Always re-ensure defaults which restores missing gender categories if switching back to 'mixed'
-    await ensureTournamentDivisionsAndCategories(id, DEFAULT_DIVISIONS)
+    // BUT use the safe version that respects custom configuration (ages, weights, etc.)
+    await restoreDefaultCategoriesSafely(id, DEFAULT_DIVISIONS)
 
     // 2. Remove Categories if Single Gender
     if (validatedFields.data.gender_preference && validatedFields.data.gender_preference !== 'mixed') {

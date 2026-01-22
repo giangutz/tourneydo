@@ -5,33 +5,14 @@ import { revalidatePath } from 'next/cache'
 import { getTournamentParticipants } from '@/lib/db/queries/registrations'
 import { saveBracket } from '@/lib/db/queries/matches'
 import { generateBracket } from '@/lib/utils/bracket-generator'
-import { getTournamentDivisions, assignParticipantDivision, createDefaultDivisions } from '@/lib/db/queries/divisions'
+import { getTournamentDivisions, assignParticipantDivision } from '@/lib/db/queries/divisions'
 import { getTournamentById } from '@/lib/db/queries/tournaments'
-import { DEFAULT_DIVISIONS, calculateAge, findDivisionByAge, findCategory } from '@/lib/constants/divisions'
+import { calculateAge, findDivisionByAge, findCategory } from '@/lib/constants/divisions'
 import { safeAction } from '@/lib/utils/errors'
 import { routes } from '@/config/routes'
 import type { ActionResult } from '@/types/api'
 import { id } from 'zod/v4/locales'
-
-/**
- * Map belt level to skill category for Standard tournaments
- * White → Beginner
- * Yellow, Blue → Novice I
- * Red, Brown → Novice II
- * Black → Advanced
- */
-function getBeltSkillCategory(beltLevel: string | null | undefined): string {
-  if (!beltLevel) return 'unknown'
-
-  const belt = beltLevel.toLowerCase()
-
-  if (belt === 'white') return 'beginner'
-  if (belt === 'yellow' || belt === 'blue') return 'novice_i'
-  if (belt === 'red' || belt === 'brown') return 'novice_ii'
-  if (belt === 'black') return 'advanced'
-
-  return 'unknown'
-}
+import { getBeltSkillCategory } from '@/lib/utils'
 
 /**
  * Generate and save bracket for a tournament
@@ -42,7 +23,7 @@ export type GenerateBracketResult =
   | {
     success: false;
     error: string;
-    errorType?: 'unweighed' | 'unassigned' | 'general';
+    errorType?: 'unweighed' | 'unassigned' | 'general' | 'invalid_belt';
     participants?: { id: string; name: string; reason?: string; currentWeight?: number; currentHeight?: number; age?: number }[]
   }
 
@@ -64,9 +45,7 @@ export async function generateTournamentBracket(tournamentId: string): Promise<G
     }
     const isOpenBelt = tournament.tournament_type === 'open-belt'
 
-    // 2. Ensure tournament has divisions configured (and backfill any missing categories)
-    const { ensureTournamentDivisionsAndCategories } = await import('@/lib/db/queries/divisions')
-    await ensureTournamentDivisionsAndCategories(tournamentId, DEFAULT_DIVISIONS)
+    // 2. Fetch tournament divisions (relying on existing configuration)
     const allDivisions = await getTournamentDivisions(tournamentId) as any
 
     // Filter to only enabled divisions
@@ -114,6 +93,28 @@ export async function generateTournamentBracket(tournamentId: string): Promise<G
       }
     }
 
+    // 3.8 Validate all confirmed participants have valid belt levels (for Standard tournaments)
+    if (!isOpenBelt) {
+      const participantsWithInvalidBelts = confirmedParticipants.filter(p => {
+        if (!p.player?.belt_level) return true // Missing belt entirely
+        const skillCategory = getBeltSkillCategory(p.player.belt_level)
+        return skillCategory === 'Unknown' || !skillCategory
+      })
+
+      if (participantsWithInvalidBelts.length > 0) {
+        return {
+          success: false,
+          error: 'Some participants have invalid or unknown belt levels',
+          errorType: 'invalid_belt',
+          participants: participantsWithInvalidBelts.map(p => ({
+            id: p.id,
+            name: `${p.player?.first_name} ${p.player?.last_name}`,
+            reason: `Invalid belt: ${p.player?.belt_level || 'None'}`
+          }))
+        }
+      }
+    }
+
     // 4. Assign participants to divisions and categories
     const assignmentErrors: { id: string; name: string; reason: string; currentWeight?: number; currentHeight?: number; age?: number }[] = []
 
@@ -128,7 +129,23 @@ export async function generateTournamentBracket(tournamentId: string): Promise<G
       }
 
       const age = calculateAge(participant.player.dob)
-      const division = findDivisionByAge(age, DEFAULT_DIVISIONS)
+
+      // Map DB divisions to config shape for matching
+      const divisionConfigs = divisions.map((d: any) => ({
+        name: d.name,
+        minAge: d.min_age,
+        maxAge: d.max_age,
+        categories: d.tournament_categories?.map((c: any) => ({
+          name: c.name,
+          gender: c.gender,
+          minWeight: c.min_weight,
+          maxWeight: c.max_weight,
+          minHeight: c.min_height,
+          maxHeight: c.max_height
+        })) || []
+      }))
+
+      const division = findDivisionByAge(age, divisionConfigs)
 
       if (!division) {
         assignmentErrors.push({

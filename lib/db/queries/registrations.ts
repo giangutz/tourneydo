@@ -229,9 +229,63 @@ export async function getTournamentParticipants(
     queryBuilder = queryBuilder.eq('players.belt_level', belt)
   }
 
+
+  // Handle search query with a different approach to avoid PostgREST or() parsing issues
+  // We'll fetch matching registrations in two separate queries and merge them
   if (query) {
-    // Search by player first name or last name
-    queryBuilder = queryBuilder.or(`first_name.ilike.%${query}%,last_name.ilike.%${query}%`, { foreignTable: 'players' })
+    // First, get registrations matching player names
+    const playerNameQuery = supabase
+      .from('tournament_registrations')
+      .select('id')
+      .eq('tournament_id', tournamentId)
+
+    // Search for matching teams to get their IDs
+    const { data: matchingTeams } = await supabase
+      .from('teams')
+      .select('id')
+      .ilike('name', `%${query}%`)
+
+    const matchingTeamIds = matchingTeams?.map(t => t.id) || []
+
+    // Build a list of registration IDs that match our search criteria
+    const matchingRegistrationIds = new Set<string>()
+
+    // Get registrations by player first name
+    const { data: firstNameMatches } = await supabase
+      .from('tournament_registrations')
+      .select('id, players!inner(first_name)')
+      .eq('tournament_id', tournamentId)
+      .ilike('players.first_name', `%${query}%`)
+
+    firstNameMatches?.forEach(r => matchingRegistrationIds.add(r.id))
+
+    // Get registrations by player last name
+    const { data: lastNameMatches } = await supabase
+      .from('tournament_registrations')
+      .select('id, players!inner(last_name)')
+      .eq('tournament_id', tournamentId)
+      .ilike('players.last_name', `%${query}%`)
+
+    lastNameMatches?.forEach(r => matchingRegistrationIds.add(r.id))
+
+    // Get registrations by team ID
+    if (matchingTeamIds.length > 0) {
+      const { data: teamMatches } = await supabase
+        .from('tournament_registrations')
+        .select('id')
+        .eq('tournament_id', tournamentId)
+        .in('team_id', matchingTeamIds)
+
+      teamMatches?.forEach(r => matchingRegistrationIds.add(r.id))
+    }
+
+    // Filter main query to only include matching registration IDs
+    if (matchingRegistrationIds.size > 0) {
+      queryBuilder = queryBuilder.in('id', Array.from(matchingRegistrationIds))
+    } else {
+      // No matches found, return empty result
+      queryBuilder = queryBuilder.eq('id', '00000000-0000-0000-0000-000000000000')
+    }
   }
 
   if (weighInStatus && weighInStatus !== 'all') {
@@ -281,8 +335,9 @@ export async function getTournamentParticipants(
   }
 
   // Transform the data to match expected structure
+  // Spread all original fields first to preserve weighed_in_by and other fields
   const transformedData = data?.map(item => ({
-    ...item,
+    ...item, // Preserve all original fields including weighed_in_by
     player: item.players,
     team: item.teams,
     weighed_in_by_user: item.weighed_in_by_user
@@ -320,27 +375,17 @@ export async function updateRegistrationStatus(
  * 
  * @param coachId - Coach's user ID
  * @returns Number of active registrations
+ * 
+ * Optimized: Uses single joined query instead of N+1 pattern
  */
 export async function getActiveRegistrationCount(coachId: string): Promise<number> {
   const supabase = createServerSupabaseClient()
 
-  // First get all team IDs for this coach
-  const { data: teams } = await supabase
-    .from('teams')
-    .select('id')
-    .eq('user_id', coachId)
-
-  if (!teams || teams.length === 0) {
-    return 0
-  }
-
-  const teamIds = teams.map(t => t.id)
-
-  // Count registrations for these teams
+  // Single query with inner join - replaces N+1 pattern
   const { count, error } = await supabase
     .from('tournament_registrations')
-    .select('*', { count: 'exact', head: true })
-    .in('team_id', teamIds)
+    .select('id, teams!inner(user_id)', { count: 'exact', head: true })
+    .eq('teams.user_id', coachId)
 
   if (error) {
     throw new Error(`Failed to count registrations: ${error.message}`)

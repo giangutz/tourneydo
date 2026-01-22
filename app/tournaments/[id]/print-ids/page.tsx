@@ -9,7 +9,7 @@ import { Printer, Calendar, MapPin, Users, Trophy, IdCard as IdCardIcon } from '
 import { PrintButton } from '@/components/tournaments/print-button'
 import { PrintStyles } from '@/components/tournaments/print-styles'
 import { SiteHeader } from '@/components/layouts/site-header'
-import { formatShortDate } from '@/lib/utils'
+import { formatShortDate, getDivisionCategoryLabel, getDivisionCategoryLabel } from '@/lib/utils'
 
 interface PrintIDsPageProps {
   params: Promise<{
@@ -19,27 +19,6 @@ interface PrintIDsPageProps {
     teamId?: string
     coachId?: string
   }>
-}
-
-// Helper function to format division label matching bracket view
-function getDivisionLabel(division: any, category: any): string {
-  if (!division || !category) return ''
-  
-  // Normalize category name (FEATHER -> Feather)
-  const categoryName = category.name.charAt(0).toUpperCase() + category.name.slice(1).toLowerCase()
-  
-  // Determine if it's a youth division (Cadet or Gradeschool)
-  const isYouth = division.name.toLowerCase().includes('cadet') || division.name.toLowerCase().includes('gradeschool')
-  
-  // Determine gender label
-  let genderLabel = ''
-  if (category.gender === 'male') {
-    genderLabel = isYouth ? 'Boys' : 'Men'
-  } else if (category.gender === 'female') {
-    genderLabel = isYouth ? 'Girls' : 'Women'
-  }
-
-  return `${division.name} ${genderLabel} - ${categoryName}`.trim()
 }
 
 export default async function PrintIDsPage({ params, searchParams }: PrintIDsPageProps) {
@@ -114,7 +93,7 @@ export default async function PrintIDsPage({ params, searchParams }: PrintIDsPag
     
     if (!category) return ''
 
-    return getDivisionLabel(division, category)
+    return getDivisionCategoryLabel(division, category)
   }
 
   return (

@@ -35,7 +35,7 @@ interface ValidationParticipant {
 interface BracketValidationDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  errorType: 'unweighed' | 'unassigned' | 'general'
+  errorType: 'unweighed' | 'unassigned' | 'general' | 'invalid_belt'
   participants: ValidationParticipant[]
   tournamentId: string
 }
@@ -63,6 +63,14 @@ export function BracketValidationDialog({
         return {
           title: "Division Assignment Failed",
           description: "The following participants could not be assigned to a valid division or weight class. Please updated their profile or check tournament division settings.",
+          actionLabel: "Go to Participants Page",
+          actionIcon: <Users className="mr-2 h-4 w-4" />,
+          actionPath: `/dashboard/tournament-organizer/tournaments/${tournamentId}/participants`
+        }
+      case 'invalid_belt':
+        return {
+          title: "Invalid Belt Levels",
+          description: "The following participants have belt levels that are not recognized by the system. Please update their profiles with a valid belt level or adding the belt to the system mapping.",
           actionLabel: "Go to Participants Page",
           actionIcon: <Users className="mr-2 h-4 w-4" />,
           actionPath: `/dashboard/tournament-organizer/tournaments/${tournamentId}/participants`

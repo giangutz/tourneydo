@@ -45,3 +45,5 @@ next-env.d.ts
 
 # csv
 *.csv
+# Sentry Config File
+.env.sentry-build-plugin

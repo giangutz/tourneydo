@@ -53,7 +53,11 @@ export default async function TournamentEditPage({ params }: TournamentEditPageP
         }
       />
       <div className="max-w-2xl mx-auto">
-        <EditTournamentClient tournament={tournament} enabledDivisions={enabledDivisions} />
+        <EditTournamentClient 
+          tournament={tournament} 
+          enabledDivisions={enabledDivisions} 
+          availableDivisions={enabledDivisions.map(name => ({ name }))} 
+        />
       </div>
     </DashboardShell>
   )

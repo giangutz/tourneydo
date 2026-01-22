@@ -1,12 +1,31 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
+import { useDebouncedCallback } from 'use-debounce'
 import { createClient } from '@/lib/supabase/client'
 
+/**
+ * Hook for subscribing to realtime tournament updates.
+ * 
+ * Optimizations:
+ * - Uses singleton Supabase client to prevent connection exhaustion
+ * - Debounces router.refresh() to max once per 500ms
+ * - Proper cleanup on unmount
+ */
 export function useTournamentRealtime(tournamentId: string) {
   const router = useRouter()
-  const supabase = createClient()
+
+  // Use singleton client - memoized to prevent recreation
+  const supabase = useMemo(() => createClient(), [])
+
+  // Debounce refresh to prevent excessive re-renders
+  // maxWait ensures updates aren't delayed indefinitely during rapid changes
+  const debouncedRefresh = useDebouncedCallback(
+    () => router.refresh(),
+    500,
+    { maxWait: 2000 }
+  )
 
   useEffect(() => {
     if (!tournamentId) return
@@ -21,9 +40,7 @@ export function useTournamentRealtime(tournamentId: string) {
           table: 'tournament_registrations',
           filter: `tournament_id=eq.${tournamentId}`
         },
-        () => {
-          router.refresh()
-        }
+        () => debouncedRefresh()
       )
       .on(
         'postgres_changes',
@@ -33,9 +50,7 @@ export function useTournamentRealtime(tournamentId: string) {
           table: 'matches',
           filter: `tournament_id=eq.${tournamentId}`
         },
-        () => {
-          router.refresh()
-        }
+        () => debouncedRefresh()
       )
       .on(
         'postgres_changes',
@@ -45,14 +60,12 @@ export function useTournamentRealtime(tournamentId: string) {
           table: 'tournaments',
           filter: `id=eq.${tournamentId}`
         },
-        () => {
-          router.refresh()
-        }
+        () => debouncedRefresh()
       )
       .subscribe()
 
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [tournamentId, router, supabase])
+  }, [tournamentId, supabase, debouncedRefresh])
 }

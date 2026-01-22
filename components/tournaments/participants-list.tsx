@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Search, Printer, Users } from 'lucide-react'
 import Link from 'next/link'
+import { getDivisionCategoryLabel } from '@/lib/utils'
 
 interface ParticipantsListProps {
   teamMap: Map<string, any[]>
@@ -31,21 +32,7 @@ export function ParticipantsList({ teamMap, coachMap, tournamentId, divisions }:
     
     if (!category) return ''
 
-    // Normalize category name (FEATHER -> Feather)
-    const categoryName = category.name.charAt(0).toUpperCase() + category.name.slice(1).toLowerCase()
-    
-    // Determine if it's a youth division (Cadet or Gradeschool)
-    const isYouth = division.name.toLowerCase().includes('cadet') || division.name.toLowerCase().includes('gradeschool')
-    
-    // Determine gender label
-    let genderLabel = ''
-    if (category.gender === 'male') {
-      genderLabel = isYouth ? 'Boys' : 'Men'
-    } else if (category.gender === 'female') {
-      genderLabel = isYouth ? 'Girls' : 'Women'
-    }
-
-    return `${division.name} ${genderLabel} - ${categoryName}`.trim()
+    return getDivisionCategoryLabel(division, category)
   }
 
   // Filter teams based on search query

@@ -120,7 +120,7 @@ export function MatchReadinessDialog({ match, open, onOpenChange, participants }
           ) : (
             <div className="text-center py-8 text-muted-foreground">
               <p>Readiness management is only available for matches in CONTEST state.</p>
-              <p className="text-sm mt-2">Current state: <Badge variant="outline">{typedMatch?.lifecycle_state || 'UNKNOWN'}</Badge></p>
+              <div className="text-sm mt-2">Current state: <Badge variant="outline">{typedMatch?.lifecycle_state || 'UNKNOWN'}</Badge></div>
             </div>
           )}
         </div>

@@ -50,7 +50,6 @@ export function PaymentVerification({ payments, tournamentId }: Props) {
     const result = await verifyPaymentAction(
        payment.id, 
        status, 
-       { teamId: payment.team_id, tournamentId: payment.tournament_id },
        path
     )
 

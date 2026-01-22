@@ -202,6 +202,60 @@ export async function ensureTournamentDivisionsAndCategories(
 }
 
 /**
+ * Restore missing default categories for existing divisions
+ * Safely adds back categories (e.g. when switching gender preference) without overwriting custom settings
+ */
+export async function restoreDefaultCategoriesSafely(
+  tournamentId: string,
+  defaults: DivisionConfig[]
+) {
+  const supabase = createServerSupabaseClient()
+
+  // 1. Get existing divisions and categories
+  const existingDivisions = await getAllTournamentDivisions(tournamentId)
+
+  for (const defaultDiv of defaults) {
+    // Only process if division exists in DB (we don't force-create disabled/deleted divisions)
+    const currentDiv = existingDivisions.find(
+      (d) => d.name.toLowerCase() === defaultDiv.name.toLowerCase()
+    )
+
+    if (currentDiv) {
+      // Check and create MISSING categories only
+      const existingCategories = currentDiv?.tournament_categories || []
+
+      for (const defaultCat of defaultDiv.categories) {
+        const existingCat: any = existingCategories.find(
+          (c: any) =>
+            c.name.toLowerCase() === defaultCat.name.toLowerCase() &&
+            c.gender === defaultCat.gender
+        )
+
+        // Only insert if completely missing
+        if (!existingCat) {
+          const { error } = await supabase
+            .from('tournament_categories')
+            .insert({
+              division_id: currentDiv.id,
+              name: defaultCat.name,
+              gender: defaultCat.gender,
+              min_weight: defaultCat.minWeight || null,
+              max_weight: defaultCat.maxWeight || null,
+              min_height: defaultCat.minHeight || null,
+              max_height: defaultCat.maxHeight || null,
+            })
+
+          if (error) {
+            console.error(`Failed to restore category ${defaultCat.name} for division ${defaultDiv.name}:`, error)
+          }
+        }
+        // Do NOT update existing categories - preserve custom limits
+      }
+    }
+  }
+}
+
+/**
  * Assign participant to division and category
  */
 export async function assignParticipantDivision(

@@ -174,6 +174,10 @@ export function transformMatch(m: any): Match {
     winner_round3: r3?.winner_id || null,
 
     court_number: (m as any).court_number || null,
+
+    // Preserve joined player data for skill level determination
+    player1: m.player1 || null,
+    player2: m.player2 || null,
   } as unknown as Match
 }
 

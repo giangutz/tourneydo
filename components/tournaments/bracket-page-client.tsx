@@ -61,18 +61,7 @@ import { BracketValidationDialog } from './bracket/bracket-validation-dialog'
 import { DivisionBreakdown } from './shared/division-breakdown'
 import { ScheduleInfeasibilityDialog } from './schedule-infeasibility-dialog'
 import { ScheduleSuccessSummaryDialog } from './schedule-success-summary-dialog'
-
-function getBeltSkillCategory(beltLevel: string | null | undefined): string {
-  if (!beltLevel) return 'Unknown'
-  const belt = beltLevel.toLowerCase()
-  
-  if (belt.includes('white')) return 'Beginner'
-  if (belt.includes('yellow') || belt.includes('blue') || belt.includes('green') || belt.includes('orange')) return 'Novice I'
-  if (belt.includes('red') || belt.includes('brown') || belt.includes('purple')) return 'Novice II'
-  if (belt.includes('black') || belt.includes('poom') || belt.includes('dan')) return 'Advanced'
-  
-  return 'Unknown'
-}
+import { getBeltSkillCategory, getCategoryDisplayName } from '@/lib/utils'
 
 const SKILL_ORDER = ['Beginner', 'Novice I', 'Novice II', 'Advanced', 'Unknown']
 
@@ -91,7 +80,7 @@ export function BracketPageClient({ tournament, participants, matches, userRole 
 
   // Validation Error State
   const [validationErrorOpen, setValidationErrorOpen] = useState(false)
-  const [validationErrorType, setValidationErrorType] = useState<'unweighed' | 'unassigned' | 'general'>('general')
+  const [validationErrorType, setValidationErrorType] = useState<'unweighed' | 'unassigned' | 'general' | 'invalid_belt'>('general')
 
   const [validationParticipants, setValidationParticipants] = useState<{id: string, name: string, reason?: string}[]>([])
 
@@ -142,7 +131,7 @@ export function BracketPageClient({ tournament, participants, matches, userRole 
       
       if (!result.success) {
         // Handle specific validation errors with the dialog
-        if (result.errorType === 'unweighed' || result.errorType === 'unassigned') {
+        if (result.errorType === 'unweighed' || result.errorType === 'unassigned' || result.errorType === 'invalid_belt') {
           // Close generation modal first
           setShowGenerationModal(false)
           
@@ -261,14 +250,44 @@ export function BracketPageClient({ tournament, participants, matches, userRole 
       if (!divName || !catName) return
       
       // Determine skill level from either player's belt
-      const p1Belt = match.player1?.belt_level
-      const p2Belt = match.player2?.belt_level
-      const skill = getBeltSkillCategory(p1Belt) !== 'Unknown' 
-        ? getBeltSkillCategory(p1Belt) 
-        : getBeltSkillCategory(p2Belt)
+      // For single-player matches (BYE), we only have one player
+      let skill = ''
       
-      // Skip matches where skill level cannot be determined
-      if (skill === 'Unknown') return
+      // Helper to get belt from participants array (fallback)
+      const getBeltFromParticipants = (playerId: string | null): string | null => {
+        if (!playerId) return null
+        const participant = participants.find((p: any) => p.player_id === playerId)
+        return participant?.player?.belt_level || null
+      }
+      
+      // Try to get skill from player1
+      if (match.player1_id) {
+        let p1Belt = match.player1?.belt_level
+        if (!p1Belt) {
+          p1Belt = getBeltFromParticipants(match.player1_id)
+        }
+        if (p1Belt) {
+          skill = getBeltSkillCategory(p1Belt)
+        }
+      }
+      
+      // If still empty, try player2
+      if (!skill && match.player2_id) {
+        let p2Belt = match.player2?.belt_level
+        if (!p2Belt) {
+          p2Belt = getBeltFromParticipants(match.player2_id)
+        }
+        if (p2Belt) {
+          skill = getBeltSkillCategory(p2Belt)
+        }
+      }
+      
+      // If still empty, mark as Unknown for display
+      if (!skill) {
+        skill = 'Unknown'
+      }
+      
+      // Include all matches - organizers need to see everything
       
       if (!divisionStats[divName]) {
         divisionStats[divName] = { players: new Set(), matches: 0, rows: new Map() }
@@ -278,10 +297,11 @@ export function BracketPageClient({ tournament, participants, matches, userRole 
       if (match.player2_id) divisionStats[divName].players.add(match.player2_id)
       divisionStats[divName].matches++
       
-      const rowKey = `${catName}-${skill}`
+      const normalizedCatName = getCategoryDisplayName(catName)
+      const rowKey = `${normalizedCatName}-${skill}`
       if (!divisionStats[divName].rows.has(rowKey)) {
         divisionStats[divName].rows.set(rowKey, {
-          category: catName,
+          category: normalizedCatName,
           skill: skill,
           playerCount: new Set(),
           matchCount: 0,
@@ -374,7 +394,7 @@ export function BracketPageClient({ tournament, participants, matches, userRole 
             title="Total Players"
             value={uniquePlayers.size}
             icon={Users}
-            description="Active participants"
+            description="Players in bracket"
           />
           <StatCard
             title="Active Divisions"
@@ -395,7 +415,7 @@ export function BracketPageClient({ tournament, participants, matches, userRole 
             description="Matches completed"
           />
 
-          <DivisionBreakdown matches={matches} />
+          <DivisionBreakdown matches={matches} participants={participants} />
         </div>
       )}
 

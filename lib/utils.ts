@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
+export * from './utils/division-labels'
 import type { Player } from "@/types/models"
 
 /**
@@ -130,10 +131,10 @@ export function getBeltSkillCategory(beltLevel: string | null | undefined): stri
 
   const belt = beltLevel.toLowerCase()
 
-  if (belt === 'white') return 'Beginner'
-  if (belt === 'yellow' || belt === 'blue') return 'Novice I'
-  if (belt === 'red' || belt === 'brown') return 'Novice II'
-  if (belt === 'black') return 'Advanced'
+  if (belt.includes('white')) return 'Beginner'
+  if (belt.includes('yellow') || belt.includes('blue')) return 'Novice I'
+  if (belt.includes('red') || belt.includes('brown')) return 'Novice II'
+  if (belt.includes('black')) return 'Advanced'
 
   return ''
 }

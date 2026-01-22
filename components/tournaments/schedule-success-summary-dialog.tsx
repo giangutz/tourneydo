@@ -38,8 +38,8 @@ export function ScheduleSuccessSummaryDialog({
 
   const avgMatchesPerDay = summary.totalMatches / summary.totalDays
   const peakDay = Object.entries(summary.matchesPerDay).reduce((max, [day, count]) => 
-    count > (summary.matchesPerDay[max[0]] || 0) ? [day, count] : max, 
-    ['1', 0]
+    count > (summary.matchesPerDay[max[0] as unknown as number] || 0) ? [day, count] : max, 
+    ['1', 0] as [string, number]
   )
 
   return (

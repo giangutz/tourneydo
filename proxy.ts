@@ -41,12 +41,46 @@
 
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
+import arcjet, { detectBot, shield, tokenBucket } from '@arcjet/next'
+
+// Arcjet protection configuration
+const aj = arcjet({
+  key: process.env.ARCJET_KEY!,
+  characteristics: ['ip.src'],
+  rules: [
+    // Shield protects against common attacks (SQL injection, XSS, etc)
+    shield({ mode: process.env.NODE_ENV === 'production' ? 'LIVE' : 'DRY_RUN' }),
+    // Bot detection - allow search engines, block malicious bots
+    detectBot({
+      mode: process.env.NODE_ENV === 'production' ? 'LIVE' : 'DRY_RUN',
+      allow: ['CATEGORY:SEARCH_ENGINE', 'CATEGORY:PREVIEW'],
+    }),
+    // Rate limiting - 100 requests per 60 seconds per IP
+    tokenBucket({
+      mode: process.env.NODE_ENV === 'production' ? 'LIVE' : 'DRY_RUN',
+      refillRate: 100,
+      interval: 60,
+      capacity: 100,
+    }),
+  ],
+})
 
 const isPublicRoute = createRouteMatcher(['/sign-in(.*)', '/sign-up(.*)', '/tournaments(.*)', '/tournament(.*)', '/api/import-test', '/api/verify-import', '/api/check-stats', '/api/debug-participants'])
 
 const isOnboardingRoute = createRouteMatcher(['/onboarding'])
 
 export default clerkMiddleware(async (auth, req) => {
+  // Apply Arcjet protection to all requests
+  // requested: 1 means each request consumes 1 token from the rate limit bucket
+  const decision = await aj.protect(req, { requested: 1 })
+
+  if (decision.isDenied()) {
+    if (decision.reason.isRateLimit()) {
+      return new NextResponse('Too Many Requests', { status: 429 })
+    }
+    return new NextResponse('Forbidden', { status: 403 })
+  }
+
   const { userId, sessionClaims } = await auth()
 
   // Allow public routes
