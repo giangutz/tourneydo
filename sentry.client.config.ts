@@ -4,14 +4,14 @@ Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
 
   // Performance Monitoring
-  tracesSampleRate: 1.0, // Capture 100% of transactions in development, reduce in production
+  tracesSampleRate: 0.01, // Capture 1% of transactions in production
 
   // Set sampling rate for profiling
-  profilesSampleRate: 1.0,
+  profilesSampleRate: 0.01, // Capture 1% of profiles
 
   // Enable replay to capture user sessions on errors
-  replaysSessionSampleRate: 0.1, // 10% of sessions
-  replaysOnErrorSampleRate: 1.0, // 100% of sessions with errors
+  replaysSessionSampleRate: 0.001, // 0.1% of sessions
+  replaysOnErrorSampleRate: 0.5, // 50% of sessions with errors
 
   integrations: [
     Sentry.replayIntegration({

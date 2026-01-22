@@ -9,7 +9,7 @@ import { Printer, Calendar, MapPin, Users, Trophy, IdCard as IdCardIcon } from '
 import { PrintButton } from '@/components/tournaments/print-button'
 import { PrintStyles } from '@/components/tournaments/print-styles'
 import { SiteHeader } from '@/components/layouts/site-header'
-import { formatShortDate, getDivisionCategoryLabel, getDivisionCategoryLabel } from '@/lib/utils'
+import { formatShortDate, getDivisionCategoryLabel } from '@/lib/utils'
 
 interface PrintIDsPageProps {
   params: Promise<{
