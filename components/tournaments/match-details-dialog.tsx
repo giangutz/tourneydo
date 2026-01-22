@@ -4,12 +4,13 @@ import { useState, useEffect } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Match } from '@/types/models'
+import { Match, MatchWithReadiness } from '@/types/models'
 import { fetchMatchRounds } from '@/lib/actions/fetch-match-rounds'
-import { Loader2, Trophy, CheckCircle2 } from 'lucide-react'
+import { Loader2, Trophy, CheckCircle2, UserCheck } from 'lucide-react'
+import { AthleteReadinessToggle, ReadinessStatusBadge } from '@/components/tournaments/athlete-readiness-toggle'
 
 interface MatchDetailsDialogProps {
-  match: Match | null
+  match: MatchWithReadiness | Match | null
   open: boolean
   onOpenChange: (open: boolean) => void
   participants: any[]
@@ -25,6 +26,7 @@ interface RoundData {
 }
 
 export function MatchDetailsDialog({ match, open, onOpenChange, participants }: MatchDetailsDialogProps) {
+  const typedMatch = match as MatchWithReadiness
   const [rounds, setRounds] = useState<RoundData[]>([])
   const [loading, setLoading] = useState(false)
 
@@ -77,7 +79,15 @@ export function MatchDetailsDialog({ match, open, onOpenChange, participants }: 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="text-xl">Match Details - Best of 3</DialogTitle>
+          <div className="flex items-center justify-between">
+            <DialogTitle className="text-xl">Match Details - Best of 3</DialogTitle>
+            {typedMatch && typedMatch.lifecycle_state === 'CONTEST' && (
+              <ReadinessStatusBadge 
+                athlete1Called={typedMatch.athlete1_called || false}
+                athlete2Called={typedMatch.athlete2_called || false}
+              />
+            )}
+          </div>
           <div className="text-sm text-muted-foreground mt-2">
             {match.status === 'completed' ? 'Match Completed' : 'Match In Progress'}
           </div>
@@ -89,6 +99,42 @@ export function MatchDetailsDialog({ match, open, onOpenChange, participants }: 
           </div>
         ) : (
           <div className="space-y-4">
+            {/* Athlete Readiness Section */}
+            {typedMatch && typedMatch.lifecycle_state === 'CONTEST' && (
+              <Card className="border-primary/20 bg-primary/5">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <UserCheck className="h-4 w-4 text-primary" />
+                    <h3 className="font-semibold text-sm">Athlete Readiness (Operational Gate)</h3>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <div className="text-xs font-medium text-muted-foreground uppercase">Athlete 1</div>
+                      <AthleteReadinessToggle
+                        matchId={typedMatch.id}
+                        athleteId={typedMatch.player1_id || ''}
+                        athleteName={name1}
+                        called={typedMatch.athlete1_called || false}
+                        disabled={!typedMatch.player1_id}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <div className="text-xs font-medium text-muted-foreground uppercase text-right">Athlete 2</div>
+                      <div className="flex justify-end">
+                        <AthleteReadinessToggle
+                          matchId={typedMatch.id}
+                          athleteId={typedMatch.player2_id || ''}
+                          athleteName={name2}
+                          called={typedMatch.athlete2_called || false}
+                          disabled={!typedMatch.player2_id}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Overall Score */}
             <Card className="bg-muted/50">
               <CardContent className="pt-6">

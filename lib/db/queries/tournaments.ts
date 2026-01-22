@@ -284,3 +284,26 @@ async function checkAndUpdateStatus(tournament: Tournament): Promise<void> {
     }
   }
 }
+
+/**
+ * Get tournament division move policy
+ * 
+ * @param tournamentId - Tournament ID
+ * @returns Division move policy ('allow_move' | 'disqualify_only')
+ */
+export async function getTournamentDivisionPolicy(tournamentId: string): Promise<'allow_move' | 'disqualify_only'> {
+  const supabase = createServerSupabaseClient()
+
+  const { data, error } = await supabase
+    .from('tournaments')
+    .select('division_move_policy')
+    .eq('id', tournamentId)
+    .single()
+
+  if (error) {
+    throw new Error(`Failed to fetch tournament division policy: ${error.message}`)
+  }
+
+  return data?.division_move_policy || 'allow_move' // Default to allow_move for backward compatibility
+}
+

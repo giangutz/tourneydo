@@ -191,6 +191,19 @@ export async function getTournamentParticipants(
       weighed_in_by_user:users!tournament_registrations_weighed_in_by_fkey (
         first_name,
         last_name
+      ),
+      tournament_divisions (
+        id,
+        name
+      ),
+      tournament_categories (
+        id,
+        name,
+        gender,
+        min_weight,
+        max_weight,
+        min_height,
+        max_height
       )
     `, { count: 'exact' })
     .eq('tournament_id', tournamentId)
@@ -225,14 +238,17 @@ export async function getTournamentParticipants(
     if (weighInStatus === 'completed') {
       queryBuilder = queryBuilder.not('weighed_in_at', 'is', null)
     } else if (weighInStatus === 'pending') {
-      queryBuilder = queryBuilder.is('weighed_in_at', null).in('status', ['verified', 'paid'])
+      queryBuilder = queryBuilder.is('weighed_in_at', null).eq('status', 'verified')
     } else if (weighInStatus === 'not-required') {
-      queryBuilder = queryBuilder.is('weighed_in_at', null).not('status', 'in', '("verified","paid")')
+      queryBuilder = queryBuilder.is('weighed_in_at', null).neq('status', 'verified')
     }
   }
 
   if (weighInSelected !== undefined) {
     queryBuilder = queryBuilder.eq('weigh_in_selected', weighInSelected)
+    if (weighInSelected === true) {
+      queryBuilder = queryBuilder.eq('status', 'verified')
+    }
   }
 
   // Apply sorting

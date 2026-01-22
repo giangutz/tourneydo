@@ -3,7 +3,7 @@ import { RectClipped } from './Clipped';
 import { Game, Side, SideInfo } from '@/lib/types/bracket-models';
 import * as _ from 'underscore';
 import { Pencil, ArrowLeftRight } from 'lucide-react';
-import { Match } from '@/types/models';
+import { Match, MatchWithReadiness } from '@/types/models';
 
 interface BracketGameProps {
   game: Game;
@@ -42,10 +42,10 @@ export default class BracketGame extends React.PureComponent<BracketGameProps> {
       hoverBackgroundColor: '#222',
       scoreBackground: '#787a80',
       winningScoreBackground: '#ff7324',
-      teamNameStyle: { fill: '#fff', fontSize: 14, textShadow: '1px 1px 1px #222', fontFamily: 'Inter, sans-serif' },
-      teamScoreStyle: { fill: '#23252d', fontSize: 14, fontFamily: 'Inter, sans-serif', fontWeight: 'bold' },
-      gameNameStyle: { fill: '#999', fontSize: 11, fontFamily: 'Inter, sans-serif' },
-      gameTimeStyle: { fill: '#999', fontSize: 11, fontFamily: 'Inter, sans-serif' },
+      teamNameStyle: { fill: '#fff', fontSize: 12, textShadow: '1px 1px 1px #222', fontFamily: 'Inter, sans-serif' },
+      teamScoreStyle: { fill: '#23252d', fontSize: 13, fontFamily: 'Inter, sans-serif', fontWeight: 'bold' },
+      gameNameStyle: { fill: '#999', fontSize: 10, fontFamily: 'Inter, sans-serif' },
+      gameTimeStyle: { fill: '#999', fontSize: 10, fontFamily: 'Inter, sans-serif' },
       teamSeparatorStyle: { stroke: '#444549', strokeWidth: 1 }
     },
 
@@ -70,7 +70,7 @@ export default class BracketGame extends React.PureComponent<BracketGameProps> {
       bottomText
     } = this.props;
 
-    const { sides, originalMatch } = game;
+    const { sides, originalMatch } = game as { sides: any, originalMatch: MatchWithReadiness };
     
     // Default styles if not provided
     const defaultStyles = BracketGame.defaultProps.styles!;
@@ -92,7 +92,6 @@ export default class BracketGame extends React.PureComponent<BracketGameProps> {
     const bottom = sides[ homeOnTop ? Side.VISITOR : Side.HOME ];
 
     // Calculate winner based on round wins (best of 3)
-    // The score object in SideInfo now contains the number of rounds won
     const topScore = top?.score?.score || 0;
     const bottomScore = bottom?.score?.score || 0;
     
@@ -100,28 +99,18 @@ export default class BracketGame extends React.PureComponent<BracketGameProps> {
     const isTopWinner = hasScores && topScore > bottomScore;
     const isBottomWinner = hasScores && bottomScore > topScore;
 
-    const winnerBackground = (hasScores && topScore !== bottomScore) ?
-      (
-        isTopWinner ?
-          <rect x={x + 170} y={y + 12} width="30" height="22.5" style={{ fill: winningScoreBackground }} rx="3" ry="3"/> :
-          <rect x={x + 170} y={y + 34.5} width="30" height="22.5" style={{ fill: winningScoreBackground }} rx="3" ry="3"/>
-      ) :
-      null;
-
-    interface SideComponentProps {
-      bx: number;
-      by: number;
-      side: SideInfo;
-      onHover: (id: string | null) => void;
+    const SideComponent = ({ bx, by, side, onHover, isWinner, athleteCalled }: { 
+      bx: number; 
+      by: number; 
+      side: SideInfo; 
+      onHover: (id: string | null) => void; 
       isWinner?: boolean;
-    }
-
-    const SideComponent = ({ bx, by, side, onHover, isWinner }: SideComponentProps) => {
+      athleteCalled?: boolean;
+    }) => {
       const tooltip = side.seed && side.team ? <title>{side.seed.displayName}</title> : null;
       const playerName = side.seed ? side.seed.displayName : 'BYE';
       const teamName = side.team ? side.team.name : '';
       
-      // If it's a BYE, show it differently
       const isBye = !side.team && !side.seed;
 
       return (
@@ -135,12 +124,12 @@ export default class BracketGame extends React.PureComponent<BracketGameProps> {
             {tooltip}
           </rect>
 
-          <RectClipped x={bx} y={by} height={30} width={165}>
+          <RectClipped x={bx} y={by} height={30} width={170}>
             {/* Player name */}
-            <text x={bx + 8} y={by + 15}
+            <text x={bx + 8} y={by + 16}
                   style={{ 
                     ...teamNameStyle, 
-                    fontSize: 13,
+                    fontSize: 12,
                     fontStyle: side.seed && side.seed.sourcePool ? 'italic' : undefined,
                     fontWeight: isWinner ? 'bold' : 'normal'
                   }}>
@@ -154,12 +143,12 @@ export default class BracketGame extends React.PureComponent<BracketGameProps> {
               )}
             </text>
             
-            {/* Team name - only show if not a BYE */}
+            {/* Team name */}
             {!isBye && teamName && (
               <text x={bx + 8} y={by + 26}
                     style={{ 
                       ...teamNameStyle, 
-                      fontSize: 9,
+                      fontSize: 8,
                       fill: '#aaa',
                       fontWeight: 'normal'
                     }}>
@@ -183,8 +172,27 @@ export default class BracketGame extends React.PureComponent<BracketGameProps> {
     if (originalMatch?.status === 'in_progress') statusColor = '#22c55e'; // green
     if (originalMatch?.status === 'completed') statusColor = '#3b82f6'; // blue
 
+    // Readiness border color (only for CONTEST matches)
+    let readinessBorderColor = 'none';
+    let readinessBorderWidth = 0;
+    if (originalMatch?.lifecycle_state === 'CONTEST') {
+      const athlete1Ready = originalMatch.athlete1_called || false;
+      const athlete2Ready = originalMatch.athlete2_called || false;
+      
+      if (athlete1Ready && athlete2Ready) {
+        readinessBorderColor = '#22c55e'; // Green - both ready
+        readinessBorderWidth = 2;
+      } else if (athlete1Ready || athlete2Ready) {
+        readinessBorderColor = '#f59e0b'; // Amber - partially ready
+        readinessBorderWidth = 2;
+      } else {
+        readinessBorderColor = '#6b7280'; // Gray - not ready
+        readinessBorderWidth = 1;
+      }
+    }
+
     return (
-      <svg width="200" height="90" viewBox={`0 0 200 90`} x={x} y={y} style={{ overflow: 'visible' }}>
+      <svg width="200" height="100" viewBox={`0 0 200 100`} x={x} y={y} style={{ overflow: 'visible' }}>
         {/* Click handler for the whole match card */}
         <g onClick={(e) => {
           e.stopPropagation();
@@ -192,14 +200,14 @@ export default class BracketGame extends React.PureComponent<BracketGameProps> {
             onMatchClick(originalMatch);
           }
         }}>
-          {/* Status dot - removed date text */}
+          {/* Status dot */}
           <circle cx="10" cy="8" r="3" fill={statusColor} />
 
-          {/* backgrounds */}
-
-          {/* base background */}
+          {/* base background with readiness border */}
           <rect x="0" y="15" width="200" height="60" fill={backgroundColor} rx="3" ry="3" 
-                style={{ cursor: 'pointer' }} stroke={originalMatch?.status === 'in_progress' ? '#22c55e' : 'none'} strokeWidth={1} />
+                style={{ cursor: 'pointer' }} 
+                stroke={readinessBorderColor} 
+                strokeWidth={readinessBorderWidth} />
 
           {/* background for the top team */}
           <rect x="0" y="15" width="200" height="30" fill={topHovered ? hoverBackgroundColor : backgroundColor} rx="3"
@@ -221,52 +229,62 @@ export default class BracketGame extends React.PureComponent<BracketGameProps> {
           {/* the players */}
           {
             top ? (
-              <SideComponent bx={0} by={15} side={top} onHover={onHoveredTeamIdChange || (() => {})} isWinner={isTopWinner} />
+              <SideComponent 
+                bx={0} by={15} side={top} 
+                onHover={onHoveredTeamIdChange || (() => {})} 
+                isWinner={isTopWinner} 
+                athleteCalled={homeOnTop ? originalMatch?.athlete1_called : originalMatch?.athlete2_called}
+              />
             ) : null
           }
 
           {
             bottom ? (
-              <SideComponent bx={0} by={45} side={bottom} onHover={onHoveredTeamIdChange || (() => {})} isWinner={isBottomWinner} />
+              <SideComponent 
+                bx={0} by={45} side={bottom} 
+                onHover={onHoveredTeamIdChange || (() => {})} 
+                isWinner={isBottomWinner} 
+                athleteCalled={homeOnTop ? originalMatch?.athlete2_called : originalMatch?.athlete1_called}
+              />
             ) : null
           }
 
           <line x1="0" y1="45" x2="200" y2="45" style={teamSeparatorStyle}/>
 
           {/* game name - show only match number */}
-          <text x="100" y="86" textAnchor="middle" style={gameNameStyle}>
+          <text x="100" y="88" textAnchor="middle" style={gameNameStyle}>
             {bottomText ? bottomText(game) : ''}
           </text>
         </g>
         
-        {/* Action buttons (only visible for organizer) */}
+        {/* Action buttons (only visible for organizer) - Larger and more visible */}
         {isOrganizer && originalMatch && (
-          <foreignObject x="160" y="0" width="50" height="20">
-            <div className="flex justify-end gap-1">
+          <foreignObject x="140" y="-22" width="70" height="30">
+            <div className="flex justify-end gap-2">
               {/* Switch sides button */}
               {onSwitchSides && (
                 <button 
-                  className="bg-white text-gray-700 hover:bg-gray-100 rounded-full p-0.5 shadow-sm border border-gray-200"
+                  className="bg-white text-gray-700 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300 rounded-md p-1.5 shadow-md border-2 border-gray-300 transition-all"
                   onClick={(e) => {
                     e.stopPropagation();
                     onSwitchSides(originalMatch);
                   }}
                   title="Switch Places / Edit Participants"
                 >
-                  <ArrowLeftRight size={10} />
+                  <ArrowLeftRight size={14} />
                 </button>
               )}
               {/* Edit match button */}
               {onEditMatch && (
                 <button 
-                  className="bg-white text-gray-700 hover:bg-gray-100 rounded-full p-0.5 shadow-sm border border-gray-200"
+                  className="bg-white text-gray-700 hover:bg-green-50 hover:text-green-600 hover:border-green-300 rounded-md p-1.5 shadow-md border-2 border-gray-300 transition-all"
                   onClick={(e) => {
                     e.stopPropagation();
                     onEditMatch(originalMatch);
                   }}
                   title="Edit Scores"
                 >
-                  <Pencil size={10} />
+                  <Pencil size={14} />
                 </button>
               )}
             </div>
@@ -276,3 +294,4 @@ export default class BracketGame extends React.PureComponent<BracketGameProps> {
     );
   }
 }
+

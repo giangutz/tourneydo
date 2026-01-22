@@ -19,6 +19,19 @@ import { TournamentBreadcrumbs } from '@/components/tournaments/tournament-bread
 export default async function TournamentEditPage({ params }: TournamentEditPageProps) {
   const { id } = await params
   const tournament = await getTournamentById(id)
+  
+  // Fetch divisions to determine which are enabled
+  const { getAllTournamentDivisions } = await import('@/lib/db/queries/divisions')
+  // We handle potential error internally or defaulting to empty if fetch fails
+  let enabledDivisions: string[] = []
+  try {
+     if (tournament) {
+       const allDivs = await getAllTournamentDivisions(tournament.id)
+       enabledDivisions = allDivs.filter(d => d.enabled).map(d => d.name)
+     }
+  } catch (e) {
+    console.error('Failed to fetch divisions for settings page', e)
+  }
 
   if (!tournament) {
     notFound()
@@ -40,7 +53,7 @@ export default async function TournamentEditPage({ params }: TournamentEditPageP
         }
       />
       <div className="max-w-2xl mx-auto">
-        <EditTournamentClient tournament={tournament} />
+        <EditTournamentClient tournament={tournament} enabledDivisions={enabledDivisions} />
       </div>
     </DashboardShell>
   )

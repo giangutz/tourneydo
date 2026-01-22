@@ -3,9 +3,11 @@
 import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Match, Tournament } from '@/types/models'
+import { Match, Tournament, MatchWithReadiness } from '@/types/models'
 import { MatchResultDialog } from '@/components/tournaments/match-result-dialog'
 import { Badge } from '@/components/ui/badge'
+import { AthleteReadinessToggle, ReadinessStatusBadge } from '@/components/tournaments/athlete-readiness-toggle'
+import { isMatchReady } from '@/lib/utils/match-lifecycle'
 import {
   Dialog,
   DialogContent,
@@ -34,19 +36,20 @@ import {
 import { assignMatchToCourt, unassignMatch, updateMatchStatus } from '@/lib/actions/matches'
 import { disqualifyParticipant } from '@/lib/actions/participants'
 import { toast } from 'sonner'
-import { ArrowRightLeft, Trash2, XCircle, Monitor } from 'lucide-react'
+import { ArrowRightLeft, Trash2, XCircle, Monitor, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { LiveDisplayMode } from '@/components/tournaments/live-display-mode'
 
 interface CourtManagerProps {
   tournament: Tournament
-  matches: Match[]
+  matches: MatchWithReadiness[] | Match[]
   participants: any[]
 }
 
 export function CourtManager({ tournament, matches, participants }: CourtManagerProps) {
-  const [selectedMatch, setSelectedMatch] = useState<Match | null>(null)
+  const typedMatches = matches as MatchWithReadiness[]
+  const [selectedMatch, setSelectedMatch] = useState<MatchWithReadiness | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   
   // State for Move/Remove actions
@@ -64,6 +67,10 @@ export function CourtManager({ tournament, matches, participants }: CourtManager
   // Live display mode state
   const [liveDisplayMode, setLiveDisplayMode] = useState(false)
 
+  // Court pagination state
+  const [courtPage, setCourtPage] = useState<Record<number, number>>({})
+  const ITEMS_PER_PAGE = 3
+
   const courts = Array.from({ length: tournament.courts || 0 }, (_, i) => i + 1)
 
   const getPlayerDisplay = (playerId: string | null) => {
@@ -77,12 +84,32 @@ export function CourtManager({ tournament, matches, participants }: CourtManager
     }
   }
 
-  const handleScoreMatch = (match: Match) => {
+  const handleScoreMatch = (match: MatchWithReadiness) => {
     setSelectedMatch(match)
     setDialogOpen(true)
   }
 
-  const handleStartMatch = async (match: Match) => {
+  const handleStartMatch = async (match: MatchWithReadiness) => {
+    // Check readiness (operational gate)
+    const readinessResult = isMatchReady(
+      match, 
+      typedMatches, 
+      new Map(), // Empty court status for now
+      { athlete1Called: match.athlete1_called || false, athlete2Called: match.athlete2_called || false }
+    )
+
+    if (!readinessResult.isReady) {
+      toast.error(
+        <div className="space-y-1">
+          <p className="font-semibold text-sm">Match not ready</p>
+          <ul className="text-xs list-disc pl-4">
+            {readinessResult.blockedReasons.map((r, i) => <li key={i}>{r}</li>)}
+          </ul>
+        </div>
+      )
+      return
+    }
+
     try {
       const result = await updateMatchStatus(match.id, match.tournament_id, 'in_progress')
       if (!result.success) {
@@ -227,19 +254,32 @@ export function CourtManager({ tournament, matches, participants }: CourtManager
         </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2">
         {courts.map((courtNumber) => {
-          const courtMatches = matches.filter(m => m.court_number === courtNumber)
+          const courtMatches = typedMatches.filter(m => m.court_number === courtNumber)
           const currentMatch = courtMatches.find(m => m.status === 'in_progress')
           const queuedMatches = courtMatches
             .filter(m => m.status === 'scheduled')
             .sort((a, b) => (a.match_number || 0) - (b.match_number || 0))
 
+          // Pagination logic
+          const currentCourtPage = courtPage[courtNumber] || 1
+          const totalPages = Math.ceil(queuedMatches.length / ITEMS_PER_PAGE)
+          
+          // Slice matches for display, but keep original indices logic if needed
+          const displayMatches = queuedMatches.slice(
+            (currentCourtPage - 1) * ITEMS_PER_PAGE,
+            currentCourtPage * ITEMS_PER_PAGE
+          )
+
           return (
             <Card key={courtNumber} className={currentMatch ? 'border-primary' : ''}>
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg flex justify-between items-center">
-                  <span>Court {courtNumber}</span>
+                  <div className="flex flex-col">
+                    <span>Court {courtNumber}</span>
+
+                  </div>
                   {currentMatch && (
                     <Badge variant="default" className="animate-pulse">Live</Badge>
                   )}
@@ -251,66 +291,72 @@ export function CourtManager({ tournament, matches, participants }: CourtManager
                   <div className="space-y-4 mb-6">
                     <div className="rounded-md bg-muted p-3">
                       <div className="text-sm font-medium text-muted-foreground mb-3 text-center">
-                        Match #{currentMatch.match_number} (Round {currentMatch.round})
+                        Match #{currentMatch.match_number}
                       </div>
                       
                       <div className="space-y-4">
                         {/* Player 1 */}
-                        <div className="flex items-center justify-between p-2 bg-background rounded border">
-                          <div className="flex flex-col flex-1">
-                            <span className="font-bold text-lg">
-                              {getPlayerDisplay(currentMatch.player1_id).name}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              {getPlayerDisplay(currentMatch.player1_id).team}
-                            </span>
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between p-2 bg-background rounded border">
+                            <div className="flex flex-col flex-1">
+                              <span className="font-bold text-lg">
+                                {getPlayerDisplay(currentMatch.player1_id).name}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {getPlayerDisplay(currentMatch.player1_id).team}
+                              </span>
+                            </div>
+                            {currentMatch.player1_id && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                title="Disqualify player"
+                                onClick={() => setPlayerToDQ({
+                                  playerId: currentMatch.player1_id!,
+                                  name: getPlayerDisplay(currentMatch.player1_id).name,
+                                  team: getPlayerDisplay(currentMatch.player1_id).team || 'Unattached',
+                                  matchId: currentMatch.id
+                                })}
+                              >
+                                <XCircle className="h-4 w-4" />
+                              </Button>
+                            )}
                           </div>
-                          {currentMatch.player1_id && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                              title="Disqualify player"
-                              onClick={() => setPlayerToDQ({
-                                playerId: currentMatch.player1_id!,
-                                name: getPlayerDisplay(currentMatch.player1_id).name,
-                                team: getPlayerDisplay(currentMatch.player1_id).team || 'Unattached',
-                                matchId: currentMatch.id
-                              })}
-                            >
-                              <XCircle className="h-4 w-4" />
-                            </Button>
-                          )}
+
                         </div>
 
                         <div className="text-center font-bold text-muted-foreground text-sm">VS</div>
 
                         {/* Player 2 */}
-                        <div className="flex items-center justify-between p-2 bg-background rounded border">
-                          <div className="flex flex-col flex-1">
-                            <span className="font-bold text-lg">
-                              {getPlayerDisplay(currentMatch.player2_id).name}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              {getPlayerDisplay(currentMatch.player2_id).team}
-                            </span>
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between p-2 bg-background rounded border">
+                            <div className="flex flex-col flex-1">
+                              <span className="font-bold text-lg">
+                                {getPlayerDisplay(currentMatch.player2_id).name}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {getPlayerDisplay(currentMatch.player2_id).team}
+                              </span>
+                            </div>
+                            {currentMatch.player2_id && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                title="Disqualify player"
+                                onClick={() => setPlayerToDQ({
+                                  playerId: currentMatch.player2_id!,
+                                  name: getPlayerDisplay(currentMatch.player2_id).name,
+                                  team: getPlayerDisplay(currentMatch.player2_id).team || 'Unattached',
+                                  matchId: currentMatch.id
+                                })}
+                              >
+                                <XCircle className="h-4 w-4" />
+                              </Button>
+                            )}
                           </div>
-                          {currentMatch.player2_id && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                              title="Disqualify player"
-                              onClick={() => setPlayerToDQ({
-                                playerId: currentMatch.player2_id!,
-                                name: getPlayerDisplay(currentMatch.player2_id).name,
-                                team: getPlayerDisplay(currentMatch.player2_id).team || 'Unattached',
-                                matchId: currentMatch.id
-                              })}
-                            >
-                              <XCircle className="h-4 w-4" />
-                            </Button>
-                          )}
+
                         </div>
                       </div>
                     </div>
@@ -356,51 +402,117 @@ export function CourtManager({ tournament, matches, participants }: CourtManager
                     <p className="text-xs text-muted-foreground text-center py-2">No upcoming matches</p>
                   ) : (
                     <div className="space-y-3">
-                      {queuedMatches.map((match, idx) => (
+                      {displayMatches.map((match, idx) => (
                         <div key={match.id} className="text-sm border rounded p-2 bg-muted/20">
                           <div className="flex justify-between items-center mb-2">
                             <span className="font-medium text-xs">Match #{match.match_number}</span>
-                            {idx === 0 && !currentMatch && (
-                              <Badge variant="outline" className="text-[10px] h-5">Next</Badge>
-                            )}
+                            <div className="flex gap-1">
+                              <ReadinessStatusBadge 
+                                athlete1Called={match.athlete1_called || false}
+                                athlete2Called={match.athlete2_called || false}
+                                compact={true}
+                              />
+                              {idx === 0 && !currentMatch && currentCourtPage === 1 && (
+                                <Badge variant="outline" className="text-[10px] h-5">Next</Badge>
+                              )}
+                            </div>
                           </div>
-                          <div className="flex justify-between items-center text-xs mb-2">
-                            <span className="truncate max-w-[45%]">{getPlayerDisplay(match.player1_id).name}</span>
-                            <span className="text-muted-foreground">vs</span>
-                            <span className="truncate max-w-[45%] text-right">{getPlayerDisplay(match.player2_id).name}</span>
+                          <div className="flex flex-col md:flex-row md:justify-between md:items-start text-xs mb-2 gap-1 md:gap-0">
+                            <div className="flex flex-col w-full md:max-w-[45%]">
+                              <span className="truncate font-medium">{getPlayerDisplay(match.player1_id).name}</span>
+                              <span className="truncate text-[10px] text-muted-foreground">{getPlayerDisplay(match.player1_id).team}</span>
+                            </div>
+                            <span className="text-muted-foreground text-[10px] md:mt-1 self-center md:self-auto">vs</span>
+                            <div className="flex flex-col w-full md:items-end md:max-w-[45%]">
+                              <span className="truncate font-medium md:text-right">{getPlayerDisplay(match.player2_id).name}</span>
+                              <span className="truncate text-[10px] text-muted-foreground md:text-right">{getPlayerDisplay(match.player2_id).team}</span>
+                            </div>
                           </div>
+                          
                           
                           {/* Queue Actions */}
                           <div className="flex gap-2 mt-2">
-                            {idx === 0 && !currentMatch ? (
-                              <Button 
-                                size="sm" 
-                                className="w-full h-7 text-xs"
-                                onClick={() => handleStartMatch(match)}
-                              >
-                                Start Match
-                              </Button>
-                            ) : (
+                            {!currentMatch && (() => {
+                              // Check if this specific match is ready to start
+                              const readinessResult = isMatchReady(
+                                match,
+                                typedMatches,
+                                new Map(), // Empty court status for now
+                                { 
+                                  athlete1Called: match.athlete1_called || false, 
+                                  athlete2Called: match.athlete2_called || false 
+                                }
+                              )
+                              
+                              return readinessResult.isReady ? (
+                                <Button 
+                                  size="sm" 
+                                  className="flex-1 h-7 text-xs"
+                                  onClick={() => handleStartMatch(match)}
+                                  title="Both athletes ready - can start now"
+                                >
+                                  Start Match
+                                </Button>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="flex-1 h-7 text-xs"
+                                  onClick={() => setMatchToMove(match)}
+                                  title={readinessResult.blockedReasons.join(', ')}
+                                >
+                                  Move
+                                </Button>
+                              )
+                            })()}
+                            {currentMatch && (
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="w-full h-7 text-xs"
+                                className="flex-1 h-7 text-xs"
                                 onClick={() => setMatchToMove(match)}
                               >
                                 Move
                               </Button>
                             )}
                             <Button 
-                              size="sm" 
-                              variant="ghost" 
-                              className="w-full h-7 text-xs text-destructive hover:text-destructive"
+                              size="icon" 
+                              variant="outline" 
+                              className="h-7 w-7 text-destructive hover:bg-destructive/10 shrink-0"
                               onClick={() => setMatchToRemove(match)}
+                              title="Remove from court"
                             >
-                              Remove
+                              <Trash2 className="h-3 w-3" />
                             </Button>
                           </div>
                         </div>
                       ))}
+                    </div>
+                  )}
+                  {/* Pagination Controls */}
+                  {totalPages > 1 && (
+                    <div className="flex justify-center items-center gap-2 mt-4">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        disabled={currentCourtPage === 1}
+                        onClick={() => setCourtPage(prev => ({ ...prev, [courtNumber]: currentCourtPage - 1 }))}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <span className="text-xs text-muted-foreground">
+                        Page {currentCourtPage} of {totalPages}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        disabled={currentCourtPage === totalPages}
+                        onClick={() => setCourtPage(prev => ({ ...prev, [courtNumber]: currentCourtPage + 1 }))}
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
                     </div>
                   )}
                 </div>

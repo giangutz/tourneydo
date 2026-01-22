@@ -65,6 +65,76 @@ export type Database = {
           },
         ]
       }
+      division_schedule_config: {
+        Row: {
+          avg_match_duration: number | null
+          category_id: string
+          competition_type: string | null
+          created_at: string | null
+          division_id: string
+          estimated_match_count: number | null
+          estimated_total_minutes: number | null
+          id: string
+          participant_count: number | null
+          priority: number
+          scheduled_day: number | null
+          tournament_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          avg_match_duration?: number | null
+          category_id: string
+          competition_type?: string | null
+          created_at?: string | null
+          division_id: string
+          estimated_match_count?: number | null
+          estimated_total_minutes?: number | null
+          id?: string
+          participant_count?: number | null
+          priority: number
+          scheduled_day?: number | null
+          tournament_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          avg_match_duration?: number | null
+          category_id?: string
+          competition_type?: string | null
+          created_at?: string | null
+          division_id?: string
+          estimated_match_count?: number | null
+          estimated_total_minutes?: number | null
+          id?: string
+          participant_count?: number | null
+          priority?: number
+          scheduled_day?: number | null
+          tournament_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "division_schedule_config_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "tournament_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "division_schedule_config_division_id_fkey"
+            columns: ["division_id"]
+            isOneToOne: false
+            referencedRelation: "tournament_divisions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "division_schedule_config_tournament_id_fkey"
+            columns: ["tournament_id"]
+            isOneToOne: false
+            referencedRelation: "tournaments"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       matches: {
         Row: {
           category_id: string | null
@@ -84,6 +154,13 @@ export type Database = {
           tournament_id: string
           updated_at: string
           winner_id: string | null
+          match_number_formatted: string | null
+          match_number_legacy: string | null
+          day_number: number | null
+          match_sequence: number | null
+          scheduled_start_time: string | null
+          scheduled_end_time: string | null
+          court_number: number | null
         }
         Insert: {
           category_id?: string | null
@@ -103,6 +180,13 @@ export type Database = {
           tournament_id: string
           updated_at?: string
           winner_id?: string | null
+          match_number_formatted?: string | null
+          match_number_legacy?: string | null
+          day_number?: number | null
+          match_sequence?: number | null
+          scheduled_start_time?: string | null
+          scheduled_end_time?: string | null
+          court_number?: number | null
         }
         Update: {
           category_id?: string | null
@@ -122,6 +206,13 @@ export type Database = {
           tournament_id: string
           updated_at?: string
           winner_id?: string | null
+          match_number_formatted?: string | null
+          match_number_legacy?: string | null
+          day_number?: number | null
+          match_sequence?: number | null
+          scheduled_start_time?: string | null
+          scheduled_end_time?: string | null
+          court_number?: number | null
         }
         Relationships: [
           {
@@ -423,6 +514,92 @@ export type Database = {
           },
         ]
       }
+      tournament_schedule_config: {
+        Row: {
+          courts: number
+          created_at: string | null
+          daily_end_time: string
+          daily_start_time: string
+          default_breaking_duration: number | null
+          default_poomsae_duration: number | null
+          default_sparring_duration: number | null
+          gradeschool_round_time: number | null
+          gradeschool_kyeshi_time: number | null
+          gradeschool_rest_between_rounds: number | null
+          cadet_round_time: number | null
+          cadet_kyeshi_time: number | null
+          cadet_rest_between_rounds: number | null
+          junior_round_time: number | null
+          junior_kyeshi_time: number | null
+          junior_rest_between_rounds: number | null
+          senior_round_time: number | null
+          senior_kyeshi_time: number | null
+          senior_rest_between_rounds: number | null
+          id: string
+          max_divisions_per_day: number | null
+          tournament_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          courts?: number
+          created_at?: string | null
+          daily_end_time?: string
+          daily_start_time?: string
+          default_breaking_duration?: number | null
+          default_poomsae_duration?: number | null
+          default_sparring_duration?: number | null
+          gradeschool_round_time?: number | null
+          gradeschool_kyeshi_time?: number | null
+          gradeschool_rest_between_rounds?: number | null
+          cadet_round_time?: number | null
+          cadet_kyeshi_time?: number | null
+          cadet_rest_between_rounds?: number | null
+          junior_round_time?: number | null
+          junior_kyeshi_time?: number | null
+          junior_rest_between_rounds?: number | null
+          senior_round_time?: number | null
+          senior_kyeshi_time?: number | null
+          senior_rest_between_rounds?: number | null
+          id?: string
+          max_divisions_per_day?: number | null
+          tournament_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          courts?: number
+          created_at?: string | null
+          daily_end_time?: string
+          daily_start_time?: string
+          default_breaking_duration?: number | null
+          default_poomsae_duration?: number | null
+          default_sparring_duration?: number | null
+          gradeschool_round_time?: number | null
+          gradeschool_kyeshi_time?: number | null
+          gradeschool_rest_between_rounds?: number | null
+          cadet_round_time?: number | null
+          cadet_kyeshi_time?: number | null
+          cadet_rest_between_rounds?: number | null
+          junior_round_time?: number | null
+          junior_kyeshi_time?: number | null
+          junior_rest_between_rounds?: number | null
+          senior_round_time?: number | null
+          senior_kyeshi_time?: number | null
+          senior_rest_between_rounds?: number | null
+          id?: string
+          max_divisions_per_day?: number | null
+          tournament_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tournament_schedule_config_tournament_id_fkey"
+            columns: ["tournament_id"]
+            isOneToOne: true
+            referencedRelation: "tournaments"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       tournament_registrations: {
         Row: {
           actual_height: number | null
@@ -647,7 +824,12 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      archive_match_numbers: {
+        Args: {
+          p_tournament_id: string
+        }
+        Returns: void
+      }
     }
     Enums: {
       belt_level: "White" | "Yellow" | "Green" | "Blue" | "Red" | "Brown" | "Black"

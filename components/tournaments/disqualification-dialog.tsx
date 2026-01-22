@@ -25,6 +25,7 @@ interface DisqualificationDialogProps {
   tournamentId: string
   open: boolean
   onOpenChange: (open: boolean) => void
+  onSuccess?: () => void
 }
 
 export function DisqualificationDialog({
@@ -32,10 +33,16 @@ export function DisqualificationDialog({
   reason: defaultReason,
   tournamentId,
   open,
-  onOpenChange
+  onOpenChange,
+  onSuccess
 }: DisqualificationDialogProps) {
   const [reason, setReason] = useState(defaultReason)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  
+  // Sync state with prop when opening
+  if (open && reason !== defaultReason && !isSubmitting) {
+      setReason(defaultReason)
+  }
 
   const handleConfirm = async () => {
     if (!reason.trim()) {
@@ -54,6 +61,9 @@ export function DisqualificationDialog({
 
       toast.success('Participant disqualified')
       onOpenChange(false)
+      if (onSuccess) {
+          onSuccess()
+      }
     } catch (error: any) {
       toast.error(error.message || 'Failed to disqualify participant')
     } finally {

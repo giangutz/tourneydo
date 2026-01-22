@@ -64,11 +64,17 @@ export async function generateTournamentBracket(tournamentId: string): Promise<G
     }
     const isOpenBelt = tournament.tournament_type === 'open-belt'
 
-    // 2. Ensure tournament has divisions configured
     // 2. Ensure tournament has divisions configured (and backfill any missing categories)
     const { ensureTournamentDivisionsAndCategories } = await import('@/lib/db/queries/divisions')
     await ensureTournamentDivisionsAndCategories(tournamentId, DEFAULT_DIVISIONS)
-    const divisions = await getTournamentDivisions(tournamentId) as any
+    const allDivisions = await getTournamentDivisions(tournamentId) as any
+
+    // Filter to only enabled divisions
+    const divisions = allDivisions.filter((d: any) => d.enabled !== false)
+
+    if (divisions.length === 0) {
+      return { success: false, error: 'No divisions are enabled for this tournament. Please enable at least one division in Division Management.', errorType: 'general' }
+    }
 
     // 3. Fetch participants
     const { data: participants } = await getTournamentParticipants(tournamentId, { limit: 1000 })
@@ -158,7 +164,7 @@ export async function generateTournamentBracket(tournamentId: string): Promise<G
         assignmentErrors.push({
           id: participant.id,
           name: `${participant.player?.first_name} ${participant.player?.last_name}`,
-          reason: `Division ${division.name} not configured in tournament`
+          reason: `Division ${division.name} is not enabled for this tournament`
         })
         continue
       }
@@ -284,6 +290,10 @@ export async function generateTournamentBracket(tournamentId: string): Promise<G
     // Save all matches at once
     await saveBracket(tournamentId, allMatches)
 
+    // NOTE: Match numbering and scheduling is now done separately 
+    // via the "regenerate schedule" action
+
+
     // Revalidate paths to prevent caching of bracket data
     revalidatePath(routes.organizer.tournamentDetail(tournamentId))
     revalidatePath(routes.organizer.tournamentBracket(tournamentId))
@@ -291,7 +301,12 @@ export async function generateTournamentBracket(tournamentId: string): Promise<G
 
     return { success: true }
   } catch (error) {
-    return { success: false, error: 'An unexpected error occurred', errorType: 'general' }
+    console.error('Error in generateTournamentBracket:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'An unexpected error occurred',
+      errorType: 'general'
+    }
   }
 }
 

@@ -129,6 +129,8 @@ export function PrintableBracketView({ matches, participants, tournament }: Prin
                 genderLabel = isYouth ? 'Boys' : 'Men'
              } else if (gender === 'female') {
                 genderLabel = isYouth ? 'Girls' : 'Women'
+             } else {
+                genderLabel = 'Mixed'
              }
              
              const skillLevelLabel = (type === 'standard' && skillLabel) ? ` ${skillLabel}` : ''

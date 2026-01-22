@@ -1,4 +1,4 @@
-import { Match } from '@/types/models'
+import { Match, MatchWithReadiness } from '@/types/models'
 
 export enum Side {
   HOME = 'home',
@@ -51,7 +51,7 @@ export interface Game {
   };
 
   // Original match data for reference
-  originalMatch?: Match;
+  originalMatch?: Match | MatchWithReadiness;
 }
 
 export interface LineInfo {

@@ -94,6 +94,22 @@ export const tournamentFormSchema = z.object({
     (val) => (val === '' || val === undefined || val === null ? 'upcoming' : val),
     z.enum(['upcoming', 'ongoing', 'completed', 'cancelled'])
   ),
+  divisions: z.string().optional(), // JSON string of selected divisions
+  gender_preference: z.enum(['mixed', 'male', 'female']).default('mixed'),
+  allowed_belt_groups: z.preprocess(
+    (val) => {
+      if (typeof val === 'string') {
+        try {
+          return JSON.parse(val)
+        } catch {
+          return val
+        }
+      }
+      return val
+    },
+    z.array(z.string()).optional()
+  ),
+  division_move_policy: z.enum(['allow_move', 'disqualify_only']).default('allow_move'),
 }).refine((data) => {
   if (data.start_date && data.end_date) {
     return new Date(data.end_date) >= new Date(data.start_date)

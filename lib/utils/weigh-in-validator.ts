@@ -36,6 +36,7 @@ export function validateWeightHeight(
 
   // Determine if this is height-based (age < 12) or weight-based (age >= 12)
   const isHeightBased = age < 12
+  console.log('[VALIDATOR DEBUG]', { age, isHeightBased, actualWeight, actualHeight })
 
   // For height-based categories (Gradeschool - under 12)
   if (isHeightBased && (registeredCategory.minHeight !== undefined || registeredCategory.maxHeight !== undefined)) {
@@ -44,14 +45,16 @@ export function validateWeightHeight(
       return result
     }
 
-    const minHeight = registeredCategory.minHeight ?? 0
-    const maxHeight = registeredCategory.maxHeight ?? Infinity
+    const minHeight = registeredCategory.minHeight !== null && registeredCategory.minHeight !== undefined ? Number(registeredCategory.minHeight) : 0
+    const maxHeight = registeredCategory.maxHeight !== null && registeredCategory.maxHeight !== undefined ? Number(registeredCategory.maxHeight) : Infinity
 
     if (actualHeight > maxHeight) {
+      console.log(`[VALIDATOR FAIL] Height ${actualHeight} > ${maxHeight}`)
       result.valid = false
       result.outOfRange = 'above'
       result.exceededLimit = 'height'
     } else if (actualHeight < minHeight) {
+      console.log(`[VALIDATOR FAIL] Height ${actualHeight} < ${minHeight}`)
       result.valid = false
       result.outOfRange = 'below'
       result.exceededLimit = 'height'
@@ -65,14 +68,18 @@ export function validateWeightHeight(
       return result
     }
 
-    const minWeight = registeredCategory.minWeight ?? 0
-    const maxWeight = registeredCategory.maxWeight ?? Infinity
+    const minWeight = registeredCategory.minWeight !== null && registeredCategory.minWeight !== undefined ? Number(registeredCategory.minWeight) : 0
+    const maxWeight = registeredCategory.maxWeight !== null && registeredCategory.maxWeight !== undefined ? Number(registeredCategory.maxWeight) : Infinity
+
+    console.log('[VALIDATOR CHECK WEIGHT]', { actualWeight, minWeight, maxWeight })
 
     if (actualWeight > maxWeight) {
+      console.log(`[VALIDATOR FAIL] Weight ${actualWeight} > ${maxWeight}`)
       result.valid = false
       result.outOfRange = 'above'
       result.exceededLimit = 'weight'
     } else if (actualWeight < minWeight) {
+      console.log(`[VALIDATOR FAIL] Weight ${actualWeight} < ${minWeight}`)
       result.valid = false
       result.outOfRange = 'below'
       result.exceededLimit = 'weight'
@@ -91,12 +98,13 @@ export function findAlternativeDivisions(
   actualWeight: number | null,
   actualHeight: number | null,
   outOfRange: 'above' | 'below',
-  exceededLimit: 'weight' | 'height'
+  exceededLimit: 'weight' | 'height',
+  divisions: DivisionConfig[] = DEFAULT_DIVISIONS
 ): SuggestedDivision[] {
   const suggestions: SuggestedDivision[] = []
 
   // Find the appropriate division for this age
-  const division = DEFAULT_DIVISIONS.find(div => {
+  const division = divisions.find(div => {
     const meetsMin = div.minAge === null || age >= div.minAge
     const meetsMax = div.maxAge === null || age <= div.maxAge
     return meetsMin && meetsMax
@@ -121,15 +129,15 @@ export function findAlternativeDivisions(
 
       if (outOfRange === 'above') {
         // Suggest heavier/taller categories
-        if (actualHeight >= minHeight && actualHeight <= maxHeight) {
+        if (actualHeight >= minHeight && (maxHeight === Infinity || actualHeight < maxHeight)) {
           fits = true
-          reason = `Height ${actualHeight}cm fits in ${category.name} (${minHeight}-${maxHeight ?? '∞'}cm)`
+          reason = `Height ${actualHeight}cm fits in ${category.name} (${minHeight}-${maxHeight === Infinity ? '∞' : maxHeight}cm)`
         }
       } else {
         // Suggest lighter/shorter categories
-        if (actualHeight >= minHeight && actualHeight <= maxHeight) {
+        if (actualHeight >= minHeight && (maxHeight === Infinity || actualHeight < maxHeight)) {
           fits = true
-          reason = `Height ${actualHeight}cm fits in ${category.name} (${minHeight}-${maxHeight ?? '∞'}cm)`
+          reason = `Height ${actualHeight}cm fits in ${category.name} (${minHeight}-${maxHeight === Infinity ? '∞' : maxHeight}cm)`
         }
       }
     }
@@ -141,15 +149,15 @@ export function findAlternativeDivisions(
 
       if (outOfRange === 'above') {
         // Suggest heavier categories
-        if (actualWeight >= minWeight && actualWeight <= maxWeight) {
+        if (actualWeight > minWeight && actualWeight <= maxWeight) {
           fits = true
-          reason = `Weight ${actualWeight}kg fits in ${category.name} (${minWeight}-${maxWeight ?? '∞'}kg)`
+          reason = `Weight ${actualWeight}kg fits in ${category.name} (> ${minWeight} to ${maxWeight === Infinity ? '∞' : maxWeight}kg)`
         }
       } else {
         // Suggest lighter categories
-        if (actualWeight >= minWeight && actualWeight <= maxWeight) {
+        if (actualWeight > minWeight && actualWeight <= maxWeight) {
           fits = true
-          reason = `Weight ${actualWeight}kg fits in ${category.name} (${minWeight}-${maxWeight ?? '∞'}kg)`
+          reason = `Weight ${actualWeight}kg fits in ${category.name} (> ${minWeight} to ${maxWeight === Infinity ? '∞' : maxWeight}kg)`
         }
       }
     }

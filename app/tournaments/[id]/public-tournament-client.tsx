@@ -42,18 +42,24 @@ export function PublicTournamentClient({ tournament, matches, participants }: Pu
   // Filter approved participants
   const approvedParticipants = participants.filter(p => p.status === 'verified' || p.status === 'paid')
 
+  // Filter matches to only include relevant lifecycle states
+  const relevantMatches = matches.filter((m: any) => {
+    const state = m.lifecycle_state
+    return state === 'WAITING' || state === 'CONTEST' || state === 'IN_PROGRESS' || state === 'COMPLETED'
+  })
+
   // Calculate Match Stats for KPIs
   const uniquePlayers = new Set<string>()
   const uniqueDivisions = new Set<string>()
-  matches.forEach((m: any) => {
+  relevantMatches.forEach((m: any) => {
       if (m.player1_id) uniquePlayers.add(m.player1_id)
       if (m.player2_id) uniquePlayers.add(m.player2_id)
       if (m.tournament_divisions?.name) uniqueDivisions.add(m.tournament_divisions.name)
   })
   
-  const totalMatches = matches.length
-  const completedMatches = matches.filter(m => m.status === 'completed').length
-  const matchesInProgress = matches.filter(m => m.status === 'in_progress').length
+  const totalMatches = relevantMatches.length
+  const completedMatches = relevantMatches.filter(m => m.lifecycle_state === 'COMPLETED').length
+  const matchesInProgress = relevantMatches.filter(m => m.lifecycle_state === 'IN_PROGRESS').length
   const progressVal = totalMatches > 0 ? Math.round((completedMatches / totalMatches) * 100) : 0
 
   // Calculate Extra Stats

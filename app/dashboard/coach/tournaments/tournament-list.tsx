@@ -32,7 +32,8 @@ import {
   Printer, 
   Search,
   Loader2, 
-  Check 
+  Check,
+  CreditCard
 } from "lucide-react"
 import Link from "next/link"
 import {
@@ -52,7 +53,6 @@ import { EmptyState } from "@/components/ui/empty-state"
 import { toast } from "sonner"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
-import { PaymentDialog } from "@/components/tournaments/payment-dialog"
 
 interface TournamentListProps {
   tournaments: Tournament[]
@@ -272,19 +272,17 @@ export function TournamentList({ tournaments, teams, registrations, coachId }: T
                 </Button>
               )}
 
-              {/* Payment Button with Team Selection */}
+              {/* Payment Button */}
               {(() => {
                 const tournamentTeams = Array.from(new Set(registrations.filter(r => r.tournament_id === tournament.id).map(r => r.team_id)))
                 
                 const unpaidTeams = tournamentTeams.map(teamId => {
                    const teamRegs = registrations.filter(r => r.tournament_id === tournament.id && r.team_id === teamId)
-                   const unpaidRegs = teamRegs.filter(r => r.status !== 'paid')
+                   const unpaidRegs = teamRegs.filter(r => r.status !== 'paid' && r.status !== 'verified')
                    const amountOwed = unpaidRegs.length * (tournament.entry_fee || 0)
-                   const teamName = teams.find(t => t.id === teamId)?.name || 'Unknown Team'
                    
                    return {
                      teamId,
-                     teamName,
                      amountOwed
                    }
                 }).filter(t => t.amountOwed > 0)
@@ -292,103 +290,20 @@ export function TournamentList({ tournaments, teams, registrations, coachId }: T
                 if (unpaidTeams.length === 0) return null
 
                 return (
-                  <PaymentDialog 
-                    tournamentId={tournament.id}
-                    coachId={coachId}
-                    unpaidTeams={unpaidTeams}
-                  />
+                  <Link href={`/dashboard/coach/tournaments/${tournament.id}/payment`} className="flex-1">
+                    <Button className="bg-green-600 hover:bg-green-700 text-white w-full">
+                      <CreditCard className="mr-2 h-4 w-4" />
+                      Make Payment
+                    </Button>
+                  </Link>
                 )
               })()}
               
-              <Dialog open={openDialogId === tournament.id} onOpenChange={(open) => setOpenDialogId(open ? tournament.id : null)}>
-                <DialogTrigger asChild>
-                  <Button size="sm" className="flex-1">
-                    {registrations.some(r => r.tournament_id === tournament.id) ? 'Update' : 'Register'}
-                  </Button>
-                </DialogTrigger>
-              <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
-                  <DialogTitle>Register for {tournament.name}</DialogTitle>
-                  <DialogDescription>
-                    Select a team to register for this tournament.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                      Select Team
-                    </label>
-                    <Select value={selectedTeam} onValueChange={(value) => handleTeamSelect(value, tournament.id)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a team" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {teams.map((team) => (
-                          <SelectItem key={team.id} value={team.id}>
-                            {team.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {selectedTeam && (
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium leading-none">
-                        Select Players ({selectedPlayers.length}/{teamPlayers.length})
-                      </label>
-                      
-                      {isLoadingPlayers ? (
-                        <div className="flex items-center justify-center py-4 text-muted-foreground">
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                          Loading players...
-                        </div>
-                      ) : teamPlayers.length === 0 ? (
-                        <div className="text-sm text-muted-foreground py-2">
-                          No players found in this team.
-                        </div>
-                      ) : (
-                        <div className="border rounded-md p-2 max-h-[200px] overflow-y-auto space-y-2">
-                          {teamPlayers.map(player => (
-                            <div key={player.id} className="flex items-center space-x-2 p-1 hover:bg-muted/50 rounded">
-                              <Checkbox 
-                                id={`player-${player.id}`} 
-                                checked={selectedPlayers.includes(player.id)}
-                                onCheckedChange={() => togglePlayer(player.id)}
-                                disabled={tournament.registration_deadline ? new Date(tournament.registration_deadline) < new Date() : false}
-                              />
-                              <Label 
-                                htmlFor={`player-${player.id}`}
-                                className="flex-1 cursor-pointer text-sm font-normal"
-                              >
-                                {player.first_name} {player.last_name}
-                                <span className="ml-2 text-xs text-muted-foreground">
-                                  ({player.belt_level || 'No Belt'})
-                                </span>
-                              </Label>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setOpenDialogId(null)}>Cancel</Button>
-                  <Button 
-                    onClick={() => handleRegister(tournament.id)} 
-                    disabled={!selectedTeam || isRegistering || (tournament.registration_deadline ? new Date(tournament.registration_deadline) < new Date() : false)}
-                  >
-                    {isRegistering && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    {selectedPlayers.length === 0 
-                      ? 'Unregister' 
-                      : registrations.some(r => r.tournament_id === tournament.id && r.team_id === selectedTeam) 
-                        ? "Update Registration" 
-                        : "Confirm Registration"}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+              <Button size="sm" className="flex-1" asChild>
+                <Link href={`/dashboard/coach/tournaments/${tournament.id}/register`}>
+                  {registrations.some(r => r.tournament_id === tournament.id) ? 'Manage Team' : 'Register'}
+                </Link>
+              </Button>
             </div>
           </CardFooter>
         </Card>

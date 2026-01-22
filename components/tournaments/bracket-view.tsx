@@ -1,27 +1,22 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Match } from '@/types/models'
+import { Match, MatchWithReadiness } from '@/types/models'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from '@/components/ui/select'
 import { Trophy, Search, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { Label } from '@/components/ui/label'
-import { assignMatchToCourt } from '@/lib/actions/matches'
-import { toast } from 'sonner'
 import BracketGenerator from './bracket/BracketGenerator'
 import { transformMatchToGame } from '@/lib/utils/bracket-data-transformer'
 import { Game } from '@/lib/types/bracket-models'
 import { MatchResultDialog } from './match-result-dialog'
 import { MatchParticipantsDialog } from './match-participants-dialog'
 import { getBeltSkillCategory } from '@/lib/utils'
-import { forEach } from 'underscore'
 
 
 interface BracketViewProps {
-  matches: Match[]
+  matches: MatchWithReadiness[] | Match[]
   participants: any[]
   onMatchClick?: (match: Match) => void
   isOrganizer?: boolean
@@ -47,9 +42,6 @@ export function BracketView({
   const [selectedDivision, setSelectedDivision] = useState<string>('all')
   const [currentPage, setCurrentPage] = useState(1)
   const ITEMS_PER_PAGE = 5
-  const [assigningMatch, setAssigningMatch] = useState<Match | null>(null)
-  const [selectedCourt, setSelectedCourt] = useState<string>('')
-  const [isAssigning, setIsAssigning] = useState(false)
   const [editingMatch, setEditingMatch] = useState<Match | null>(null)
   const [editingParticipantsMatch, setEditingParticipantsMatch] = useState<Match | null>(null)
   const [editingSkillCategory, setEditingSkillCategory] = useState<string>('')
@@ -64,62 +56,25 @@ export function BracketView({
     setEditingSkillCategory(skillCategory || '')
   }
 
-  const handleAssignCourt = async () => {
-    if (!assigningMatch || !selectedCourt) return
-
-    setIsAssigning(true)
-    try {
-      const courtNum = parseInt(selectedCourt)
-      
-      // Check if court is currently occupied (has an in_progress match)
-      const isOccupied = matches.some(m => m.court_number === courtNum && m.status === 'in_progress')
-      
-      // Determine status: if occupied -> scheduled (queue), if free -> in_progress (live)
-      const status = isOccupied ? 'scheduled' : 'in_progress'
-
-      const result = await assignMatchToCourt(assigningMatch.id, assigningMatch.tournament_id, courtNum, status)
-      
-      if (!result.success) {
-        toast.error(result.error)
-      } else {
-        const message = isOccupied 
-          ? `Match added to Court ${selectedCourt} queue` 
-          : `Match assigned to Court ${selectedCourt} (Live)`
-        toast.success(message)
-        setAssigningMatch(null)
-        setSelectedCourt('')
-      }
-    } catch (error) {
-      toast.error('Failed to assign match')
-    } finally {
-      setIsAssigning(false)
+  // Court assignment removed - use Court Manager page instead
+  
+  // DEBUG: Inspect match structure
+  useMemo(() => {
+    if (matches.length > 0) {
+      console.log('BracketView matches[0]:', matches[0])
+      console.log('Has tournament_divisions?', 'tournament_divisions' in matches[0])
     }
-  }
-
-  // Get available courts (free OR queue < 3)
-  const getAvailableCourts = () => {
-    return Array.from({ length: courts }, (_, i) => i + 1)
-      .map(courtNum => {
-        const courtMatches = matches.filter(m => m.court_number === courtNum)
-        const isOccupied = courtMatches.some(m => m.status === 'in_progress')
-        const queueSize = courtMatches.filter(m => m.status === 'scheduled').length
-        
-        return {
-          courtNum,
-          isOccupied,
-          queueSize,
-          isAvailable: !isOccupied || queueSize < 3
-        }
-      })
-      .filter(c => c.isAvailable)
-  }
+  }, [matches])
 
   // Group matches by division and category, THEN by connected component (bracket island)
   const divisionGroups = useMemo(() => {
+    // Filter out AUTO_ADVANCE matches (BYE advancements) - they clutter the bracket
+    const visibleMatches = matches.filter((match: any) => match.lifecycle_state !== 'AUTO_ADVANCE')
+    
     // 1. Initial grouping by Division + Category
     const rawGroups: Record<string, Match[]> = {}
     
-    matches.forEach((match: any) => {
+    visibleMatches.forEach((match: any) => {
       const key = `${match.division_id || 'no-division'}_${match.category_id || 'no-category'}`
       if (!rawGroups[key]) rawGroups[key] = []
       rawGroups[key].push(match)
@@ -199,7 +154,14 @@ export function BracketView({
         const finalKey = `${baseKey}${suffix}`
 
         refinedGroups[finalKey] = {
-            matches: islandMatches.sort((a, b) => a.match_number - b.match_number),
+            matches: islandMatches.sort((a, b) => {
+              // Sort by formatted match number (M101, M205) if available
+              if (a.match_number_formatted && b.match_number_formatted) {
+                return a.match_number_formatted.localeCompare(b.match_number_formatted)
+              }
+              // Fallback to numeric match_number
+              return a.match_number - b.match_number
+            }),
             division: (islandMatches[0] as any).tournament_divisions,
             category: (islandMatches[0] as any).tournament_categories,
             skillLabel
@@ -235,6 +197,8 @@ export function BracketView({
       genderLabel = isYouth ? 'Boys' : 'Men'
     } else if (category.gender === 'female') {
       genderLabel = isYouth ? 'Girls' : 'Women'
+    } else {
+      genderLabel = 'Mixed'
     }
 
     // Add skill level for Standard tournaments
@@ -317,6 +281,7 @@ export function BracketView({
       let genderLabel = ''
       if (group.category?.gender === 'male') genderLabel = isYouth ? 'Boys' : 'Men'
       else if (group.category?.gender === 'female') genderLabel = isYouth ? 'Girls' : 'Women'
+      else genderLabel = 'Mixed'
       
       const skillLabel = (tournamentType === 'standard' && group.skillLabel) ? group.skillLabel : ''
       
@@ -369,16 +334,24 @@ export function BracketView({
         return false
       }
 
-      // Search filter
+      // Search filter - search by player name or match number
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase()
-        const hasMatchingPlayer = group.matches.some((match: any) => {
+        const hasMatch = group.matches.some((match: any) => {
+          // Search by player names
           const player1Name = getPlayerDisplay(match.player1_id).name.toLowerCase()
           const player2Name = getPlayerDisplay(match.player2_id).name.toLowerCase()
-          return player1Name.includes(query) || player2Name.includes(query)
+          const playerMatch = player1Name.includes(query) || player2Name.includes(query)
+          
+          // Search by match number
+          const matchNumberStr = match.match_number?.toString() || ''
+          const matchNumberFormatted = match.match_number_formatted?.toLowerCase() || ''
+          const numberMatch = matchNumberStr.includes(query) || matchNumberFormatted.includes(query)
+          
+          return playerMatch || numberMatch
         })
         
-        if (!hasMatchingPlayer) {
+        if (!hasMatch) {
           return false
         }
       }
@@ -453,6 +426,7 @@ export function BracketView({
       let genderLabel = ''
       if (group.category?.gender === 'male') genderLabel = isYouth ? 'Boys' : 'Men'
       else if (group.category?.gender === 'female') genderLabel = isYouth ? 'Girls' : 'Women'
+      else genderLabel = 'Mixed'
       
       const skillLabel = (tournamentType === 'standard' && group.skillLabel) ? group.skillLabel : ''
       const parts = [divName, genderLabel, skillLabel].filter(Boolean)
@@ -514,7 +488,7 @@ export function BracketView({
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search by player name..."
+                placeholder="Search by player name or match number..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9"
@@ -611,15 +585,7 @@ export function BracketView({
                           <div className="min-w-max p-6">
                             <BracketGenerator 
                               games={games}
-                              onMatchClick={(match) => {
-                                // Handle court assignment if in assigning mode or if organizer clicks
-                                if (isOrganizer) {
-                                  // Open assignment dialog
-                                  setAssigningMatch(match)
-                                } else if (onMatchClick) {
-                                  onMatchClick(match)
-                                }
-                              }}
+                              onMatchClick={onMatchClick}
                               isOrganizer={isOrganizer}
                               onEditMatch={(isOrganizer && canScore) ? handleEditMatch : undefined}
                               onSwitchSides={(isOrganizer && canManageParticipants) ? (match) => handleSwitchSides(match, skillLevel) : undefined}
@@ -668,72 +634,6 @@ export function BracketView({
           )}
         </div>
       )}
-
-      {/* Court Assignment Dialog */}
-      <Dialog open={!!assigningMatch} onOpenChange={(open) => !open && setAssigningMatch(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Assign Match to Court</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            {assigningMatch && (
-              <div className="bg-muted p-4 rounded-md">
-                <div className="text-sm text-muted-foreground mb-2">Match #{assigningMatch.match_number}</div>
-                <div className="flex items-center justify-between gap-4">
-                  <div className="font-semibold text-right flex-1">
-                    {getPlayerDisplay(assigningMatch.player1_id).name}
-                  </div>
-                  <div className="text-xs font-bold text-muted-foreground bg-background px-2 py-1 rounded border">
-                    VS
-                  </div>
-                  <div className="font-semibold text-left flex-1">
-                    {getPlayerDisplay(assigningMatch.player2_id).name}
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            <div>
-              <Label>Select Court</Label>
-              <Select value={selectedCourt} onValueChange={setSelectedCourt}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose a court" />
-                </SelectTrigger>
-                <SelectContent>
-                  {getAvailableCourts().length === 0 ? (
-                    <div className="p-2 text-sm text-muted-foreground text-center">
-                      No courts available
-                    </div>
-                  ) : (
-                    getAvailableCourts().map(({ courtNum, isOccupied, queueSize }) => (
-                      <SelectItem key={courtNum} value={courtNum.toString()}>
-                        Court {courtNum} 
-                        {isOccupied ? ` (Queue: ${queueSize}/3)` : ' (Free)'}
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-              {getAvailableCourts().length === 0 && (
-                <p className="text-sm text-muted-foreground mt-2">
-                  All courts are currently occupied. Please wait for a match to finish.
-                </p>
-              )}
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setAssigningMatch(null)}>
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleAssignCourt} 
-              disabled={!selectedCourt || isAssigning || getAvailableCourts().length === 0}
-            >
-              {isAssigning ? 'Assigning...' : 'Assign'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Match Result Dialog for Editing */}
       <MatchResultDialog

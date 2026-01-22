@@ -1,0 +1,50 @@
+-- Migration: Add payment_players junction table
+-- Purpose: Track which specific players are covered by each payment
+-- This enables partial payments and accurate status tracking
+
+-- Create payment_players junction table
+CREATE TABLE IF NOT EXISTS payment_players (
+  payment_id UUID NOT NULL REFERENCES payments(id) ON DELETE CASCADE,
+  player_id UUID NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (payment_id, player_id)
+);
+
+-- Add index for faster lookups
+CREATE INDEX IF NOT EXISTS idx_payment_players_payment_id ON payment_players(payment_id);
+CREATE INDEX IF NOT EXISTS idx_payment_players_player_id ON payment_players(player_id);
+
+-- Add RLS policies
+ALTER TABLE payment_players ENABLE ROW LEVEL SECURITY;
+
+-- Coaches can view payment_players for their own payments
+CREATE POLICY "Coaches can view their payment players"
+  ON payment_players
+  FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM payments
+      WHERE payments.id = payment_players.payment_id
+      AND payments.coach_id = (auth.jwt() ->> 'sub')
+    )
+  );
+
+-- Organizers can view payment_players for their tournaments
+CREATE POLICY "Organizers can view tournament payment players"
+  ON payment_players
+  FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM payments
+      JOIN tournaments ON tournaments.id = payments.tournament_id
+      WHERE payments.id = payment_players.payment_id
+      AND tournaments.organizer_id = (auth.jwt() ->> 'sub')
+    )
+  );
+
+-- Only the system (service role) can insert/update/delete payment_players
+-- This is handled by server actions
+CREATE POLICY "Service role can manage payment players"
+  ON payment_players
+  FOR ALL
+  USING (auth.jwt() ->> 'role' = 'service_role');

@@ -21,7 +21,9 @@ interface Participant {
 
 interface SuggestedDivision {
   divisionName: string
+  divisionId: string
   categoryName: string
+  categoryId: string
   categoryGender: string
   reason: string
   minWeight?: number | null
@@ -38,6 +40,7 @@ interface DivisionMoveDialogProps {
   tournamentId: string
   open: boolean
   onOpenChange: (open: boolean) => void
+  onSuccess?: () => void
 }
 
 export function DivisionMoveDialog({
@@ -47,32 +50,41 @@ export function DivisionMoveDialog({
   actualHeight,
   tournamentId,
   open,
-  onOpenChange
+  onOpenChange,
+  onSuccess
 }: DivisionMoveDialogProps) {
-  const [selectedDivision, setSelectedDivision] = useState<string>('')
+  const [selectedKey, setSelectedKey] = useState<string>('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleConfirm = async () => {
-    if (!selectedDivision) {
+    if (!selectedKey) {
       toast.error('Please select a division')
       return
     }
 
-    // For now, we'll need to implement a way to get the actual division/category IDs
-    // This is a simplified version - in production, we'd need to fetch the actual IDs
-    // from the database based on the selected division/category names
+    const [divisionId, categoryId] = selectedKey.split('|')
     
-    toast.info('Division move functionality requires database ID mapping - to be implemented')
-    onOpenChange(false)
+    setIsSubmitting(true)
+    try {
+      const result = await moveParticipantDivision(
+        participant.id,
+        tournamentId,
+        divisionId,
+        categoryId
+      )
 
-    // TODO: Implement actual division move with proper ID resolution
-    // const [divisionName, categoryName] = selectedDivision.split('|')
-    // const result = await moveParticipantDivision(
-    //   participant.id,
-    //   tournamentId,
-    //   divisionId,
-    //   categoryId
-    // )
+      if (result?.success) {
+        toast.success('Participant moved successfully')
+        onOpenChange(false)
+        if (onSuccess) onSuccess()
+      } else {
+        toast.error(result?.error || 'Failed to move participant')
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'An unexpected error occurred')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -100,10 +112,10 @@ export function DivisionMoveDialog({
               </AlertDescription>
             </Alert>
           ) : (
-            <RadioGroup value={selectedDivision} onValueChange={setSelectedDivision}>
+            <RadioGroup value={selectedKey} onValueChange={setSelectedKey}>
               <div className="space-y-3">
                 {suggestedDivisions.map((div, index) => {
-                  const key = `${div.divisionName}|${div.categoryName}|${div.categoryGender}`
+                  const key = `${div.divisionId}|${div.categoryId}`
                   const limits = div.minWeight !== undefined
                     ? `${div.minWeight || 0}-${div.maxWeight || '∞'}kg`
                     : `${div.minHeight || 0}-${div.maxHeight || '∞'}cm`
@@ -136,7 +148,7 @@ export function DivisionMoveDialog({
           </Button>
           <Button
             onClick={handleConfirm}
-            disabled={isSubmitting || !selectedDivision}
+            disabled={isSubmitting || !selectedKey}
           >
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Confirm Move

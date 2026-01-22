@@ -43,13 +43,29 @@ export function DivisionBreakdown({ matches }: DivisionBreakdownProps) {
     rows: Map<string, { category: string, skill: string, playerCount: Set<string>, matchCount: number, completedCount: number }>
   }> = {}
 
-  if (matches.length > 0) {
-    matches.forEach((match: any) => {
-      const divName = match.tournament_divisions?.name || 'Unknown'
-      const catName = match.tournament_categories?.name || 'Unassigned'
+  // Filter matches to only include relevant lifecycle states
+  const relevantMatches = matches.filter((m: any) => {
+    const state = m.lifecycle_state
+    return state === 'WAITING' || state === 'CONTEST' || state === 'IN_PROGRESS' || state === 'COMPLETED'
+  })
+
+  if (relevantMatches.length > 0) {
+    relevantMatches.forEach((match: any) => {
+      const divName = match.tournament_divisions?.name
+      const catName = match.tournament_categories?.name
       
+      // Skip matches without division/category data
+      if (!divName || !catName) return
+      
+      // Determine skill level from either player's belt
       const p1Belt = match.player1?.belt_level
-      const skill = getBeltSkillCategory(p1Belt)
+      const p2Belt = match.player2?.belt_level
+      const skill = getBeltSkillCategory(p1Belt) !== 'Unknown' 
+        ? getBeltSkillCategory(p1Belt) 
+        : getBeltSkillCategory(p2Belt)
+      
+      // Skip matches where skill level cannot be determined
+      if (skill === 'Unknown') return
       
       if (!divisionStats[divName]) {
         divisionStats[divName] = { players: new Set(), matches: 0, rows: new Map() }
@@ -74,7 +90,7 @@ export function DivisionBreakdown({ matches }: DivisionBreakdownProps) {
       if (match.player1_id) row.playerCount.add(match.player1_id)
       if (match.player2_id) row.playerCount.add(match.player2_id)
       row.matchCount++
-      if (match.status === 'completed') row.completedCount++
+      if (match.lifecycle_state === 'COMPLETED') row.completedCount++
     })
   }
 

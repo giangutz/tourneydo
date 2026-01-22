@@ -18,7 +18,8 @@ import {
   Settings, 
   ArrowLeft,
   ExternalLink,
-  Scale
+  Scale,
+  Calendar
 } from 'lucide-react'
 import Link from 'next/link'
 import { routes } from '@/config/routes'
@@ -139,6 +140,34 @@ export default async function TournamentDashboardPage({ params }: TournamentDash
             </Link>
           )}
 
+          {canManageBracket && (
+            <Link href={routes.organizer.schedule(tournament.id)} className="block">
+              <Card className="hover:bg-muted/50 transition-colors cursor-pointer h-full">
+                <CardHeader>
+                  <CardTitle className="flex items-center text-base">
+                    <Calendar className="mr-2 h-5 w-5 text-primary" />
+                    Schedule
+                  </CardTitle>
+                  <CardDescription>Time & Courts</CardDescription>
+                </CardHeader>
+              </Card>
+            </Link>
+          )}
+
+          {canManageSettings && (
+            <Link href={`/dashboard/tournament-organizer/tournaments/${tournament.id}/divisions`} className="block">
+              <Card className="hover:bg-muted/50 transition-colors cursor-pointer h-full">
+                <CardHeader>
+                  <CardTitle className="flex items-center text-base">
+                    <Trophy className="mr-2 h-5 w-5 text-primary" />
+                    Divisions
+                  </CardTitle>
+                  <CardDescription>Configure Categories</CardDescription>
+                </CardHeader>
+              </Card>
+            </Link>
+          )}
+
           {canWeighIn && (
             <Link href={routes.organizer.weighIn(tournament.id)} className="block">
               <Card className="hover:bg-muted/50 transition-colors cursor-pointer h-full">
@@ -168,7 +197,7 @@ export default async function TournamentDashboardPage({ params }: TournamentDash
           )}
 
           {canManageSettings && (
-            <PaymentSubmissionsCard pendingPayments={pendingPayments} />
+            <PaymentSubmissionsCard pendingPayments={pendingPayments} tournamentId={tournament.id} />
           )}
 
           {canManageSettings && (

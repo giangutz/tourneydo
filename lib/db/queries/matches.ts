@@ -147,6 +147,90 @@ export async function advanceWinner(matchId: string, updates: Partial<Match>): P
 }
 
 /**
+ * Helper to transform DB match to Match interface
+ */
+export function transformMatch(m: any): Match {
+  const rounds = m.match_rounds as any[] || []
+  const r1 = rounds.find(r => r.round_number === 1)
+  const r2 = rounds.find(r => r.round_number === 2)
+  const r3 = rounds.find(r => r.round_number === 3)
+
+  return {
+    ...m,
+    round: (m as any).round || m.round_number || 0,
+    score_player1: (m as any).score_player1 || 0,
+    score_player2: (m as any).score_player2 || 0,
+
+    score_round1_player1: r1?.score_player1 || 0,
+    score_round1_player2: r1?.score_player2 || 0,
+    winner_round1: r1?.winner_id || null,
+
+    score_round2_player1: r2?.score_player1 || 0,
+    score_round2_player2: r2?.score_player2 || 0,
+    winner_round2: r2?.winner_id || null,
+
+    score_round3_player1: r3?.score_player1 || 0,
+    score_round3_player2: r3?.score_player2 || 0,
+    winner_round3: r3?.winner_id || null,
+
+    court_number: (m as any).court_number || null,
+  } as unknown as Match
+}
+
+/**
+ * Get a single match by ID with joined data
+ */
+export async function getMatchById(id: string): Promise<Match | null> {
+  const supabase = createServerSupabaseClient()
+
+  const { data, error } = await supabase
+    .from('matches')
+    .select(`
+      *,
+      match_rounds (
+        round_number,
+        score_player1,
+        score_player2,
+        winner_id
+      ),
+      tournament_divisions (
+        id,
+        name,
+        min_age,
+        max_age
+      ),
+      tournament_categories (
+        id,
+        name,
+        gender
+      ),
+      player1:players!player1_id (
+        id,
+        first_name,
+        last_name,
+        belt_level
+      ),
+      player2:players!player2_id (
+        id,
+        first_name,
+        last_name,
+        belt_level
+      )
+    `)
+    .eq('id', id)
+    .maybeSingle()
+
+  if (error) {
+    console.error(`Failed to fetch match ${id}:`, error)
+    return null
+  }
+
+  if (!data) return null
+
+  return transformMatch(data)
+}
+
+/**
  * Get all matches for a tournament
  */
 export async function getTournamentMatches(tournamentId: string) {
@@ -194,36 +278,7 @@ export async function getTournamentMatches(tournamentId: string) {
     throw new Error(`Failed to fetch matches: ${error.message}`)
   }
 
-  // Transform to match Match interface
-  const matches = data?.map(m => {
-    const rounds = m.match_rounds as any[] || []
-    const r1 = rounds.find(r => r.round_number === 1)
-    const r2 = rounds.find(r => r.round_number === 2)
-    const r3 = rounds.find(r => r.round_number === 3)
-
-    return {
-      ...m,
-      round: (m as any).round || m.round_number || 0,
-      score_player1: (m as any).score_player1 || 0,
-      score_player2: (m as any).score_player2 || 0,
-
-      score_round1_player1: r1?.score_player1 || 0,
-      score_round1_player2: r1?.score_player2 || 0,
-      winner_round1: r1?.winner_id || null,
-
-      score_round2_player1: r2?.score_player1 || 0,
-      score_round2_player2: r2?.score_player2 || 0,
-      winner_round2: r2?.winner_id || null,
-
-      score_round3_player1: r3?.score_player1 || 0,
-      score_round3_player2: r3?.score_player2 || 0,
-      winner_round3: r3?.winner_id || null,
-
-      court_number: (m as any).court_number || null,
-    } as unknown as Match
-  }) || []
-
-  return matches
+  return data?.map(m => transformMatch(m)) || []
 }
 
 /**

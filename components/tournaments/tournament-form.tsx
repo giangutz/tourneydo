@@ -40,9 +40,11 @@ import { TournamentFormInput, tournamentFormSchema } from '@/lib/validations/tou
 
 interface TournamentFormProps {
   tournament?: Tournament
+  initialEnabledDivisions?: string[]
+  availableDivisions?: { name: string }[]
 }
 
-export function TournamentForm({ tournament }: TournamentFormProps) {
+export function TournamentForm({ tournament, initialEnabledDivisions, availableDivisions = [] }: TournamentFormProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
@@ -60,6 +62,10 @@ export function TournamentForm({ tournament }: TournamentFormProps) {
     courts: (tournament?.courts as any) ?? null,
     status: (tournament?.status as any) || 'upcoming',
     tournament_type: (tournament?.tournament_type as any) || 'standard',
+    gender_preference: (tournament?.gender_preference as any) || 'mixed',
+    allowed_belt_groups: tournament?.allowed_belt_groups ?? undefined,
+    division_move_policy: (tournament?.division_move_policy as any) || 'allow_move',
+    divisions: initialEnabledDivisions ? JSON.stringify(initialEnabledDivisions) : undefined
   }
 
   const form = useForm<TournamentFormInput>({
@@ -72,7 +78,18 @@ export function TournamentForm({ tournament }: TournamentFormProps) {
       const formData = new FormData()
       Object.entries(data).forEach(([key, value]) => {
         if (value !== null && value !== undefined) {
-          formData.append(key, value.toString())
+          if (Array.isArray(value)) {
+            // Append each item individually for standard FormData handling
+            // This works better with getAll() on server
+            if (key === 'divisions') {
+               // specific exception: divisions is expected as a JSON string by the server schema currently
+               formData.append(key, JSON.stringify(value))
+            } else {
+               value.forEach((v: any) => formData.append(key, v))
+            }
+          } else {
+            formData.append(key, value.toString())
+          }
         } else {
           formData.append(key, '')
         }
@@ -346,6 +363,175 @@ export function TournamentForm({ tournament }: TournamentFormProps) {
               )}
             />
 
+            {/* Division Configuration */}
+            <div className="space-y-6">
+                <div className="space-y-4 border rounded-md p-4 bg-muted/20">
+                  <div className="space-y-1">
+                    <FormLabel className="text-base">Gender Configuration</FormLabel>
+                    <FormDescription>
+                      Select the gender format for this tournament. This will automatically configure the available categories.
+                    </FormDescription>
+                  </div>
+                  <div className="grid grid-cols-3 gap-4">
+                    {[
+                      { value: 'mixed', label: 'Mixed (All)' },
+                      { value: 'male', label: 'Male Only' },
+                      { value: 'female', label: 'Female Only' }
+                    ].map((option) => (
+                      <div key={option.value} className="flex items-center space-x-2">
+                        <input
+                          type="radio"
+                          id={`gender-${option.value}`}
+                          name="gender_pref"
+                          value={option.value}
+                          defaultChecked={tournament?.gender_preference ? tournament.gender_preference === option.value : option.value === 'mixed'}
+                          className="h-4 w-4 border-gray-300 text-primary focus:ring-primary"
+                          onChange={(e) => {
+                            form.setValue('gender_preference', e.target.value as any)
+                          }}
+                        />
+                        <label 
+                          htmlFor={`gender-${option.value}`}
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                        >
+                          {option.label}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                   {/* Initialize default value */}
+                  <input type="hidden" {...form.register('gender_preference')} defaultValue="mixed" />
+                </div>
+
+                <div className="space-y-4 border rounded-md p-4 bg-muted/20">
+                  <div className="space-y-1">
+                    <FormLabel className="text-base">Weigh-In Division Movement Policy</FormLabel>
+                    <FormDescription>
+                      Control what happens when a participant's actual weight/height is out of range during weigh-in.
+                    </FormDescription>
+                  </div>
+                  <div className="space-y-3">
+                    {[
+                      { 
+                        value: 'allow_move', 
+                        label: 'Allow Division Moves',
+                        description: 'Participants can be moved to a different division if their measurements are out of range'
+                      },
+                      { 
+                        value: 'disqualify_only', 
+                        label: 'Disqualify Only',
+                        description: 'Participants must be disqualified if measurements are out of range (no division moves allowed)'
+                      }
+                    ].map((option) => (
+                      <div key={option.value} className="flex items-start space-x-3 rounded-lg border p-3 hover:bg-accent">
+                        <input
+                          type="radio"
+                          id={`policy-${option.value}`}
+                          name="division_move_policy"
+                          value={option.value}
+                          defaultChecked={tournament?.division_move_policy ? tournament.division_move_policy === option.value : option.value === 'allow_move'}
+                          className="mt-1 h-4 w-4 border-gray-300 text-primary focus:ring-primary"
+                          onChange={(e) => {
+                            form.setValue('division_move_policy', e.target.value as any)
+                          }}
+                        />
+                        <label 
+                          htmlFor={`policy-${option.value}`}
+                          className="flex-1 cursor-pointer"
+                        >
+                          <div className="font-medium">{option.label}</div>
+                          <div className="text-sm text-muted-foreground">{option.description}</div>
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Initialize default value */}
+                  <input type="hidden" {...form.register('division_move_policy')} defaultValue="allow_move" />
+                </div>
+
+                <div className="space-y-4 border rounded-md p-4 bg-muted/20">
+                  <div className="space-y-1">
+                    <FormLabel className="text-base">Allowed Belt Levels</FormLabel>
+                    <FormDescription>
+                      Select which belt groups can interact/register for this tournament.
+                    </FormDescription>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    {['Beginner', 'Novice I', 'Novice II', 'Advanced'].map((group) => (
+                      <div key={group} className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          id={`belt-${group.replace(/\s/g, '')}`}
+                          defaultChecked={tournament?.allowed_belt_groups ? tournament.allowed_belt_groups.includes(group) : true}
+                          className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                          onChange={(e) => {
+                             const current = form.getValues('allowed_belt_groups') || ['Beginner', 'Novice I', 'Novice II', 'Advanced']
+                             let next: string[]
+                             if (e.target.checked) {
+                               next = [...current, group]
+                             } else {
+                               next = current.filter((g) => g !== group)
+                             }
+                             form.setValue('allowed_belt_groups', next)
+                          }}
+                        />
+                        <label 
+                          htmlFor={`belt-${group.replace(/\s/g, '')}`}
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                        >
+                          {group}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Initialize default value - using a custom logic to sync with form state since we don't have a direct field for array in UI easily without specialized component */}
+                  {/* We just need to make sure the form knows about it */}
+                </div>
+
+                <div className="space-y-4 border rounded-md p-4">
+                   <div className="space-y-1">
+                    <FormLabel className="text-base">Enabled Divisions</FormLabel>
+                    <FormDescription>
+                      Select which divisions to include. You can always change this later in Division Settings.
+                    </FormDescription>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    {(availableDivisions.length > 0 ? availableDivisions : [{name: 'Gradeschool'}, {name: 'Cadet'}, {name: 'Junior'}, {name: 'Senior'}]).map((div) => (
+                      <div key={div.name} className="flex items-center space-x-2">
+                         <input
+                          type="checkbox"
+                          id={`div-${div.name}`}
+                          defaultChecked={initialEnabledDivisions ? initialEnabledDivisions.includes(div.name) : true}
+                          className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                          onChange={(e) => {
+                             // Helper to get current array from form state or default
+                            const val = form.getValues('divisions')
+                            const defaultDivs = (availableDivisions.length > 0 ? availableDivisions : [{name: 'Gradeschool'}, {name: 'Cadet'}, {name: 'Junior'}, {name: 'Senior'}]).map(d => d.name)
+                            const current = val ? JSON.parse(val) : (initialEnabledDivisions || defaultDivs)
+                            
+                            let next: string[]
+                            if (e.target.checked) {
+                               next = [...current, div.name]
+                            } else {
+                               next = current.filter((d: string) => d !== div.name)
+                            }
+                            form.setValue('divisions', JSON.stringify(next))
+                          }}
+                        />
+                        <label 
+                          htmlFor={`div-${div.name}`} 
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                        >
+                          {div.name}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Initialize default value */}
+                  {/* Initialize default value */}
+                  <input type="hidden" {...form.register('divisions')} defaultValue={JSON.stringify(initialEnabledDivisions || (availableDivisions.length > 0 ? availableDivisions.map(d => d.name) : ['Gradeschool', 'Cadet', 'Junior', 'Senior']))} />
+                </div>
+              </div>
             <CardFooter className="flex justify-end space-x-2 px-0 pt-4">
               <Button type="button" variant="outline" onClick={() => router.back()}>
                 Cancel

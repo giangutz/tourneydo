@@ -80,6 +80,29 @@ export default async function WeighInPage({ params, searchParams }: WeighInPageP
         }
       />
 
+      {/* Tournament Configuration Summary */}
+      <div className="mb-6 rounded-lg border bg-card p-4">
+        <h3 className="font-semibold mb-3">Tournament Configuration</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+          <div>
+            <p className="text-muted-foreground">Tournament Type</p>
+            <p className="font-medium capitalize">{tournament.tournament_type === 'open-belt' ? 'Open Belt' : 'Standard'}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Division Movement Policy</p>
+            <p className="font-medium">
+              {tournament.division_move_policy === 'allow_move' 
+                ? '✓ Allow Division Moves' 
+                : '✗ Disqualify Only'}
+            </p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Active Divisions</p>
+            <p className="font-medium">{divisions.length} divisions configured</p>
+          </div>
+        </div>
+      </div>
+
       <WeighInList 
         participants={participantsRes.data}
         divisions={divisions}

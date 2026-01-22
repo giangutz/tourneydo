@@ -90,8 +90,8 @@ export async function ensureTournamentDivisionsAndCategories(
 ) {
   const supabase = createServerSupabaseClient()
 
-  // 1. Get existing divisions and categories
-  const existingDivisions = await getTournamentDivisions(tournamentId)
+  // 1. Get existing divisions and categories (including disabled)
+  const existingDivisions = await getAllTournamentDivisions(tournamentId)
 
   for (const defaultDiv of defaults) {
     let divId: string
@@ -174,6 +174,30 @@ export async function ensureTournamentDivisionsAndCategories(
         }
       }
     }
+
+    // 3. Cleanup: Delete categories that are no longer in the default configuration
+    const expectedCategoryNames = new Set(defaultDiv.categories.map(c => `${c.name.toLowerCase()}|${c.gender}`))
+
+    // existingCategories contains ALL categories for this division (from fetch)
+    // We filter out those that are NOT in the expected set
+    const categoriesToDelete = existingCategories.filter((existingCat: any) => {
+      const key = `${existingCat.name.toLowerCase()}|${existingCat.gender}`
+      return !expectedCategoryNames.has(key)
+    })
+
+    if (categoriesToDelete.length > 0) {
+      const idsToDelete = categoriesToDelete.map((c: any) => c.id)
+      console.log(`Cleaning up ${idsToDelete.length} obsolete categories for division ${defaultDiv.name}`)
+
+      const { error: delError } = await supabase
+        .from('tournament_categories')
+        .delete()
+        .in('id', idsToDelete)
+
+      if (delError) {
+        console.error('Failed to cleanup obsolete categories:', delError)
+      }
+    }
   }
 }
 
@@ -197,5 +221,384 @@ export async function assignParticipantDivision(
 
   if (error) {
     throw new Error(`Failed to assign division: ${error.message}`)
+  }
+}
+/**
+ * Get all divisions for a tournament (including disabled ones)
+ * Used for division management UI
+ */
+export async function getAllTournamentDivisions(tournamentId: string) {
+  const supabase = createServerSupabaseClient()
+
+  const { data, error } = await supabase
+    .from('tournament_divisions')
+    .select(`
+      *,
+      tournament_categories (
+        id,
+        name,
+        gender,
+        min_weight,
+        max_weight,
+        min_height,
+        max_height
+      )
+    `)
+    .eq('tournament_id', tournamentId)
+    .order('min_age', { ascending: true, nullsFirst: true })
+
+  if (error) {
+    throw new Error(`Failed to fetch all divisions: ${error.message}`)
+  }
+
+  return data || []
+}
+
+/**
+ * Update division enabled status
+ */
+export async function updateDivisionStatus(
+  divisionId: string,
+  enabled: boolean
+) {
+  const supabase = createServerSupabaseClient()
+
+  const { error } = await supabase
+    .from('tournament_divisions')
+    .update({ enabled })
+    .eq('id', divisionId)
+
+  if (error) {
+    throw new Error(`Failed to update division status: ${error.message}`)
+  }
+}
+
+/**
+ * Update category weight/height limits
+ */
+export async function updateCategoryLimits(
+  categoryId: string,
+  limits: {
+    min_weight?: number | null
+    max_weight?: number | null
+    min_height?: number | null
+    max_height?: number | null
+  }
+) {
+  const supabase = createServerSupabaseClient()
+
+  const { error } = await supabase
+    .from('tournament_categories')
+    .update(limits)
+    .eq('id', categoryId)
+
+  if (error) {
+    throw new Error(`Failed to update category limits: ${error.message}`)
+  }
+}
+
+/**
+ * Update category name
+ */
+export async function updateCategoryName(
+  categoryId: string,
+  name: string
+) {
+  const supabase = createServerSupabaseClient()
+
+  const { error } = await supabase
+    .from('tournament_categories')
+    .update({ name })
+    .eq('id', categoryId)
+
+  if (error) {
+    throw new Error(`Failed to update category name: ${error.message}`)
+  }
+}
+
+/**
+ * Create a custom category for a division
+ */
+export async function createCustomCategory(
+  divisionId: string,
+  category: {
+    name: string
+    gender: 'male' | 'female' | 'both'
+    min_weight?: number | null
+    max_weight?: number | null
+    min_height?: number | null
+    max_height?: number | null
+  }
+) {
+  const supabase = createServerSupabaseClient()
+
+  const { data, error } = await supabase
+    .from('tournament_categories')
+    .insert({
+      division_id: divisionId,
+      ...category
+    })
+    .select()
+    .single()
+
+  if (error) {
+    throw new Error(`Failed to create category: ${error.message}`)
+  }
+
+  return data
+}
+
+/**
+ * Delete a category
+ * Only allowed if no participants are assigned to it
+ */
+export async function deleteCategory(categoryId: string) {
+  const supabase = createServerSupabaseClient()
+
+  // Check if any participants are assigned to this category
+  const { data: registrations, error: checkError } = await supabase
+    .from('tournament_registrations')
+    .select('id')
+    .eq('category_id', categoryId)
+    .limit(1)
+
+  if (checkError) {
+    throw new Error(`Failed to check category usage: ${checkError.message}`)
+  }
+
+  if (registrations && registrations.length > 0) {
+    throw new Error('Cannot delete category with assigned participants')
+  }
+
+  const { error } = await supabase
+    .from('tournament_categories')
+    .delete()
+    .eq('id', categoryId)
+
+  if (error) {
+    throw new Error(`Failed to delete category: ${error.message}`)
+  }
+}
+
+/**
+ * Toggle category gender (enable/disable male or female)
+ */
+export async function toggleCategoryGender(
+  divisionId: string,
+  gender: 'male' | 'female',
+  enabled: boolean
+) {
+  const supabase = createServerSupabaseClient()
+
+  if (enabled) {
+    // Re-enable: Update existing categories or do nothing
+    // Categories are typically not deleted, just filtered
+    return
+  } else {
+    // Disable: Check if any participants exist, then soft-delete or mark
+    // For now, we'll just return an error if participants exist
+    const { data: registrations, error: checkError } = await supabase
+      .from('tournament_registrations')
+      .select('id')
+      .eq('division_id', divisionId)
+      .limit(1)
+
+    if (checkError) {
+      throw new Error(`Failed to check division usage: ${checkError.message}`)
+    }
+
+    if (registrations && registrations.length > 0) {
+      throw new Error(`Cannot disable ${gender} categories with assigned participants`)
+    }
+
+    // Delete all categories of this gender in this division
+    const { error } = await supabase
+      .from('tournament_categories')
+      .delete()
+      .eq('division_id', divisionId)
+      .eq('gender', gender)
+
+    if (error) {
+      throw new Error(`Failed to disable ${gender} categories: ${error.message}`)
+    }
+  }
+}
+
+
+/**
+ * Remove categories of a specific gender for a tournament
+ * Used during setup to enforce "Men Only" or "Women Only" preference
+ */
+export async function removeCategoriesByGender(tournamentId: string, genderToRemove: 'male' | 'female') {
+  const supabase = createServerSupabaseClient()
+
+  // We need to delete from tournament_categories where
+  // 1. Division belongs to this tournament
+  // 2. Gender matches
+
+  // First get all division IDs for this tournament
+  const { data: divisions } = await supabase
+    .from('tournament_divisions')
+    .select('id')
+    .eq('tournament_id', tournamentId)
+
+  if (!divisions?.length) return
+
+  const divisionIds = divisions.map(d => d.id)
+
+  const { error } = await supabase
+    .from('tournament_categories')
+    .delete()
+    .in('division_id', divisionIds)
+    .eq('gender', genderToRemove)
+
+  if (error) {
+    throw new Error(`Failed to remove ${genderToRemove} categories: ${error.message}`)
+  }
+}
+
+/**
+ * Get division and category details with limits
+ * Used for weigh-in validation to ensure accurate category limits are displayed
+ */
+export async function getDivisionCategoryDetails(divisionId: string, categoryId: string) {
+  const supabase = createServerSupabaseClient()
+
+  const { data: division, error: divError } = await supabase
+    .from('tournament_divisions')
+    .select(`
+      *,
+      tournament_categories (
+        id,
+        name,
+        gender,
+        min_weight,
+        max_weight,
+        min_height,
+        max_height
+      )
+    `)
+    .eq('id', divisionId)
+    .single()
+
+  if (divError) {
+    throw new Error(`Failed to fetch division: ${divError.message}`)
+  }
+
+  const category = (division.tournament_categories as any[])?.find((c: any) => c.id === categoryId)
+
+  if (!category) {
+    throw new Error('Category not found in division')
+  }
+
+  return {
+    division: {
+      id: division.id,
+      name: division.name,
+      min_age: division.min_age,
+      max_age: division.max_age
+    },
+    category: {
+      id: category.id,
+      name: category.name,
+      gender: category.gender,
+      min_weight: category.min_weight,
+      max_weight: category.max_weight,
+      min_height: category.min_height,
+      max_height: category.max_height
+    }
+  }
+}
+
+/**
+ * Create a new custom division
+ */
+export async function createDivision(
+  tournamentId: string,
+  data: {
+    name: string
+    min_age?: number | null
+    max_age?: number | null
+  }
+) {
+  const supabase = createServerSupabaseClient()
+
+  const { data: division, error } = await supabase
+    .from('tournament_divisions')
+    .insert({
+      tournament_id: tournamentId,
+      name: data.name,
+      min_age: data.min_age || null,
+      max_age: data.max_age || null,
+      enabled: true // Default enabled
+    })
+    .select()
+    .single()
+
+  if (error) {
+    throw new Error(`Failed to create division: ${error.message}`)
+  }
+
+  // Optimize: Return with empty categories array to match expected structure
+  return { ...division, tournament_categories: [] }
+}
+
+/**
+ * Update division details (name, age limits)
+ */
+export async function updateDivision(
+  divisionId: string,
+  data: {
+    name?: string
+    min_age?: number | null
+    max_age?: number | null
+  }
+) {
+  const supabase = createServerSupabaseClient()
+
+  const { error } = await supabase
+    .from('tournament_divisions')
+    .update({
+      ...(data.name !== undefined && { name: data.name }),
+      ...(data.min_age !== undefined && { min_age: data.min_age }),
+      ...(data.max_age !== undefined && { max_age: data.max_age }),
+    })
+    .eq('id', divisionId)
+
+  if (error) {
+    throw new Error(`Failed to update division: ${error.message}`)
+  }
+}
+
+/**
+ * Delete a division
+ * Only allowed if no participants are assigned to it
+ */
+export async function deleteDivision(divisionId: string) {
+  const supabase = createServerSupabaseClient()
+
+  // Safety check: Check for registrations
+  const { data: registrations, error: checkError } = await supabase
+    .from('tournament_registrations')
+    .select('id')
+    .eq('division_id', divisionId)
+    .limit(1)
+
+  if (checkError) {
+    throw new Error(`Failed to check division usage: ${checkError.message}`)
+  }
+
+  if (registrations && registrations.length > 0) {
+    throw new Error('Cannot delete division with registered participants')
+  }
+
+  // Delete division (categories will cascade delete due to FK)
+  const { error } = await supabase
+    .from('tournament_divisions')
+    .delete()
+    .eq('id', divisionId)
+
+  if (error) {
+    throw new Error(`Failed to delete division: ${error.message}`)
   }
 }

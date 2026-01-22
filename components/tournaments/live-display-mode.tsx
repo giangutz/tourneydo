@@ -74,7 +74,7 @@ export function LiveDisplayMode({ tournament, matches, participants, onClose }: 
             const queuedMatches = courtMatches
               .filter(m => m.status === 'scheduled')
               .sort((a, b) => (a.match_number || 0) - (b.match_number || 0))
-              .slice(0, 3) // Show max 3 queued matches
+              .slice(0, 1) // Show only next queued match
 
             return (
               <div
@@ -137,29 +137,36 @@ export function LiveDisplayMode({ tournament, matches, participants, onClose }: 
                   )}
                 </div>
 
-                {/* Queue */}
-                {queuedMatches.length > 0 && (
-                  <div className="border-t border-white/10 bg-black/20 px-6 py-4">
-                    <div className="text-sm font-semibold text-blue-200 mb-3">UP NEXT</div>
-                    <div className="space-y-2">
-                      {queuedMatches.map((match, idx) => (
-                        <div 
-                          key={match.id} 
-                          className="flex items-center justify-between text-sm bg-white/5 rounded-lg px-3 py-2"
-                        >
-                          <div className="flex items-center gap-2">
-                            {idx === 0 && (
-                              <Badge variant="outline" className="text-xs border-blue-400 text-blue-300">
-                                Next
-                              </Badge>
-                            )}
-                            <span className="text-white/80">Match #{match.match_number}</span>
-                          </div>
-                          <div className="text-white/60 text-xs truncate max-w-[200px]">
-                            {getPlayerDisplay(match.player1_id).name} vs {getPlayerDisplay(match.player2_id).name}
-                          </div>
+                {/* Queue - Single Next Match */}
+                {queuedMatches[0] && (
+                  <div className="border-t border-white/10 bg-black/40 px-6 py-4">
+                    <div className="flex items-center gap-3 mb-2">
+                      <Badge className="bg-blue-500/20 text-blue-300 border-blue-500/50 hover:bg-blue-500/30">
+                        NEXT UP
+                      </Badge>
+                      <span className="text-blue-200/80 text-sm font-medium">Match #{queuedMatches[0].match_number}</span>
+                    </div>
+                    
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-white font-semibold text-lg truncate">
+                          {getPlayerDisplay(queuedMatches[0].player1_id).name}
                         </div>
-                      ))}
+                        <div className="text-blue-200 text-sm truncate font-medium">
+                          {getPlayerDisplay(queuedMatches[0].player1_id).team}
+                        </div>
+                      </div>
+                      
+                      <div className="text-white/40 font-bold text-sm px-2">VS</div>
+                      
+                      <div className="flex-1 min-w-0 text-right">
+                        <div className="text-white font-semibold text-lg truncate">
+                          {getPlayerDisplay(queuedMatches[0].player2_id).name}
+                        </div>
+                        <div className="text-blue-200 text-sm truncate font-medium">
+                          {getPlayerDisplay(queuedMatches[0].player2_id).team}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}

@@ -13,6 +13,12 @@ import { toast } from 'sonner'
 import { formatDistanceToNow } from 'date-fns'
 import { approvePayment, rejectPayment, bulkApprovePayments, bulkRejectPayments } from '@/lib/actions/payments'
 
+interface PendingPlayer {
+  id: string
+  first_name: string
+  last_name: string
+}
+
 interface PendingPayment {
   id: string
   amount: number
@@ -27,6 +33,9 @@ interface PendingPayment {
     id: string
     name: string
   }
+  payment_players?: {
+    players: PendingPlayer
+  }[]
 }
 
 interface PaymentReviewDialogProps {
@@ -218,7 +227,22 @@ export function PaymentReviewDialog({ open, onOpenChange, payments }: PaymentRev
                             <div className="text-xs text-muted-foreground break-all">
                               Ref: <span className="font-mono text-foreground">{payment.reference_number}</span>
                             </div>
-                            <div className="text-xs text-muted-foreground">
+                            
+                            {/* Covered Players List */}
+                            {payment.payment_players && payment.payment_players.length > 0 && (
+                              <div className="mt-2 text-xs">
+                                <span className="text-muted-foreground font-medium uppercase text-[10px] tracking-wider">Covered Athletes:</span>
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {payment.payment_players.map((pp, i) => (
+                                    <Badge key={i} variant="secondary" className="font-normal text-[10px] py-0 px-2 h-5">
+                                      {pp.players?.first_name} {pp.players?.last_name}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            <div className="text-xs text-muted-foreground mt-1">
                               Submitted {formatDistanceToNow(new Date(payment.created_at))} ago
                             </div>
                           </div>

@@ -1,14 +1,13 @@
 import { notFound } from 'next/navigation'
 import { getTournamentById } from '@/lib/db/queries/tournaments'
 import { getTournamentParticipants } from '@/lib/db/queries/registrations'
-import { getTournamentMatches } from '@/lib/db/queries/matches'
+import { getMatchesWithReadiness } from '@/lib/db/queries/match-readiness'
 import { DashboardShell } from '@/components/layouts/dashboard-shell'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, RefreshCw } from 'lucide-react'
 import Link from 'next/link'
 import { routes } from '@/config/routes'
-import { BracketView } from '@/components/tournaments/bracket-view'
 import { BracketPageClient } from '@/components/tournaments/bracket-page-client'
 
 interface BracketPageProps {
@@ -29,7 +28,7 @@ export default async function BracketPage({ params }: BracketPageProps) {
   const [tournament, { data: participants }, matches] = await Promise.all([
     getTournamentById(id),
     getTournamentParticipants(id, { limit: 1000 }),
-    getTournamentMatches(id)
+    getMatchesWithReadiness(id)
   ])
 
   if (!tournament) {

@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import { getTournamentById } from '@/lib/db/queries/tournaments'
 import { getTournamentParticipants } from '@/lib/db/queries/registrations'
-import { getTournamentMatches } from '@/lib/db/queries/matches'
+import { getMatchesWithReadiness } from '@/lib/db/queries/match-readiness'
 import { DashboardShell } from '@/components/layouts/dashboard-shell'
 import { PageHeader } from '@/components/ui/page-header'
 import { OrganizerMatchesClient } from './organizer-matches-client'
@@ -17,7 +17,6 @@ import { Button } from '@/components/ui/button'
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { routes } from '@/config/routes'
-import { matches } from 'underscore'
 
 export const revalidate = 30 // Revalidate every 30 seconds
 
@@ -26,7 +25,7 @@ export default async function LiveBracketPage({ params }: LiveBracketPageProps) 
   const [tournament, { data: participants }, matches] = await Promise.all([
     getTournamentById(id),
     getTournamentParticipants(id, { limit: 1000 }),
-    getTournamentMatches(id)
+    getMatchesWithReadiness(id)
   ])
 
   if (!tournament) {

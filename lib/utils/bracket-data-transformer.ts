@@ -152,7 +152,7 @@ export function transformMatchToGame(
 
   return {
     id: match.id,
-    name: `Match ${match.match_number}`,
+    name: match.match_number_formatted || `Match ${match.match_number}`,
     bracketLabel: roundLabel, // This will be "Finals", "Semi-Finals", etc.
     scheduled: new Date(match.created_at).getTime(),
     court: match.court_number ? {

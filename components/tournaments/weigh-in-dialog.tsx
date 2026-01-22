@@ -2,6 +2,16 @@
 
 import { useState, useEffect } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -30,8 +40,12 @@ interface Participant {
   team: {
     name: string
   }
+  actual_weight: number | null
+  actual_height: number | null
   division_id?: string | null
   category_id?: string | null
+  tournament_divisions?: any
+  tournament_categories?: any
 }
 
 interface WeighInDialogProps {
@@ -50,6 +64,8 @@ interface WeighInDialogProps {
   onOpenChange: (open: boolean) => void
 }
 
+const getSingle = (val: any) => Array.isArray(val) ? val[0] : val
+
 export function WeighInDialog({
   participant,
   tournamentId,
@@ -60,12 +76,26 @@ export function WeighInDialog({
   open,
   onOpenChange
 }: WeighInDialogProps) {
-  const [actualWeight, setActualWeight] = useState<string>(participant.player.weight?.toString() || '')
-  const [actualHeight, setActualHeight] = useState<string>(participant.player.height?.toString() || '')
+  // Extract data robustly if not provided
+  const category = getSingle(participant.tournament_categories)
+  const division = getSingle(participant.tournament_divisions)
+  
+  const effectiveDivisionName = divisionName || division?.name
+  const effectiveCategoryName = categoryName || category?.name
+  const effectiveLimits = categoryLimits || {
+    minWeight: category?.min_weight,
+    maxWeight: category?.max_weight,
+    minHeight: category?.min_height,
+    maxHeight: category?.max_height,
+  }
+
+  const [actualWeight, setActualWeight] = useState<string>(participant.actual_weight?.toString() || '')
+  const [actualHeight, setActualHeight] = useState<string>(participant.actual_height?.toString() || '')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [validationResult, setValidationResult] = useState<any>(null)
   const [showDivisionMove, setShowDivisionMove] = useState(false)
   const [showDisqualify, setShowDisqualify] = useState(false)
+  const [showValidationAlert, setShowValidationAlert] = useState(false)
 
   const age = participant.player.dob
     ? new Date().getFullYear() - new Date(participant.player.dob).getFullYear()
@@ -94,8 +124,9 @@ export function WeighInDialog({
       }
 
       if (result.data?.needsAction) {
-        // Out of range - show validation result
+        // Out of range - trigger validation dialog
         setValidationResult(result.data)
+        setShowValidationAlert(true)
       } else {
         // Within limits - success
         toast.success('Weigh-in recorded successfully')
@@ -109,15 +140,15 @@ export function WeighInDialog({
   }
 
   // Format limits for display
-  const limitsDisplay = categoryLimits
+  const limitsDisplay = effectiveLimits
     ? isHeightBased
-      ? `${categoryLimits.minHeight || 0} - ${categoryLimits.maxHeight || '∞'} cm`
-      : `${categoryLimits.minWeight || 0} - ${categoryLimits.maxWeight || '∞'} kg`
+      ? `${effectiveLimits.minHeight || 0} - ${effectiveLimits.maxHeight || '∞'} cm`
+      : `${effectiveLimits.minWeight || 0} - ${effectiveLimits.maxWeight || '∞'} kg`
     : 'Not assigned'
 
   return (
     <>
-      <Dialog open={open && !showDivisionMove && !showDisqualify} onOpenChange={onOpenChange}>
+      <Dialog open={open && !showDivisionMove && !showDisqualify && !showValidationAlert} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -140,11 +171,11 @@ export function WeighInDialog({
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
                   <p className="text-muted-foreground">Division</p>
-                  <p className="font-medium">{divisionName || 'Not assigned'}</p>
+                  <p className="font-medium">{effectiveDivisionName || 'Not assigned'}</p>
                 </div>
                 <div>
                   <p className="text-muted-foreground">Category</p>
-                  <p className="font-medium">{categoryName || 'Not assigned'}</p>
+                  <p className="font-medium">{effectiveCategoryName || 'Not assigned'}</p>
                 </div>
                 <div>
                   <p className="text-muted-foreground">Gender</p>
@@ -218,71 +249,93 @@ export function WeighInDialog({
               </div>
             </div>
 
-            {/* Validation result - out of range */}
-            {validationResult && (
-              <Alert variant="destructive">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription>
-                  <p className="font-medium mb-1">
-                    Actual {validationResult.exceededLimit} is {validationResult.outOfRange} the category limits
-                  </p>
-                  <p className="text-sm">
-                    The participant's actual measurement falls outside their registered category. Choose an action below.
-                  </p>
-                </AlertDescription>
-              </Alert>
-            )}
-
             {/* Info alert */}
-            {!validationResult && (
-              <Alert>
-                <Info className="h-4 w-4" />
-                <AlertDescription className="text-xs">
-                  The system will validate the actual measurement against the category limits ({limitsDisplay}). 
-                  If out of range, you can move the participant to a different division or disqualify them.
-                </AlertDescription>
-              </Alert>
-            )}
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertDescription className="text-xs">
+                The system will validate the actual measurement against the category limits ({limitsDisplay}). 
+                If out of range, you will be prompted to either move the participant or disqualify them based on tournament rules.
+              </AlertDescription>
+            </Alert>
           </div>
 
           <DialogFooter className="flex-col sm:flex-col gap-2">
-            {!validationResult ? (
-              <>
-                <Button onClick={handleRecordWeighIn} disabled={isSubmitting} className="w-full">
-                  {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Record Weigh-In
-                </Button>
-                <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting} className="w-full">
-                  Cancel
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button onClick={handleRecordWeighIn} disabled={isSubmitting} className="w-full">
-                  {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Record Weigh-In Anyway
-                </Button>
-                <Button
-                  variant="secondary"
-                  onClick={() => setShowDivisionMove(true)}
-                  disabled={isSubmitting || !validationResult.suggestedDivisions?.length}
-                  className="w-full"
-                >
-                  Move Division
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={() => setShowDisqualify(true)}
-                  disabled={isSubmitting}
-                  className="w-full"
-                >
-                  Disqualify
-                </Button>
-              </>
-            )}
+            <Button onClick={handleRecordWeighIn} disabled={isSubmitting} className="w-full">
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Record Weigh-In
+            </Button>
+            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting} className="w-full">
+              Cancel
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Validation Confirmation Dialog */}
+      <AlertDialog open={showValidationAlert} onOpenChange={setShowValidationAlert}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              Measurements Out of Range
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p className="font-medium text-foreground">
+                Actual {validationResult?.exceededLimit} is {validationResult?.outOfRange} the category limits.
+              </p>
+              <p>
+                The participant's actual measurement falls outside their registered category.
+                {validationResult?.divisionMovePolicy === 'disqualify_only' 
+                  ? ' This tournament STRICTLY requires disqualification for out-of-range measurements.'
+                  : ' You can choose to move them to a different division or disqualify them.'}
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-col gap-2">
+            {validationResult?.divisionMovePolicy === 'allow_move' && (
+              <AlertDialogAction
+                onClick={() => {
+                   setShowValidationAlert(false)
+                   setShowDivisionMove(true)
+                }}
+                className="w-full bg-primary hover:bg-primary/90"
+              >
+                Move Division
+              </AlertDialogAction>
+            )}
+            
+            <AlertDialogAction
+              onClick={() => {
+                setShowValidationAlert(false)
+                setShowDisqualify(true)
+              }}
+              className="w-full bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Disqualify Participant
+            </AlertDialogAction>
+
+            <AlertDialogCancel 
+              className="w-full mt-2 sm:mt-0"
+              onClick={() => {
+                setShowValidationAlert(false)
+                onOpenChange(false) // Close main dialog too? Or just close alert? Usually "Accept" implies closing the loop.
+                toast.warning('Weigh-in recorded with out-of-range values')
+              }}
+            >
+              Accept & Close (Keep in current division)
+            </AlertDialogCancel>
+            
+            <Button 
+               variant="ghost" 
+               size="sm" 
+               className="mt-2"
+               onClick={() => setShowValidationAlert(false)}
+            >
+               Back to Editing
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Division Move Dialog */}
       {showDivisionMove && validationResult && (

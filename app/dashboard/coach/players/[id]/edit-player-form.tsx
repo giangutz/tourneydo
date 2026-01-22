@@ -1,5 +1,6 @@
 "use client"
 
+import { toast } from "sonner"
 import { useState, useMemo } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -167,10 +168,11 @@ export function EditPlayerForm({ player, availableTeams, currentAssignments }: E
         if (deleteError) throw deleteError
       }
 
+      toast.success("Player updated successfully")
       router.push("/dashboard/coach/players")
-      // Optional: Show toast success
     } catch (error) {
       console.error("Error updating player:", error)
+      toast.error("Failed to update player")
     } finally {
       setIsLoading(false)
     }

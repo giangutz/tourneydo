@@ -55,7 +55,7 @@ export async function generateWeighInList(tournamentId: string): Promise<WeighIn
       )
     `)
     .eq('tournament_id', tournamentId)
-    .in('status', ['verified', 'paid'])
+    .eq('status', 'verified')
 
   if (regError) {
     return { success: false, message: `Failed to fetch registrations: ${regError.message}` }
@@ -127,13 +127,22 @@ export async function submitWeighInResult(
 ): Promise<{ success: boolean; message: string }> {
   const supabase = createServerSupabaseClient()
 
-  // 1. Fetch registration with category details to get max weight
+  // 1. Fetch registration with category details to get limits
   const { data: registration, error: fetchError } = await supabase
     .from('tournament_registrations')
     .select(`
       *,
+      players (
+        dob,
+        gender
+      ),
       tournament_categories (
-        max_weight
+        name,
+        gender,
+        min_weight,
+        max_weight,
+        min_height,
+        max_height
       )
     `)
     .eq('id', registrationId)
@@ -143,21 +152,52 @@ export async function submitWeighInResult(
     return { success: false, message: 'Registration not found.' }
   }
 
-  const category = registration.tournament_categories
-  // If no category or no max weight (e.g. open weight), they pass.
-  // Although open weight usually has no max limit.
-  // If max_weight is null, traverse assumption: unlimited.
+  // ONLY verified participants can be weighed in
+  if (registration.status !== 'verified') {
+    return { success: false, message: 'Only verified participants can be weighed in. Please verify their payment first.' }
+  }
 
-  const maxWeight = category?.max_weight
+  const { validateWeightHeight } = await import('@/lib/utils/weigh-in-validator')
+  const { calculateAge } = await import('@/lib/constants/divisions')
+
+  const category: any = registration.tournament_categories
+  const age = registration.players?.dob ? calculateAge(registration.players.dob) : 0
+
+  // Map DB fields to validator format
+  const categoryConfig = {
+    name: category.name,
+    gender: category.gender,
+    minWeight: category.min_weight,
+    maxWeight: category.max_weight,
+    minHeight: category.min_height,
+    maxHeight: category.max_height
+  }
+
+  // Validate with 5% tolerance for surprise weigh-ins? 
+  // For now, let's stick to the official validation logic but include tolerance calculation if that's the rule
+  const validation = validateWeightHeight(weight, height ?? null, categoryConfig, age)
+
   let disqualified = false
   let reason: string | null = null
 
-  if (maxWeight) {
-    const tolerance = maxWeight * 0.05
-    const limit = maxWeight + tolerance
-    if (weight > limit) {
+  if (!validation.valid) {
+    // Re-check with 5% tolerance for weight-based surprise checks
+    const maxWeight = category.max_weight
+    if (maxWeight && weight > maxWeight) {
+      const tolerance = maxWeight * 0.05
+      const limit = maxWeight + tolerance
+      if (weight > limit) {
+        disqualified = true
+        reason = `Weigh-in Failed: ${weight}kg exceeds limit ${limit.toFixed(2)}kg (Max ${maxWeight} + 5%)`
+      } else {
+        // Passed with tolerance
+        disqualified = false
+      }
+    } else {
+      // Failed height or min weight - usually no tolerance for these in surprise checks?
+      // For now, mark as disqualified if validator says so and it's not the weight tolerance case
       disqualified = true
-      reason = `Weigh-in Failed: ${weight}kg exceeds limit ${limit.toFixed(2)}kg (Max ${maxWeight} + 5%)`
+      reason = `Weigh-in Failed: Measurements out of range for ${category.name}`
     }
   }
 

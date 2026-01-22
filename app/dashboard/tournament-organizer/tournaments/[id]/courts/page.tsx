@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import { getTournamentById } from '@/lib/db/queries/tournaments'
-import { getTournamentMatches } from '@/lib/db/queries/matches'
 import { getTournamentParticipants } from '@/lib/db/queries/registrations'
+import { getMatchesWithReadiness } from '@/lib/db/queries/match-readiness'
 import { DashboardShell } from '@/components/layouts/dashboard-shell'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
@@ -27,7 +27,7 @@ export default async function TournamentCourtsPage({ params }: TournamentCourtsP
   }
 
   const { data: participants } = await getTournamentParticipants(id, { limit: 1000 })
-  const matches = await getTournamentMatches(id)
+  const matches = await getMatchesWithReadiness(id)
 
   return (
     <DashboardShell>

@@ -1,7 +1,9 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter, useSearchParams, usePathname } from 'next/navigation'
+import { useState, useMemo } from 'react'
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
+import { routes } from '@/config/routes'
 import {
   Table,
   TableBody,
@@ -30,7 +32,6 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { AddParticipantDialog } from './add-participant-dialog'
 import { EditParticipantDialog } from './edit-participant-dialog'
-import { WeighInDialog } from './weigh-in-dialog'
 import { Team } from '@/types/models'
 import { Pencil, MoreHorizontal, Search, Check, X, DollarSign, Loader2, Scale, CheckCircle2, AlertTriangle, ArrowUpDown, Filter, ChevronLeft, ChevronRight, Trash2, Download } from 'lucide-react'
 import { updateParticipantStatus, bulkWeighIn, deleteParticipant, bulkDeleteParticipants } from '@/lib/actions/participants'
@@ -70,6 +71,19 @@ interface Participant {
     first_name: string | null
     last_name: string | null
   } | null
+  tournament_divisions?: {
+    id: string
+    name: string
+  } | null
+  tournament_categories?: {
+    id: string
+    name: string
+    gender: string
+    min_weight: number | null
+    max_weight: number | null
+    min_height: number | null
+    max_height: number | null
+  } | null
 }
 
 interface ParticipantListProps {
@@ -103,9 +117,15 @@ export function ParticipantList({
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [isUpdating, setIsUpdating] = useState(false)
   const [editingParticipant, setEditingParticipant] = useState<Participant | null>(null)
-  const [weighingParticipant, setWeighingParticipant] = useState<Participant | null>(null)
   const [deletingParticipant, setDeletingParticipant] = useState<Participant | null>(null)
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false)
+  
+  const selectedVerifiedCount = useMemo(() => {
+    return selectedIds.filter(id => {
+      const p = participants.find(p => p.id === id)
+      return p?.status === 'verified'
+    }).length
+  }, [selectedIds, participants])
   
   // URL Params state
   const searchQuery = searchParams.get('q') || ''
@@ -170,15 +190,6 @@ export function ParticipantList({
   }
 
   const handleStatusUpdate = async (id: string, status: 'verified' | 'paid') => {
-    // If marking as verified, open weigh-in dialog
-    if (status === 'verified') {
-      const participant = participants.find(p => p.id === id)
-      if (participant) {
-        setWeighingParticipant(participant)
-        return
-      }
-    }
-
     const result = await updateParticipantStatus(id, tournamentId, status)
     if (!result.success) {
       toast.error(result.error)
@@ -213,12 +224,22 @@ export function ParticipantList({
   const handleBulkWeighIn = async () => {
     if (selectedIds.length === 0) return
     
+    const verifiedIds = selectedIds.filter(id => {
+      const p = participants.find(p => p.id === id)
+      return p?.status === 'verified'
+    })
+
+    if (verifiedIds.length !== selectedIds.length) {
+      toast.error("Only verified participants can be bulk weighed in. Please ensure all selected participants are verified.")
+      return
+    }
+
     setIsUpdating(true)
     try {
       const result = await bulkWeighIn(selectedIds, tournamentId)
       
       if (result?.success) {
-        toast.success(`${selectedIds.length} participants weighed in`)
+        toast.success(`${verifiedIds.length} participants weighed in`)
         setSelectedIds([])
         router.refresh()
       } else {
@@ -393,7 +414,10 @@ export function ParticipantList({
                     <DollarSign className="mr-2 h-4 w-4" /> Mark as Paid
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleBulkWeighIn}>
+                   <DropdownMenuItem 
+                    onClick={handleBulkWeighIn}
+                    disabled={selectedVerifiedCount !== selectedIds.length || selectedIds.length === 0}
+                  >
                     <Scale className="mr-2 h-4 w-4" /> Bulk Weigh-In
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
@@ -617,9 +641,11 @@ export function ParticipantList({
                         <DropdownMenuItem onClick={() => setEditingParticipant(participant)}>
                           <Pencil className="mr-2 h-4 w-4" /> Edit Details
                         </DropdownMenuItem>
-                        {(participant.status === 'verified' || participant.status === 'paid') && (
-                          <DropdownMenuItem onClick={() => setWeighingParticipant(participant)}>
-                            <Scale className="mr-2 h-4 w-4" /> Weigh In
+                        {participant.status === 'verified' && (
+                          <DropdownMenuItem asChild>
+                            <Link href={routes.organizer.participantWeighIn(tournamentId, participant.id)}>
+                              <Scale className="mr-2 h-4 w-4" /> Weigh In
+                            </Link>
                           </DropdownMenuItem>
                         )}
                         <DropdownMenuSeparator />
@@ -702,15 +728,7 @@ export function ParticipantList({
         />
       )}
 
-      {weighingParticipant && (
-        <WeighInDialog
-          participant={weighingParticipant}
-          tournamentId={tournamentId}
-          tournamentType={tournamentType}
-          open={!!weighingParticipant}
-          onOpenChange={(open) => !open && setWeighingParticipant(null)}
-        />
-      )}
+
 
       {/* Individual Delete Confirmation */}
       <DeleteConfirmDialog

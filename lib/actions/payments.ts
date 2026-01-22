@@ -1,7 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { createPayment, updatePaymentStatus } from "@/lib/db/queries/payments"
+import { createPayment, createPaymentWithPlayers, updatePaymentStatus } from "@/lib/db/queries/payments"
 import { PaymentInsert } from "@/types/models"
 import { auth } from '@clerk/nextjs/server'
 import { safeAction } from '@/lib/utils/errors'
@@ -20,15 +20,36 @@ export async function submitPaymentAction(data: PaymentInsert, path: string) {
   }
 }
 
+/**
+ * Submit payment with specific players
+ * This is the new player-aware payment submission
+ */
+export async function submitPaymentWithPlayers(
+  data: PaymentInsert,
+  playerIds: string[],
+  path: string
+): Promise<ActionResult<void>> {
+  return safeAction(async () => {
+    const { userId } = await auth()
+    if (!userId) throw new Error('Unauthorized')
+
+    if (playerIds.length === 0) {
+      throw new Error('Please select at least one player')
+    }
+
+    await createPaymentWithPlayers(data, playerIds)
+    revalidatePath(path)
+  })
+}
+
 export async function verifyPaymentAction(
   paymentId: string,
   status: 'verified' | 'rejected',
-  context: { teamId: string, tournamentId: string },
   path: string,
   reason?: string
 ) {
   try {
-    await updatePaymentStatus(paymentId, status, context, reason)
+    await updatePaymentStatus(paymentId, status, reason)
     revalidatePath(path)
     return { success: true }
   } catch (error) {
@@ -104,7 +125,7 @@ export async function rejectPayment(paymentId: string, reason: string): Promise<
       throw new Error('Payment not found')
     }
 
-    await updatePaymentStatus(paymentId, 'rejected', undefined, reason)
+    await updatePaymentStatus(paymentId, 'rejected', reason)
 
     // Send rejection email
     if (payment.teams?.users?.email) {
@@ -186,7 +207,7 @@ export async function bulkRejectPayments(paymentIds: string[], reason: string): 
       `)
       .in('id', paymentIds)
 
-    await Promise.all(paymentIds.map(id => updatePaymentStatus(id, 'rejected', undefined, reason)))
+    await Promise.all(paymentIds.map(id => updatePaymentStatus(id, 'rejected', reason)))
 
     // Send rejection emails
     if (payments) {

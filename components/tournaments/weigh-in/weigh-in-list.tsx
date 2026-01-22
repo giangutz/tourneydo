@@ -11,7 +11,6 @@ import {
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { WeighInDialog } from './weigh-in-dialog'
 import { CheckCircle2, XCircle, Clock } from 'lucide-react'
 
 // Types for props (simplified from models)
@@ -59,10 +58,11 @@ interface WeighInListProps {
 
 import { startTransition, useState, useEffect } from 'react'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Loader2, Download, Trash2, Search, ArrowLeft, ArrowRight, X } from 'lucide-react'
+import { Loader2, Download, Trash2, Search, ArrowLeft, ArrowRight, X, Scale } from 'lucide-react'
 import { toast } from 'sonner'
 import { useDebounce } from 'use-debounce'
 import {
@@ -76,6 +76,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { deleteWeighInChecklist } from '@/lib/actions/participants'
+import { id } from 'zod/v4/locales'
 
 export function WeighInList({ participants, divisions, tournamentId, page, totalPages, totalCount }: WeighInListProps) {
   const router = useRouter()
@@ -85,6 +86,7 @@ export function WeighInList({ participants, divisions, tournamentId, page, total
   const [isExporting, setIsExporting] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [weighingId, setWeighingId] = useState<string | null>(null)
 
   // URL State management
   const [searchQuery, setSearchQuery] = useState(searchParams.get('query') || '')
@@ -405,14 +407,12 @@ export function WeighInList({ participants, divisions, tournamentId, page, total
                     {details.maxWeight ? `${details.maxWeight}kg` : 'Open'}
                   </TableCell>
                   <TableCell className="text-right">
-                    <WeighInDialog
-                      registrationId={p.id}
-                      participantName={fullName}
-                      maxWeight={details.maxWeight}
-                      tournamentId={tournamentId}
-                      currentWeight={p.actual_weight}
-                      currentHeight={p.actual_height}
-                    />
+                    <Button variant="secondary" size="sm" asChild>
+                      <Link href={`/dashboard/tournament-organizer/tournaments/${tournamentId}/weigh-in/${p.id}`}>
+                        <Scale className="h-4 w-4 mr-2" />
+                        Weigh In
+                      </Link>
+                    </Button>
                   </TableCell>
                 </TableRow>
               )

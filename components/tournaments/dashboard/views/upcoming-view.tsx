@@ -74,8 +74,8 @@ export function UpcomingView({ tournamentId }: UpcomingViewProps) {
 
         const total = registrations.length
         const newLast24h = registrations.filter((r) => new Date(r.created_at) > oneDayAgo).length
-        const unpaid = registrations.filter((r) => r.status !== 'paid').length
-        const uniqueTeams = new Set(registrations.map((r) => r.team_id)).size
+        const unpaid = registrations.filter((r) => r.status === 'pending').length
+        const uniqueTeams = new Set(registrations.map((r) => r.team_id).filter(Boolean)).size
         
         setStats({
           totalRegistrations: total,
@@ -108,12 +108,12 @@ export function UpcomingView({ tournamentId }: UpcomingViewProps) {
 
         const teamMap: Record<string, { name: string, count: number, unpaid: number }> = {}
         registrations.forEach((r) => {
-          const teamName = r.teams?.name || 'Unknown Team'
+          const teamName = r.teams?.name || 'No Team'
           if (!teamMap[teamName]) {
             teamMap[teamName] = { name: teamName, count: 0, unpaid: 0 }
           }
           teamMap[teamName].count++
-          if (r.status !== 'paid') {
+          if (r.status === 'pending') {
             teamMap[teamName].unpaid++
           }
         })

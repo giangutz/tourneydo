@@ -1,4 +1,4 @@
-import { MatchInsert } from '@/types/models'
+import { MatchInsert, MatchLifecycleState } from '@/types/models'
 
 interface Participant {
   id: string
@@ -162,7 +162,7 @@ export function generateBracket(
       id: crypto.randomUUID(),
       tournament_id: tournamentId,
       round: 1,
-      match_number: startMatchNumber,
+      match_number: 0, // Will be assigned during schedule generation
       player1_id: participants[0].player_id,
       player2_id: null,
       winner_id: participants[0].player_id,
@@ -179,13 +179,24 @@ export function generateBracket(
       winner_round2: null,
       winner_round3: null,
       status: 'completed' as const,
+      // WT Lifecycle: Single participant = AUTO_ADVANCE (no actual contest)
+      lifecycle_state: 'AUTO_ADVANCE' as MatchLifecycleState,
+      source_match_ids: [],
+      athlete1_available_at: null,
+      athlete2_available_at: null,
       next_match_id: null,
       source_match_id: null,
       court_number: null,
       scheduled_start_time: null,
       scheduled_end_time: null,
       actual_start_time: null,
-      actual_end_time: null
+      actual_end_time: null,
+      match_number_formatted: null,
+      match_number_legacy: null,
+      day_number: null,
+      match_sequence: null,
+      division_id: participants[0].id ? undefined : undefined,
+      category_id: undefined
     }]
   }
 
@@ -237,6 +248,19 @@ export function generateBracket(
       let player2Id: string | null = null
       let status: 'scheduled' | 'completed' | 'in_progress' = 'scheduled'
       let winnerId: string | null = null
+      let lifecycleState: MatchLifecycleState = 'WAITING'
+
+      // Calculate source match IDs (matches that feed into this one)
+      let sourceMatchIds: string[] = []
+      if (round > 1) {
+        const source1MatchNum = structuralMatchNum * 2 - 1
+        const source2MatchNum = structuralMatchNum * 2
+        const source1Key = `${round - 1}-${source1MatchNum}`
+        const source2Key = `${round - 1}-${source2MatchNum}`
+        const source1Id = matchMap.get(source1Key)
+        const source2Id = matchMap.get(source2Key)
+        sourceMatchIds = [source1Id, source2Id].filter((id): id is string => !!id)
+      }
 
       // Only populate Round 1 matches with players
       if (round === 1) {
@@ -248,17 +272,23 @@ export function generateBracket(
         player1Id = p1 ? p1.player_id : null
         player2Id = p2 ? p2.player_id : null
 
-        // Handle BYEs
+        // Handle BYEs with proper WT lifecycle states
         if (p1 && !p2) {
           status = 'completed'
           winnerId = p1.player_id
+          lifecycleState = 'AUTO_ADVANCE' // BYE = invisible, no court time
         } else if (!p1 && p2) {
           status = 'completed'
           winnerId = p2.player_id
+          lifecycleState = 'AUTO_ADVANCE' // BYE = invisible, no court time
         } else if (!p1 && !p2) {
           // Double BYE - mark as completed with no winner
           status = 'completed'
           winnerId = null
+          lifecycleState = 'AUTO_ADVANCE'
+        } else if (p1 && p2) {
+          // Both players known = ready for contest
+          lifecycleState = 'CONTEST'
         }
       }
 
@@ -266,7 +296,7 @@ export function generateBracket(
         id,
         tournament_id: tournamentId,
         round,
-        match_number: matchNum,
+        match_number: 0, // Will be assigned during schedule generation
         player1_id: player1Id,
         player2_id: player2Id,
         winner_id: winnerId,
@@ -283,18 +313,41 @@ export function generateBracket(
         winner_round2: null,
         winner_round3: null,
         status,
+        // WT Lifecycle fields
+        lifecycle_state: lifecycleState,
+        source_match_ids: sourceMatchIds,
+        athlete1_available_at: null,
+        athlete2_available_at: null,
         next_match_id: nextMatchId,
         source_match_id: null,
         court_number: null,
         scheduled_start_time: null,
         scheduled_end_time: null,
         actual_start_time: null,
-        actual_end_time: null
+        actual_end_time: null,
+        match_number_formatted: null,
+        match_number_legacy: null,
+        day_number: null,
+        match_sequence: null,
+        division_id: undefined, // Will be filled by caller
+        category_id: undefined
       }
 
       matches.push(match)
     }
   }
+
+  // REORDERING STEP:
+  // The generation loop above goes Top-Down (Finals -> Round 1) to handle next_match_id linking.
+  // Sort by Round ASC for logical ordering (Round 1 first).
+  // NOTE: Match numbers are NOT assigned here - they will be assigned during schedule generation
+
+  matches.sort((a, b) => {
+    // Primary: Low round first (Round 1 < Round 2)
+    if (a.round !== b.round) return a.round - b.round
+    // Secondary: maintain structural order within round
+    return 0
+  })
 
   // Propagate BYE winners to next rounds
   let changesMade = true

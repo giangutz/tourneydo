@@ -31,6 +31,61 @@ export async function getPlayersByCoachId(coachId: string): Promise<Player[]> {
 }
 
 /**
+ * Get players with teams, pagination, and search
+ * 
+ * @param coachId - Coach's user ID
+ * @param page - Page number (1-based)
+ * @param pageSize - Items per page
+ * @param query - Search query
+ * @returns Object with data and total pages
+ */
+export async function getPlayersWithTeamsPaginated(
+  coachId: string,
+  page: number = 1,
+  pageSize: number = 10,
+  query: string = ''
+): Promise<{ data: any[], totalPages: number }> {
+  const supabase = createServerSupabaseClient()
+  const start = (page - 1) * pageSize
+  const end = start + pageSize - 1
+
+  let dbQuery = supabase
+    .from('players')
+    .select(`
+      *,
+      team_players(
+        teams(*)
+      )
+    `, { count: 'exact' })
+    .eq('coach_id', coachId)
+    .order('created_at', { ascending: false })
+
+  if (query && query.trim() !== '') {
+    dbQuery = dbQuery.or(`first_name.ilike.%${query}%,last_name.ilike.%${query}%`)
+  }
+
+  // Apply range after filtering
+  dbQuery = dbQuery.range(start, end)
+
+  const { data, error, count } = await dbQuery
+
+  if (error) {
+    throw new Error(`Failed to fetch players: ${error.message}`)
+  }
+
+  const players = (data || []).map((player: any) => ({
+    ...player,
+    teams: player.team_players?.map((tp: any) => tp.teams).filter(Boolean) || [],
+    team_players: undefined,
+  }))
+
+  return {
+    data: players,
+    totalPages: Math.ceil((count || 0) / pageSize)
+  }
+}
+
+/**
  * Get a single player by ID
  * 
  * @param id - Player ID

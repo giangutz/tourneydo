@@ -1,4 +1,4 @@
-import { getPlayersWithTeams } from '@/lib/db/queries/players'
+import { getPlayersWithTeamsPaginated } from '@/lib/db/queries/players'
 import { auth } from '@clerk/nextjs/server'
 import { Button } from '@/components/ui/button'
 import {
@@ -23,13 +23,24 @@ import { PageHeader } from '@/components/ui/page-header'
 import { formatPlayerName, formatShortDate, calculateAge, getBeltLevelColor } from '@/lib/utils'
 import { routes } from '@/config/routes'
 import { Badge } from '@/components/ui/badge'
+import { SearchInput } from '@/components/search-input'
+import { CustomPagination } from '@/components/custom-pagination'
 
-export default async function CoachPlayersPage() {
+export default async function CoachPlayersPage(props: {
+  searchParams?: Promise<{
+    query?: string
+    page?: string
+  }>
+}) {
+  const searchParams = await props.searchParams
+  const query = searchParams?.query || ''
+  const currentPage = Number(searchParams?.page) || 1
+  
   const { userId } = await auth()
   if (!userId) return null
 
-  // Fetch players using the query layer
-  const players = await getPlayersWithTeams(userId)
+  // Fetch players with pagination
+  const { data: players, totalPages } = await getPlayersWithTeamsPaginated(userId, currentPage, 10, query)
 
   return (
     <DashboardShell>
@@ -51,6 +62,10 @@ export default async function CoachPlayersPage() {
           <CardDescription>Manage your athletes and assign them to teams.</CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="mb-4">
+             <SearchInput placeholder="Search players..." />
+          </div>
+          
           <Table>
             <TableHeader>
               <TableRow>
@@ -119,12 +134,16 @@ export default async function CoachPlayersPage() {
               {players.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={6} className="h-24 text-center">
-                    No players found. Add your first player to get started.
+                    No players found.
                   </TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
+          
+          <div className="mt-4">
+             <CustomPagination totalPages={totalPages} />
+          </div>
         </CardContent>
       </Card>
     </DashboardShell>

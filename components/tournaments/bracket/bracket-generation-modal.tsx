@@ -14,9 +14,11 @@ interface BracketGenerationModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   participantCount: number
+  matchCount?: number
+  type?: 'bracket' | 'schedule'
 }
 
-const STEPS = [
+const BRACKET_STEPS = [
   "Validating tournament parameters",
   "Fetching verified participants",
   "Assigning divisions",
@@ -24,12 +26,31 @@ const STEPS = [
   "Finalizing bracket structure"
 ]
 
-export function BracketGenerationModal({ open, onOpenChange, participantCount }: BracketGenerationModalProps) {
+const SCHEDULE_STEPS = [
+  "Analyzing schedule configurations",
+  "Validating match durations",
+  "Assigning match numbers",
+  "Optimizing court utilization",
+  "Finalizing daily milestones"
+]
+
+export function BracketGenerationModal({ open, onOpenChange, participantCount, matchCount = 0, type = 'bracket' }: BracketGenerationModalProps) {
   const [currentStep, setCurrentStep] = useState(0)
   const [progress, setProgress] = useState(0)
 
-  // Estimate duration: 2s base overhead + ~0.2s per participant
-  const estimatedSeconds = Math.max(3, Math.ceil((2000 + participantCount * 200) / 1000))
+  const steps = type === 'schedule' ? SCHEDULE_STEPS : BRACKET_STEPS
+  const title = type === 'schedule' ? 'Generating Schedule' : 'Generating Brackets'
+  const description = type === 'schedule' 
+    ? 'Please wait while we optimize the tournament schedule.'
+    : 'Please wait while we organize the tournament structure.'
+
+  // Estimate duration:
+  // Bracket: 2s base overhead + ~0.2s per participant (creation is heavier)
+  // Schedule: 3s base overhead + ~0.05s per match (mostly updates & calculation)
+  // If matchCount is 0 (first run), fallback to participant heuristic for schedule too.
+  const estimatedSeconds = type === 'schedule'
+    ? Math.max(3, Math.ceil(3000 + (matchCount || participantCount) * 50) / 1000)
+    : Math.max(3, Math.ceil((2000 + participantCount * 200) / 1000))
 
   useEffect(() => {
     if (open) {
@@ -39,10 +60,10 @@ export function BracketGenerationModal({ open, onOpenChange, participantCount }:
       const totalDuration = estimatedSeconds * 1000
       
       // Scale steps to match total duration
-      const stepDuration = totalDuration / STEPS.length
+      const stepDuration = totalDuration / steps.length
       const stepInterval = setInterval(() => {
         setCurrentStep((prev) => {
-          if (prev < STEPS.length - 1) return prev + 1
+          if (prev < steps.length - 1) return prev + 1
           return prev
         })
       }, stepDuration) 
@@ -64,19 +85,19 @@ export function BracketGenerationModal({ open, onOpenChange, participantCount }:
         clearInterval(progressInterval)
       }
     }
-  }, [open, estimatedSeconds])
+  }, [open, estimatedSeconds, steps.length])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md" onInteractOutside={(e) => e.preventDefault()}>
         <DialogHeader>
-          <DialogTitle>Generating Brackets</DialogTitle>
+          <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
-            Please wait while we organize the tournament structure.
+            {description}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
-          {STEPS.map((step, index) => {
+          {steps.map((step, index) => {
             const isCompleted = index < currentStep
             const isCurrent = index === currentStep
             const isPending = index > currentStep
