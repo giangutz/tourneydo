@@ -64,6 +64,7 @@ interface WeighInFormProps {
     minHeight?: number | null
     maxHeight?: number | null
   }
+  title?: string
 }
 
 const getSingle = (val: any) => Array.isArray(val) ? val[0] : val
@@ -75,7 +76,16 @@ export function WeighInForm({
   divisionName,
   categoryName,
   categoryLimits,
+  title
 }: WeighInFormProps) {
+  // ... existing code ...
+
+// Note: I cannot replace the whole file easily. I will replace the interface and function signature first.
+// Then I will replacing the usage in a second chunk.
+// Wait, I can do it in one chunk if I span enough lines.
+// But the usage is far down line 285.
+// I'll do two chunks or use multi_replace.
+
   const router = useRouter()
   
   const category = getSingle(participant.tournament_categories)
@@ -282,7 +292,7 @@ export function WeighInForm({
         <div>
            <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
              <Scale className="h-6 w-6" />
-             Weigh-In Participant
+             {title || 'Weigh-In Participant'}
            </h1>
            <p className="text-muted-foreground">
              {participant.player.first_name} {participant.player.last_name} • {participant.team.name}

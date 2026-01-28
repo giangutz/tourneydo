@@ -12,7 +12,7 @@ interface LiveBracketPageProps {
   }>
 }
 
-import { TournamentBreadcrumbs } from '@/components/tournaments/tournament-breadcrumbs'
+
 import { Button } from '@/components/ui/button'
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
@@ -34,18 +34,17 @@ export default async function LiveBracketPage({ params }: LiveBracketPageProps) 
 
   return (
     <DashboardShell>
-      <TournamentBreadcrumbs tournamentName={tournament.name} tournamentId={tournament.id} pageName="Matches" hideParent />
+      <div className="mb-4">
+        <Button variant="outline" asChild className="w-fit">
+          <Link href={routes.organizer.tournamentDetail(id)}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Tournament
+          </Link>
+        </Button>
+      </div>
       <PageHeader
         title="Matches"
         description="Live match console and results."
-        action={
-          <Button variant="outline" asChild>
-            <Link href={routes.organizer.tournamentDetail(id)}>
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Tournament
-            </Link>
-          </Button>
-        }
       />
 
       <OrganizerMatchesClient 

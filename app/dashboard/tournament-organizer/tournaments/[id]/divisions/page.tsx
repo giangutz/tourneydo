@@ -5,6 +5,11 @@ import { getAllTournamentDivisions } from '@/lib/db/queries/divisions'
 import { getTournamentById } from '@/lib/db/queries/tournaments'
 import { redirect } from 'next/navigation'
 import { Skeleton } from '@/components/ui/skeleton'
+import { id } from 'zod/v4/locales'
+import { Button } from '@/components/ui/button'
+import { ArrowLeft } from 'lucide-react'
+import Link from 'next/link'
+import { routes } from '@/config/routes'
 
 interface DivisionsPageProps {
   params: Promise<{
@@ -26,6 +31,14 @@ export default async function DivisionsPage({ params }: DivisionsPageProps) {
 
   return (
     <div className="space-y-6">
+      <div className="mb-4">
+        <Button variant="outline" asChild className="w-fit">
+          <Link href={routes.organizer.tournamentDetail(tournamentId)}>
+             <ArrowLeft className="mr-2 h-4 w-4" />
+             Back to Tournament
+          </Link>
+        </Button>
+      </div>
       <div className="flex flex-col gap-2">
         <h2 className="text-3xl font-bold tracking-tight">Division Management</h2>
         <p className="text-muted-foreground">

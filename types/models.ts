@@ -359,6 +359,20 @@ export interface Match {
     name: string
     gender: 'male' | 'female' | 'mixed'
   } | null
+
+  // Joined player data (optional, depends on query)
+  player1?: {
+    id: string
+    first_name: string
+    last_name: string
+    belt_level: string | null
+  } | null
+  player2?: {
+    id: string
+    first_name: string
+    last_name: string
+    belt_level: string | null
+  } | null
 }
 
 export type MatchInsert = Omit<Match, 'created_at' | 'updated_at'> & {

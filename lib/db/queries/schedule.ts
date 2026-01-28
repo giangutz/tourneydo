@@ -343,14 +343,41 @@ export async function getDailyScheduleSummary(tournamentId: string): Promise<Dai
   }
 
   // Map Belt Levels to Skill Labels
+  // Map Belt Levels to Skill Labels
   const getSkillLabel = (belt: string | null) => {
     if (!belt) return ''
     const beltLower = belt.toLowerCase()
-    if (beltLower.includes('white')) return 'Beginner'
+    // Beginner: White
+    if (beltLower.includes('white') || beltLower.includes('beginner')) return 'Beginner'
+    // Novice I: Yellow, Blue
     if (beltLower.includes('yellow') || beltLower.includes('blue')) return 'Novice I'
+    // Novice II: Red, Brown
     if (beltLower.includes('red') || beltLower.includes('brown')) return 'Novice II'
+    // Advanced: Black
     if (beltLower.includes('black')) return 'Advanced'
     return ''
+  }
+
+  // Pre-pass: Find representative belt for each Division+Category group
+  const repBeltMap = new Map<string, string>()
+  const matches = data || []
+
+  for (const match of matches) {
+    const divId = (match.tournament_divisions as any)?.id // No ID in select above? Need to check query.
+    // Wait, query doesn't select Division ID explicitly, only name. 
+    // Actually tournament_divisions (name). We can use name as key if needed, or update query.
+    // Let's rely on distinct names for now or better, update query to select ID.
+    // Existing query: tournament_divisions (name). Let's use name.
+
+    // Actually, let's assume we can key by DivName + CatName.
+    const divName = (match.tournament_divisions as any)?.name
+    const catName = (match.tournament_categories as any)?.name
+    const key = `${divName}::${catName}`
+
+    if (!repBeltMap.has(key)) {
+      const b = (match.player1 as any)?.belt_level || (match.player2 as any)?.belt_level
+      if (b) repBeltMap.set(key, b)
+    }
   }
 
   // Helper to build detailed name
@@ -364,7 +391,7 @@ export async function getDailyScheduleSummary(tournamentId: string): Promise<Dai
     // Junior/Senior -> Men/Women
     let genderLabel = ''
     const isYouth = /Gradeschool|Cadet/i.test(divName)
-    const isAdult = /Junior|Senior/i.test(divName)
+    // const isAdult = /Junior|Senior/i.test(divName) // Unused logic
 
     if (cat.gender === 'male') {
       genderLabel = isYouth ? 'Boys' : 'Men'
@@ -374,9 +401,15 @@ export async function getDailyScheduleSummary(tournamentId: string): Promise<Dai
       genderLabel = 'Mixed'
     }
 
-    // Try to find belt level from players
-    let belt = (match.player1 as any)?.belt_level || (match.player2 as any)?.belt_level
-    const skillLabel = getSkillLabel(belt)
+    // Try to find belt level from this match, or fallback to representative belt
+    const ownBelt = (match.player1 as any)?.belt_level || (match.player2 as any)?.belt_level
+    const key = `${divName}::${cat.name}`
+    const repBelt = repBeltMap.get(key)
+
+    // Use own belt if available (most accurate), otherwise Rep belt
+    const effectiveBelt = ownBelt || repBelt
+
+    const skillLabel = getSkillLabel(effectiveBelt)
 
     // Build parts: Division + Gender + Skill
     // User Request: "Category + Gender + Age (Division) + Belt + Weight (Category)"
@@ -404,13 +437,6 @@ export async function getDailyScheduleSummary(tournamentId: string): Promise<Dai
 
     // 4. Category Name (Weight / Group) - CRITICAL ADDITION
     const catName = (match.tournament_categories as any)?.name
-    if (catName) {
-      // e.g. "Fin", "Group A"
-      // Add a separator for clarity? User usage: "Cadet Girls Novice II - Bantam"
-      // So we append it with a hyphen logic in the join or just push it?
-      // Actually, let's just push it. The user example has " - ". 
-      // We can check if we pushed anything.
-    }
 
     let base = parts.join(' ')
     if (catName) {
@@ -420,7 +446,7 @@ export async function getDailyScheduleSummary(tournamentId: string): Promise<Dai
     return base
   }
 
-  for (const match of data || []) {
+  for (const match of matches) {
     const day = match.day_number!
     if (!dayMap.has(day)) {
       dayMap.set(day, {

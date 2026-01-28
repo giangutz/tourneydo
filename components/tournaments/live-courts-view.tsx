@@ -4,6 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Match, Tournament } from '@/types/models'
 
+import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { useState } from 'react'
+
 interface LiveCourtsViewProps {
   tournament: Tournament
   matches: Match[]
@@ -12,16 +16,33 @@ interface LiveCourtsViewProps {
 
 export function LiveCourtsView({ tournament, matches, participants }: LiveCourtsViewProps) {
   const courts = Array.from({ length: tournament.courts || 0 }, (_, i) => i + 1)
+  const [courtPage, setCourtPage] = useState<Record<number, number>>({})
+  const ITEMS_PER_PAGE = 3
 
-  const getPlayerDisplay = (playerId: string | null) => {
-    if (!playerId) return { name: 'BYE', team: null }
-    const p = participants.find(p => p.player_id === playerId)
-    if (!p) return { name: 'TBD', team: null }
+  const getPlayerDisplay = (match: Match, side: 'player1' | 'player2') => {
+    const playerId = side === 'player1' ? match.player1_id : match.player2_id
+    const playerObj = side === 'player1' ? match.player1 : match.player2
     
-    return {
-      name: `${p.player.first_name} ${p.player.last_name}`,
-      team: p.team?.name || 'Unattached'
+    if (!playerId) return { name: 'BYE', team: null }
+
+    // Try to find in participants list first (for Team info)
+    const p = participants.find(p => p.player_id === playerId || p.player?.id === playerId)
+    if (p) {
+        return {
+            name: `${p.player.first_name} ${p.player.last_name}`,
+            team: p.team?.name || 'Unattached'
+        }
     }
+
+    // Fallback to match data
+    if (playerObj) {
+         return {
+            name: `${playerObj.first_name} ${playerObj.last_name}`,
+            team: 'TBD' // We don't have team in match object
+        }
+    }
+    
+    return { name: 'TBD', team: null }
   }
 
   if (!tournament.courts || tournament.courts === 0) {
@@ -55,16 +76,16 @@ export function LiveCourtsView({ tournament, matches, participants }: LiveCourts
                 {currentMatch ? (
                   <div className="text-center mb-6">
                     <div className="mb-4 text-sm text-muted-foreground">
-                      Match #{currentMatch.match_number} • Round {currentMatch.round}
+                      Match #{currentMatch.match_number}
                     </div>
                     <div className="flex flex-col gap-6">
                       {/* Player 1 */}
                       <div className="flex flex-col items-center">
                         <span className="text-xl font-bold">
-                          {getPlayerDisplay(currentMatch.player1_id).name}
+                          {getPlayerDisplay(currentMatch, 'player1').name}
                         </span>
                         <span className="text-sm text-muted-foreground">
-                          {getPlayerDisplay(currentMatch.player1_id).team}
+                          {getPlayerDisplay(currentMatch, 'player1').team}
                         </span>
                       </div>
 
@@ -73,10 +94,10 @@ export function LiveCourtsView({ tournament, matches, participants }: LiveCourts
                       {/* Player 2 */}
                       <div className="flex flex-col items-center">
                         <span className="text-xl font-bold">
-                          {getPlayerDisplay(currentMatch.player2_id).name}
+                          {getPlayerDisplay(currentMatch, 'player2').name}
                         </span>
                         <span className="text-sm text-muted-foreground">
-                          {getPlayerDisplay(currentMatch.player2_id).team}
+                          {getPlayerDisplay(currentMatch, 'player2').team}
                         </span>
                       </div>
                     </div>
@@ -93,25 +114,69 @@ export function LiveCourtsView({ tournament, matches, participants }: LiveCourts
                   
                   {queuedMatches.length === 0 ? (
                     <p className="text-xs text-muted-foreground text-center py-2">No upcoming matches</p>
-                  ) : (
-                    <div className="space-y-3">
-                      {queuedMatches.map((match, idx) => (
-                        <div key={match.id} className="text-sm border rounded p-2 bg-muted/20">
-                          <div className="flex justify-between items-center mb-2">
-                            <span className="font-medium text-xs">Match #{match.match_number}</span>
-                            {idx === 0 && !currentMatch && (
-                              <Badge variant="outline" className="text-[10px] h-5">Next</Badge>
-                            )}
-                          </div>
-                          <div className="flex justify-between items-center text-xs">
-                            <span className="truncate max-w-[45%]">{getPlayerDisplay(match.player1_id).name}</span>
-                            <span className="text-muted-foreground">vs</span>
-                            <span className="truncate max-w-[45%] text-right">{getPlayerDisplay(match.player2_id).name}</span>
-                          </div>
+                  ) : (() => {
+                    const currentCourtPage = courtPage[courtNumber] || 1
+                    const totalPages = Math.ceil(queuedMatches.length / ITEMS_PER_PAGE)
+                    const displayMatches = queuedMatches.slice(
+                      (currentCourtPage - 1) * ITEMS_PER_PAGE,
+                      currentCourtPage * ITEMS_PER_PAGE
+                    )
+
+                    return (
+                      <>
+                        <div className="space-y-3">
+                          {displayMatches.map((match, idx) => (
+                            <div key={match.id} className="text-sm border rounded p-2 bg-muted/20">
+                              <div className="flex justify-between items-center mb-2">
+                                <span className="font-medium text-xs">Match #{match.match_number}</span>
+                                {idx === 0 && !currentMatch && currentCourtPage === 1 && (
+                                  <Badge variant="outline" className="text-[10px] h-5">Next</Badge>
+                                )}
+                              </div>
+                              <div className="flex flex-col md:flex-row md:justify-between md:items-start text-xs mb-2 gap-1 md:gap-0">
+                                <div className="flex flex-col w-full md:max-w-[45%]">
+                                  <span className="truncate font-medium">{getPlayerDisplay(match, 'player1').name}</span>
+                                  <span className="truncate text-[10px] text-muted-foreground">{getPlayerDisplay(match, 'player1').team}</span>
+                                </div>
+                                <span className="text-muted-foreground text-[10px] md:mt-1 self-center md:self-auto">vs</span>
+                                <div className="flex flex-col w-full md:items-end md:max-w-[45%]">
+                                  <span className="truncate font-medium md:text-right">{getPlayerDisplay(match, 'player2').name}</span>
+                                  <span className="truncate text-[10px] text-muted-foreground md:text-right">{getPlayerDisplay(match, 'player2').team}</span>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
-                  )}
+
+                        {/* Pagination Controls */}
+                        {totalPages > 1 && (
+                          <div className="flex justify-center items-center gap-2 mt-4">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              disabled={currentCourtPage === 1}
+                              onClick={() => setCourtPage(prev => ({ ...prev, [courtNumber]: currentCourtPage - 1 }))}
+                            >
+                              <ChevronLeft className="h-4 w-4" />
+                            </Button>
+                            <span className="text-xs text-muted-foreground">
+                              Page {currentCourtPage} of {totalPages}
+                            </span>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              disabled={currentCourtPage === totalPages}
+                              onClick={() => setCourtPage(prev => ({ ...prev, [courtNumber]: currentCourtPage + 1 }))}
+                            >
+                              <ChevronRight className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )}
+                      </>
+                    )
+                  })()}
                 </div>
               </CardContent>
             </Card>

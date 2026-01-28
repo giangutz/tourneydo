@@ -5,6 +5,7 @@ import { getBracketRoundLabel } from './bracket-generator';
 interface Participant {
   player_id: string;
   player: {
+    id?: string;
     first_name: string;
     last_name: string;
   };
@@ -64,13 +65,25 @@ export function calculateRoundWins(match: Match): { player1Wins: number, player2
 /**
  * Get display name for a player
  */
-function getPlayerName(playerId: string | null, participants: Participant[]): string {
+function getPlayerName(playerId: string | null, participants: Participant[], match?: Match, side?: 'player1' | 'player2'): string {
   if (!playerId) return 'BYE';
 
-  const participant = participants.find(p => p.player_id === playerId);
-  if (!participant || !participant.player) return 'Unknown Player';
+  // Try finding in participants first (better data source for teams etc)
+  const participant = participants.find(p => p.player_id === playerId || p.player?.id === (playerId as any)); // loose check if id matches
 
-  return `${participant.player.first_name} ${participant.player.last_name}`;
+  if (participant && participant.player) {
+    return `${participant.player.first_name} ${participant.player.last_name}`;
+  }
+
+  // Fallback to match object if available
+  if (match && side) {
+    const playerObj = side === 'player1' ? match.player1 : match.player2;
+    if (playerObj) {
+      return `${playerObj.first_name} ${playerObj.last_name}`;
+    }
+  }
+
+  return 'Unknown Player';
 }
 
 /**
@@ -79,8 +92,8 @@ function getPlayerName(playerId: string | null, participants: Participant[]): st
 function getTeamName(playerId: string | null, participants: Participant[]): string {
   if (!playerId) return '';
 
-  const participant = participants.find(p => p.player_id === playerId);
-  if (!participant || !participant.team) return 'Unattached';
+  const participant = participants.find(p => p.player_id === playerId || p.player?.id === (playerId as any));
+  if (!participant || !participant.team) return 'TBD';
 
   return participant.team.name;
 }
@@ -117,7 +130,7 @@ export function transformMatchToGame(
       round3: match.score_round3_player1
     },
     seed: {
-      displayName: getPlayerName(match.player1_id, participants),
+      displayName: getPlayerName(match.player1_id, participants, match, 'player1'),
       rank: 1, // Placeholder
       sourceGame: topSourceMatch ? transformMatchToGame(topSourceMatch, allMatches, participants) : null,
       sourcePool: null
@@ -138,7 +151,7 @@ export function transformMatchToGame(
       round3: match.score_round3_player2
     },
     seed: {
-      displayName: getPlayerName(match.player2_id, participants),
+      displayName: getPlayerName(match.player2_id, participants, match, 'player2'),
       rank: 2, // Placeholder
       sourceGame: bottomSourceMatch ? transformMatchToGame(bottomSourceMatch, allMatches, participants) : null,
       sourcePool: null

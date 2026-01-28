@@ -8,6 +8,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { StatCard } from '@/components/ui/stat-card'
 import { Trophy, Users, DollarSign, Activity, Calendar } from "lucide-react"
 import { formatDistanceToNow } from 'date-fns'
 
@@ -23,31 +24,13 @@ export default async function TournamentOrganizerDashboard() {
     getTotalRevenueByOrganizerId(userId)
   ])
 
-  // Calculate tournament statuses
-  const now = new Date()
-  const thirtyDaysFromNow = new Date()
-  thirtyDaysFromNow.setDate(now.getDate() + 30)
-
   const stats = {
     total: tournaments.length,
-    upcoming: 0,
-    ongoing: 0,
-    completed: 0,
-    cancelled: 0
+    upcoming: tournaments.filter(t => t.status === 'upcoming').length,
+    ongoing: tournaments.filter(t => t.status === 'ongoing').length,
+    completed: tournaments.filter(t => t.status === 'completed').length,
+    cancelled: tournaments.filter(t => t.status === 'cancelled').length
   }
-
-  tournaments.forEach(t => {
-    // Determine status based on dates matching logic in queries/tournaments.ts
-    // If status is explicit in DB, use it, but logic here helps validation
-    const status = t.status
-    
-    // We can also double check with dates if status might be stale in UI view
-    // But t.status from getTournamentsByOrganizerId should be auto-updated
-    if (status === 'upcoming') stats.upcoming++
-    else if (status === 'ongoing') stats.ongoing++
-    else if (status === 'completed') stats.completed++
-    else if (status === 'cancelled') stats.cancelled++
-  })
 
   // Format currency
   const formattedRevenue = new Intl.NumberFormat('en-PH', {
@@ -56,91 +39,101 @@ export default async function TournamentOrganizerDashboard() {
   }).format(totalRevenue)
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-bold tracking-tight">Organizer Dashboard</h1>
+    <div className="space-y-8">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Organizer Dashboard</h1>
+        <p className="text-muted-foreground mt-2">Overview of your tournaments and revenue.</p>
+      </div>
       
-      <div className="space-y-4">
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {/* Tournaments Overview Card */}
-          <Card className="col-span-1">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Tournaments Overview</CardTitle>
-              <Trophy className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold mb-4">{stats.total} <span className="text-sm font-normal text-muted-foreground">Total</span></div>
-              <div className="grid grid-cols-4 gap-2 text-center">
-                <div className="flex flex-col items-center p-2 bg-muted/50 rounded-lg">
-                  <span className="text-[10px] text-muted-foreground uppercase font-semibold">Ongoing</span>
-                  <span className="text-lg font-bold text-green-600">{stats.ongoing}</span>
-                </div>
-                <div className="flex flex-col items-center p-2 bg-muted/50 rounded-lg">
-                  <span className="text-[10px] text-muted-foreground uppercase font-semibold">Upcoming</span>
-                  <span className="text-lg font-bold text-blue-600">{stats.upcoming}</span>
-                </div>
-                <div className="flex flex-col items-center p-2 bg-muted/50 rounded-lg">
-                  <span className="text-[10px] text-muted-foreground uppercase font-semibold">Done</span>
-                  <span className="text-lg font-bold text-gray-500">{stats.completed}</span>
-                </div>
-                <div className="flex flex-col items-center p-2 bg-muted/50 rounded-lg">
-                  <span className="text-[10px] text-muted-foreground uppercase font-semibold">Cancelled</span>
-                  <span className="text-lg font-bold text-red-500">{stats.cancelled}</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        
-        {/* Registrations Card */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Registrations</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalRegistrations}</div>
-            <p className="text-xs text-muted-foreground">Across all events</p>
-            <div className="mt-4 pt-4 border-t text-xs text-muted-foreground">
-               Approx. {stats.total > 0 ? (totalRegistrations / stats.total).toFixed(1) : 0} registrations / tournament
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Revenue Card */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formattedRevenue}</div>
-            <p className="text-xs text-muted-foreground">Verified payments</p>
-            <div className="mt-4 pt-4 border-t text-xs text-muted-foreground flex items-center gap-1">
-              <Activity className="h-3 w-3" />
-              <span>Based on confirmed payments</span>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Top Stats Grid */}
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          title="Total Revenue"
+          value={formattedRevenue}
+          description="Verified payments"
+          icon={DollarSign}
+          className="lg:col-span-2"
+        />
+        <StatCard
+          title="Total Registrations"
+          value={totalRegistrations}
+          description={`Avg. ${(stats.total > 0 ? totalRegistrations / stats.total : 0).toFixed(1)} per event`}
+          icon={Users}
+        />
+        <StatCard
+          title="Total Tournaments"
+          value={stats.total}
+          description="All time events"
+          icon={Trophy}
+        />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        <Card className="col-span-4">
+      <div className="grid gap-6 lg:grid-cols-7">
+        
+        {/* Tournament Status Breakdown (Custom Card) */}
+        <Card className="lg:col-span-4 shadow-sm border bg-card transition-all hover:shadow-md">
+           <CardHeader>
+              <CardTitle>Tournament Status</CardTitle>
+           </CardHeader>
+           <CardContent>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                 <div className="p-4 rounded-2xl bg-blue-50 dark:bg-blue-500/10 border border-blue-100 dark:border-blue-500/20 flex flex-col items-center justify-center text-center">
+                    <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">{stats.upcoming}</span>
+                    <span className="text-sm font-medium text-blue-600/80 dark:text-blue-400/80">Upcoming</span>
+                 </div>
+                 <div className="p-4 rounded-2xl bg-green-50 dark:bg-green-500/10 border border-green-100 dark:border-green-500/20 flex flex-col items-center justify-center text-center">
+                    <div className="flex items-center gap-1.5">
+                       <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                        </span>
+                        <span className="text-2xl font-bold text-green-600 dark:text-green-400">{stats.ongoing}</span>
+                    </div>
+                    <span className="text-sm font-medium text-green-600/80 dark:text-green-400/80">Active Now</span>
+                 </div>
+                 <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700 flex flex-col items-center justify-center text-center">
+                    <span className="text-2xl font-bold text-slate-600 dark:text-slate-400">{stats.completed}</span>
+                    <span className="text-sm font-medium text-slate-500">Completed</span>
+                 </div>
+                 <div className="p-4 rounded-2xl bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/20 flex flex-col items-center justify-center text-center">
+                    <span className="text-2xl font-bold text-red-600 dark:text-red-400">{stats.cancelled}</span>
+                    <span className="text-sm font-medium text-red-600/80 dark:text-red-400/80">Cancelled</span>
+                 </div>
+              </div>
+           </CardContent>
+        </Card>
+
+        {/* Recent Activity */}
+        <Card className="lg:col-span-3 shadow-sm border bg-card transition-all hover:shadow-md">
           <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+                <Activity className="h-5 w-5 text-primary" />
+                Recent Activity
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-8">
+            <div className="space-y-6">
               {recentActivity.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No recent activity to display.
-                </p>
+                <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
+                   <Calendar className="h-8 w-8 mb-2 opacity-20" />
+                   <p className="text-sm">No recent activity.</p>
+                </div>
               ) : (
-                recentActivity.map((activity: any) => (
-                  <div key={activity.id} className="flex items-center">
-                    <div className="space-y-1">
-                      <p className="text-sm font-medium leading-none">
-                        <span className="font-semibold">{activity.players?.first_name} {activity.players?.last_name}</span> registered for <span className="font-semibold">{activity.tournaments?.name}</span>
+                recentActivity.map((activity: any, i: number) => (
+                  <div key={activity.id} className="group flex items-start gap-4 p-3 -mx-3 rounded-xl hover:bg-muted/50 transition-colors">
+                     {/* Avatar / Icon Placeholder */}
+                    <div className="h-10 w-10 flex-shrink-0 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs ring-2 ring-background group-hover:ring-muted transition-all">
+                        {activity.players?.first_name?.[0]}{activity.players?.last_name?.[0]}
+                    </div>
+                    
+                    <div className="space-y-1 flex-1 min-w-0">
+                      <p className="text-sm font-medium leading-none truncate">
+                        {activity.players?.first_name} {activity.players?.last_name}
                       </p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-muted-foreground line-clamp-1">
+                         Registered for <span className="font-medium text-foreground">{activity.tournaments?.name}</span>
+                      </p>
+                      <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
                         {formatDistanceToNow(new Date(activity.created_at), { addSuffix: true })}
                       </p>
                     </div>
@@ -151,7 +144,7 @@ export default async function TournamentOrganizerDashboard() {
           </CardContent>
         </Card>
       </div>
-      </div>
     </div>
   )
 }
+

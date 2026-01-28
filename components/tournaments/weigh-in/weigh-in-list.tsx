@@ -265,26 +265,25 @@ export function WeighInList({ participants, divisions, tournamentId, page, total
   return (
     <Card>
       <CardHeader>
-         <div className="flex flex-col gap-4">
-            <div className="flex flex-row items-center justify-between">
+            <div className="flex flex-col lg:flex-row gap-4 lg:items-center justify-between">
                 <div>
                   <CardTitle>Prescheduled Weigh-Ins</CardTitle>
                   <CardDescription>
                     Surprise check list for today. ({totalCount} participants)
                   </CardDescription>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <Button 
                     variant="outline" 
                     size="sm" 
                     disabled={isExporting || isDeleting}
-                    className="text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/20"
+                    className="flex-1 sm:flex-none text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/20"
                     onClick={() => setDeleteDialogOpen(true)}
                   >
                     {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
                     Delete List
                   </Button>
-                  <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={isExporting || isDeleting}>
+                  <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={isExporting || isDeleting} className="flex-1 sm:flex-none">
                       {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />} 
                       {isExporting ? 'Exporting...' : 'Export CSV'}
                   </Button>
@@ -292,153 +291,215 @@ export function WeighInList({ participants, divisions, tournamentId, page, total
             </div>
 
             {/* Filters */}
-            <div className="flex flex-wrap items-center gap-3">
-                <div className="relative flex-1 min-w-[200px] max-w-xs">
+            <div className="flex flex-col sm:flex-row flex-wrap items-center gap-3">
+                <div className="relative w-full sm:flex-1 min-w-[200px]">
                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                    <Input 
                       placeholder="Search athlete..." 
-                      className="pl-8" 
+                      className="pl-8 w-full" 
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                    />
                 </div>
                 
-                <Select value={statusFilter} onValueChange={(val) => updateFilter('status', val)}>
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Statuses</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="completed">Passed/Completed</SelectItem> 
-                    <SelectItem value="not-required">Failed/DQ</SelectItem> 
-                  </SelectContent>
-                </Select>
+                <div className="flex flex-col sm:flex-row flex-wrap gap-3 w-full sm:w-auto">
+                  <Select value={statusFilter} onValueChange={(val) => updateFilter('status', val)}>
+                    <SelectTrigger className="w-full sm:w-[150px]">
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Statuses</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="completed">Passed/Completed</SelectItem> 
+                      <SelectItem value="not-required">Failed/DQ</SelectItem> 
+                    </SelectContent>
+                  </Select>
 
-                <Select value={divisionFilter} onValueChange={(val) => updateFilter('divisionId', val)}>
-                  <SelectTrigger className="w-[160px]">
-                    <SelectValue placeholder="Select Division" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Divisions</SelectItem>
-                    {divisions
-                        .filter(d => ['Cadet', 'Junior', 'Senior'].some(term => d.name.includes(term)))
-                        .map(d => (
-                        <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  <Select value={divisionFilter} onValueChange={(val) => updateFilter('divisionId', val)}>
+                    <SelectTrigger className="w-full sm:w-[160px]">
+                      <SelectValue placeholder="Select Division" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Divisions</SelectItem>
+                      {divisions
+                          .filter(d => ['Cadet', 'Junior', 'Senior'].some(term => d.name.includes(term)))
+                          .map(d => (
+                          <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
 
-                <Select value={categoryFilter} onValueChange={(val) => updateFilter('categoryId', val)} disabled={divisionFilter === 'all'}>
-                  <SelectTrigger className="w-[200px]">
-                    <SelectValue placeholder="Select Category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Categories</SelectItem>
-                    {(() => {
-                        // Deduplicate categories by label
-                        const uniqueCategories = new Map();
-                        availableCategories.forEach((c: any) => {
-                            const label = getCategoryLabel(c, activeDivision?.name || '');
-                            // Use Label + Gender as key to differentiate same weights but different gender (though label already includes gender now)
-                            if (!uniqueCategories.has(label)) {
-                                uniqueCategories.set(label, c);
-                            } else {
-                                const existing = uniqueCategories.get(label);
-                                if (!existing.max_weight && c.max_weight) {
-                                    uniqueCategories.set(label, c);
-                                }
-                            }
-                        });
-                        
-                        // Convert back to array and sort by weight/name
-                        return Array.from(uniqueCategories.values()).map((c: any) => (
-                            <SelectItem key={c.id} value={c.id}>
-                                {getCategoryLabel(c, activeDivision?.name || '')}
-                            </SelectItem>
-                        ));
-                    })()}
-                  </SelectContent>
-                </Select>
+                  <Select value={categoryFilter} onValueChange={(val) => updateFilter('categoryId', val)} disabled={divisionFilter === 'all'}>
+                    <SelectTrigger className="w-full sm:w-[200px]">
+                      <SelectValue placeholder="Select Category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Categories</SelectItem>
+                      {(() => {
+                          // Deduplicate categories by label
+                          const uniqueCategories = new Map();
+                          availableCategories.forEach((c: any) => {
+                              const label = getCategoryLabel(c, activeDivision?.name || '');
+                              if (!uniqueCategories.has(label)) {
+                                  uniqueCategories.set(label, c);
+                              } else {
+                                  const existing = uniqueCategories.get(label);
+                                  if (!existing.max_weight && c.max_weight) {
+                                      uniqueCategories.set(label, c);
+                                  }
+                              }
+                          });
+                          
+                          return Array.from(uniqueCategories.values()).map((c: any) => (
+                              <SelectItem key={c.id} value={c.id}>
+                                  {getCategoryLabel(c, activeDivision?.name || '')}
+                              </SelectItem>
+                          ));
+                      })()}
+                    </SelectContent>
+                  </Select>
+                </div>
             </div>
-         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Desktop Table */}
+        <div className="hidden lg:block rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Athlete</TableHead>
+                <TableHead>Division</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Max Weight</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {participants.map((p: Participant) => {
+                const details = getCategoryDetails(p.division_id, p.category_id)
+                const fullName = p.player 
+                  ? `${p.player.first_name} ${p.player.last_name}`
+                  : `${p.first_name} ${p.last_name}`
+                const teamName = p.team?.name || p.team_name || '-'
 
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Athlete</TableHead>
-              <TableHead>Division</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Max Weight</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {participants.map((p: Participant) => {
-              const details = getCategoryDetails(p.division_id, p.category_id)
-              const fullName = p.player 
-                ? `${p.player.first_name} ${p.player.last_name}`
-                : `${p.first_name} ${p.last_name}`
-              const teamName = p.team?.name || p.team_name || '-'
+                let statusBadge = <Badge variant="outline"><Clock className="mr-1 h-3 w-3" /> Pending</Badge>
+                if (p.disqualified && p.disqualification_reason?.includes('Weigh-in')) {
+                  statusBadge = <Badge variant="destructive"><XCircle className="mr-1 h-3 w-3" /> Failed</Badge>
+                } else if (p.weighed_in_at && !p.disqualified) {
+                  statusBadge = <Badge variant="default" className="bg-green-600 hover:bg-green-700"><CheckCircle2 className="mr-1 h-3 w-3" /> Passed</Badge>
+                } else if (p.disqualified) {
+                  statusBadge = <Badge variant="destructive">Disqualified</Badge>
+                }
 
-              let statusBadge = <Badge variant="outline"><Clock className="mr-1 h-3 w-3" /> Pending</Badge>
-              if (p.disqualified && p.disqualification_reason?.includes('Weigh-in')) {
-                 statusBadge = <Badge variant="destructive"><XCircle className="mr-1 h-3 w-3" /> Failed</Badge>
-              } else if (p.weighed_in_at && !p.disqualified) {
-                 statusBadge = <Badge variant="default" className="bg-green-600 hover:bg-green-700"><CheckCircle2 className="mr-1 h-3 w-3" /> Passed</Badge>
-              } else if (p.disqualified) {
-                 statusBadge = <Badge variant="destructive">Disqualified</Badge>
-              }
+                return (
+                  <TableRow key={p.id}>
+                    <TableCell>
+                      <div className="font-medium">{fullName}</div>
+                      <div className="text-xs text-muted-foreground">{teamName}</div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm">{details.divisionName}</div>
+                      <div className="text-xs text-muted-foreground">{details.categoryName}</div>
+                    </TableCell>
+                    <TableCell>{statusBadge}</TableCell>
+                    <TableCell className="text-right">
+                      {details.maxWeight ? `${(details.maxWeight * 1.05).toFixed(2)}kg` : 'Open'}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="secondary" size="sm" asChild>
+                        <Link href={`/dashboard/tournament-organizer/tournaments/${tournamentId}/random-weigh-in/${p.id}`}>
+                          <Scale className="h-4 w-4 mr-2" />
+                          Random Check
+                        </Link>
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
+              {participants.length === 0 && (
+                  <TableRow>
+                      <TableCell colSpan={5} className="h-24 text-center">
+                          No participants found matching your filters.
+                      </TableCell>
+                  </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
 
-              return (
-                <TableRow key={p.id}>
-                  <TableCell>
-                    <div className="font-medium">{fullName}</div>
-                    <div className="text-xs text-muted-foreground">{teamName}</div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-sm">{details.divisionName}</div>
-                    <div className="text-xs text-muted-foreground">{details.categoryName}</div>
-                  </TableCell>
-                  <TableCell>{statusBadge}</TableCell>
-                  <TableCell className="text-right">
-                    {details.maxWeight ? `${details.maxWeight}kg` : 'Open'}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="secondary" size="sm" asChild>
-                      <Link href={`/dashboard/tournament-organizer/tournaments/${tournamentId}/weigh-in/${p.id}`}>
+        {/* Mobile Card View */}
+        <div className="lg:hidden space-y-4">
+          {participants.length === 0 ? (
+             <div className="text-center py-12 border rounded-lg bg-muted/10">
+               <p className="text-muted-foreground">No participants found</p>
+             </div>
+          ) : (
+             participants.map((p: Participant) => {
+                const details = getCategoryDetails(p.division_id, p.category_id)
+                const fullName = p.player 
+                  ? `${p.player.first_name} ${p.player.last_name}`
+                  : `${p.first_name} ${p.last_name}`
+                const teamName = p.team?.name || p.team_name || '-'
+
+                let statusBadge = <Badge variant="outline"><Clock className="mr-1 h-3 w-3" /> Pending</Badge>
+                if (p.disqualified && p.disqualification_reason?.includes('Weigh-in')) {
+                  statusBadge = <Badge variant="destructive"><XCircle className="mr-1 h-3 w-3" /> Failed</Badge>
+                } else if (p.weighed_in_at && !p.disqualified) {
+                  statusBadge = <Badge variant="default" className="bg-green-600 hover:bg-green-700"><CheckCircle2 className="mr-1 h-3 w-3" /> Passed</Badge>
+                } else if (p.disqualified) {
+                  statusBadge = <Badge variant="destructive">Disqualified</Badge>
+                }
+
+                return (
+                  <div key={p.id} className="border rounded-lg bg-card p-4 space-y-4 shadow-sm">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="font-semibold text-base">{fullName}</div>
+                        <div className="text-sm text-muted-foreground">{teamName}</div>
+                      </div>
+                      {statusBadge}
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div>
+                        <span className="text-muted-foreground block text-xs">Division</span>
+                        <span className="font-medium">{details.divisionName}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground block text-xs">Category</span>
+                        <span className="font-medium">{details.categoryName}</span>
+                      </div>
+                       <div>
+                        <span className="text-muted-foreground block text-xs">Max Weight (+5%)</span>
+                        <span className="font-medium">{details.maxWeight ? `${(details.maxWeight * 1.05).toFixed(2)}kg` : 'Open'}</span>
+                      </div>
+                    </div>
+
+                    <Button variant="secondary" className="w-full" asChild>
+                      <Link href={`/dashboard/tournament-organizer/tournaments/${tournamentId}/random-weigh-in/${p.id}`}>
                         <Scale className="h-4 w-4 mr-2" />
-                        Weigh In
+                        Random Check
                       </Link>
                     </Button>
-                  </TableCell>
-                </TableRow>
-              )
-            })}
-            {participants.length === 0 && (
-                <TableRow>
-                    <TableCell colSpan={5} className="h-24 text-center">
-                        No participants found matching your filters.
-                    </TableCell>
-                </TableRow>
-            )}
-          </TableBody>
-        </Table>
+                  </div>
+                )
+             })
+          )}
+        </div>
 
         {/* Pagination Controls */}
         {totalPages > 1 && (
-            <div className="flex items-center justify-between py-4">
+            <div className="flex flex-col sm:flex-row items-center justify-between py-4 gap-4 sm:gap-0">
                 <div className="text-sm text-muted-foreground">
                     Page {page} of {totalPages}
                 </div>
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center gap-2 w-full sm:w-auto">
                     <Button
                         variant="outline"
                         size="sm"
                         onClick={() => handlePageChange(page - 1)}
                         disabled={page <= 1}
+                        className="flex-1 sm:flex-none"
                     >
                         <ArrowLeft className="h-4 w-4 mr-2" />
                         Previous
@@ -448,6 +509,7 @@ export function WeighInList({ participants, divisions, tournamentId, page, total
                         size="sm"
                         onClick={() => handlePageChange(page + 1)}
                         disabled={page >= totalPages}
+                        className="flex-1 sm:flex-none"
                     >
                         Next
                         <ArrowRight className="h-4 w-4 ml-2" />

@@ -7,64 +7,33 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "13.0.5"
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
-      match_rounds: {
-        Row: {
-          created_at: string | null
-          id: string
-          match_id: string
-          round_number: number
-          score_player1: number | null
-          score_player2: number | null
-          status: string | null
-          updated_at: string | null
-          winner_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          match_id: string
-          round_number: number
-          score_player1?: number | null
-          score_player2?: number | null
-          status?: string | null
-          updated_at?: string | null
-          winner_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          match_id?: string
-          round_number?: number
-          score_player1?: number | null
-          score_player2?: number | null
-          status?: string | null
-          updated_at?: string | null
-          winner_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "match_rounds_match_id_fkey"
-            columns: ["match_id"]
-            isOneToOne: false
-            referencedRelation: "matches"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "match_rounds_winner_id_fkey"
-            columns: ["winner_id"]
-            isOneToOne: false
-            referencedRelation: "players"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       division_schedule_config: {
         Row: {
           avg_match_duration: number | null
@@ -132,87 +101,228 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "tournaments"
             referencedColumns: ["id"]
-          }
+          },
+        ]
+      }
+      match_athlete_readiness: {
+        Row: {
+          athlete_id: string
+          called: boolean
+          called_at: string | null
+          called_by: string | null
+          created_at: string
+          id: string
+          match_id: string
+          updated_at: string
+        }
+        Insert: {
+          athlete_id: string
+          called?: boolean
+          called_at?: string | null
+          called_by?: string | null
+          created_at?: string
+          id?: string
+          match_id: string
+          updated_at?: string
+        }
+        Update: {
+          athlete_id?: string
+          called?: boolean
+          called_at?: string | null
+          called_by?: string | null
+          created_at?: string
+          id?: string
+          match_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "match_athlete_readiness_athlete_id_fkey"
+            columns: ["athlete_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_athlete_readiness_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      match_rounds: {
+        Row: {
+          created_at: string | null
+          id: string
+          match_id: string
+          round_number: number
+          score_player1: number | null
+          score_player2: number | null
+          status: string | null
+          updated_at: string | null
+          winner_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          match_id: string
+          round_number: number
+          score_player1?: number | null
+          score_player2?: number | null
+          status?: string | null
+          updated_at?: string | null
+          winner_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          match_id?: string
+          round_number?: number
+          score_player1?: number | null
+          score_player2?: number | null
+          status?: string | null
+          updated_at?: string | null
+          winner_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "match_rounds_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_rounds_winner_id_fkey"
+            columns: ["winner_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
         ]
       }
       matches: {
         Row: {
+          athlete1_available_at: string | null
+          athlete2_available_at: string | null
           category_id: string | null
-          court_id: string | null
+          court_number: number | null
           created_at: string
+          day_number: number | null
+          division_id: string | null
           id: string
-          match_number: number | null
-          next_match_loser_id: string | null
-          next_match_winner_id: string | null
+          lifecycle_state:
+            | Database["public"]["Enums"]["match_lifecycle_state"]
+            | null
+          match_number: number
+          match_number_formatted: string | null
+          match_number_legacy: string | null
+          match_sequence: number | null
+          next_match_id: string | null
           player1_id: string | null
-          player1_score: number | null
           player2_id: string | null
-          player2_score: number | null
-          round_number: number | null
-          start_time: string | null
-          status: string | null
+          round: number
+          scheduled_end_time: string | null
+          scheduled_start_time: string | null
+          score_player1: number | null
+          score_player2: number | null
+          score_round1_player1: number
+          score_round1_player2: number
+          score_round2_player1: number
+          score_round2_player2: number
+          score_round3_player1: number
+          score_round3_player2: number
+          source_match_id: string | null
+          source_match_ids: string[] | null
+          status: string
           tournament_id: string
           updated_at: string
           winner_id: string | null
-          match_number_formatted: string | null
-          match_number_legacy: string | null
-          day_number: number | null
-          match_sequence: number | null
-          scheduled_start_time: string | null
-          scheduled_end_time: string | null
-          court_number: number | null
+          winner_round1: string | null
+          winner_round2: string | null
+          winner_round3: string | null
         }
         Insert: {
+          athlete1_available_at?: string | null
+          athlete2_available_at?: string | null
           category_id?: string | null
-          court_id?: string | null
+          court_number?: number | null
           created_at?: string
+          day_number?: number | null
+          division_id?: string | null
           id?: string
-          match_number?: number | null
-          next_match_loser_id?: string | null
-          next_match_winner_id?: string | null
+          lifecycle_state?:
+            | Database["public"]["Enums"]["match_lifecycle_state"]
+            | null
+          match_number: number
+          match_number_formatted?: string | null
+          match_number_legacy?: string | null
+          match_sequence?: number | null
+          next_match_id?: string | null
           player1_id?: string | null
-          player1_score?: number | null
           player2_id?: string | null
-          player2_score?: number | null
-          round_number?: number | null
-          start_time?: string | null
-          status?: string | null
+          round: number
+          scheduled_end_time?: string | null
+          scheduled_start_time?: string | null
+          score_player1?: number | null
+          score_player2?: number | null
+          score_round1_player1?: number
+          score_round1_player2?: number
+          score_round2_player1?: number
+          score_round2_player2?: number
+          score_round3_player1?: number
+          score_round3_player2?: number
+          source_match_id?: string | null
+          source_match_ids?: string[] | null
+          status?: string
           tournament_id: string
           updated_at?: string
           winner_id?: string | null
-          match_number_formatted?: string | null
-          match_number_legacy?: string | null
-          day_number?: number | null
-          match_sequence?: number | null
-          scheduled_start_time?: string | null
-          scheduled_end_time?: string | null
-          court_number?: number | null
+          winner_round1?: string | null
+          winner_round2?: string | null
+          winner_round3?: string | null
         }
         Update: {
+          athlete1_available_at?: string | null
+          athlete2_available_at?: string | null
           category_id?: string | null
-          court_id?: string | null
+          court_number?: number | null
           created_at?: string
+          day_number?: number | null
+          division_id?: string | null
           id?: string
-          match_number?: number | null
-          next_match_loser_id?: string | null
-          next_match_winner_id?: string | null
-          player1_id?: string | null
-          player1_score?: number | null
-          player2_id?: string | null
-          player2_score?: number | null
-          round_number?: number | null
-          start_time?: string | null
-          status?: string | null
-          tournament_id: string
-          updated_at?: string
-          winner_id?: string | null
+          lifecycle_state?:
+            | Database["public"]["Enums"]["match_lifecycle_state"]
+            | null
+          match_number?: number
           match_number_formatted?: string | null
           match_number_legacy?: string | null
-          day_number?: number | null
           match_sequence?: number | null
-          scheduled_start_time?: string | null
+          next_match_id?: string | null
+          player1_id?: string | null
+          player2_id?: string | null
+          round?: number
           scheduled_end_time?: string | null
-          court_number?: number | null
+          scheduled_start_time?: string | null
+          score_player1?: number | null
+          score_player2?: number | null
+          score_round1_player1?: number
+          score_round1_player2?: number
+          score_round2_player1?: number
+          score_round2_player2?: number
+          score_round3_player1?: number
+          score_round3_player2?: number
+          source_match_id?: string | null
+          source_match_ids?: string[] | null
+          status?: string
+          tournament_id?: string
+          updated_at?: string
+          winner_id?: string | null
+          winner_round1?: string | null
+          winner_round2?: string | null
+          winner_round3?: string | null
         }
         Relationships: [
           {
@@ -223,22 +333,15 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "matches_court_id_fkey"
-            columns: ["court_id"]
+            foreignKeyName: "matches_division_id_fkey"
+            columns: ["division_id"]
             isOneToOne: false
-            referencedRelation: "tournament_courts"
+            referencedRelation: "tournament_divisions"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "matches_next_match_loser_id_fkey"
-            columns: ["next_match_loser_id"]
-            isOneToOne: false
-            referencedRelation: "matches"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "matches_next_match_winner_id_fkey"
-            columns: ["next_match_winner_id"]
+            foreignKeyName: "matches_next_match_id_fkey"
+            columns: ["next_match_id"]
             isOneToOne: false
             referencedRelation: "matches"
             referencedColumns: ["id"]
@@ -258,6 +361,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "matches_source_match_id_fkey"
+            columns: ["source_match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "matches_tournament_id_fkey"
             columns: ["tournament_id"]
             isOneToOne: false
@@ -271,14 +381,36 @@ export type Database = {
             referencedRelation: "players"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "matches_winner_round1_fkey"
+            columns: ["winner_round1"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "matches_winner_round2_fkey"
+            columns: ["winner_round2"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "matches_winner_round3_fkey"
+            columns: ["winner_round3"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
         ]
       }
       players: {
         Row: {
           belt_level: string | null
-          coach_id: string | null
+          coach_id: string
           created_at: string
           dob: string | null
+          email: string | null
           first_name: string
           gender: string | null
           height: number | null
@@ -289,9 +421,10 @@ export type Database = {
         }
         Insert: {
           belt_level?: string | null
-          coach_id?: string | null
+          coach_id: string
           created_at?: string
           dob?: string | null
+          email?: string | null
           first_name: string
           gender?: string | null
           height?: number | null
@@ -302,9 +435,10 @@ export type Database = {
         }
         Update: {
           belt_level?: string | null
-          coach_id?: string | null
+          coach_id?: string
           created_at?: string
           dob?: string | null
+          email?: string | null
           first_name?: string
           gender?: string | null
           height?: number | null
@@ -319,7 +453,7 @@ export type Database = {
             columns: ["coach_id"]
             isOneToOne: false
             referencedRelation: "users"
-            referencedColumns: ["id"]
+            referencedColumns: ["user_id"]
           },
         ]
       }
@@ -355,35 +489,26 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      },
+      }
       teams: {
         Row: {
-          coach_name: string | null
-          contact_number: string | null
           created_at: string
-          email: string | null
           id: string
           name: string
           updated_at: string
           user_id: string
         }
         Insert: {
-          coach_name?: string | null
-          contact_number?: string | null
           created_at?: string
-          email?: string | null
           id?: string
           name: string
           updated_at?: string
           user_id: string
         }
         Update: {
-          coach_name?: string | null
-          contact_number?: string | null
           created_at?: string
-          email?: string | null
           id?: string
-          name: string
+          name?: string
           updated_at?: string
           user_id?: string
         }
@@ -393,7 +518,7 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
-            referencedColumns: ["id"]
+            referencedColumns: ["user_id"]
           },
         ]
       }
@@ -403,7 +528,9 @@ export type Database = {
           division_id: string
           gender: string
           id: string
+          max_height: number | null
           max_weight: number | null
+          min_height: number | null
           min_weight: number | null
           name: string
           updated_at: string
@@ -413,7 +540,9 @@ export type Database = {
           division_id: string
           gender: string
           id?: string
+          max_height?: number | null
           max_weight?: number | null
+          min_height?: number | null
           min_weight?: number | null
           name: string
           updated_at?: string
@@ -423,7 +552,9 @@ export type Database = {
           division_id?: string
           gender?: string
           id?: string
+          max_height?: number | null
           max_weight?: number | null
+          min_height?: number | null
           min_weight?: number | null
           name?: string
           updated_at?: string
@@ -438,45 +569,10 @@ export type Database = {
           },
         ]
       }
-      tournament_courts: {
-        Row: {
-          created_at: string
-          id: string
-          name: string
-          status: string
-          tournament_id: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          name: string
-          status?: string
-          tournament_id: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          name?: string
-          status?: string
-          tournament_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "tournament_courts_tournament_id_fkey"
-            columns: ["tournament_id"]
-            isOneToOne: false
-            referencedRelation: "tournaments"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       tournament_divisions: {
         Row: {
           created_at: string
-          enabled: boolean | null
+          enabled: boolean
           id: string
           max_age: number | null
           min_age: number | null
@@ -486,7 +582,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          enabled?: boolean | null
+          enabled?: boolean
           id?: string
           max_age?: number | null
           min_age?: number | null
@@ -496,7 +592,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          enabled?: boolean | null
+          enabled?: boolean
           id?: string
           max_age?: number | null
           min_age?: number | null
@@ -514,148 +610,59 @@ export type Database = {
           },
         ]
       }
-      tournament_schedule_config: {
-        Row: {
-          courts: number
-          created_at: string | null
-          daily_end_time: string
-          daily_start_time: string
-          default_breaking_duration: number | null
-          default_poomsae_duration: number | null
-          default_sparring_duration: number | null
-          gradeschool_round_time: number | null
-          gradeschool_kyeshi_time: number | null
-          gradeschool_rest_between_rounds: number | null
-          cadet_round_time: number | null
-          cadet_kyeshi_time: number | null
-          cadet_rest_between_rounds: number | null
-          junior_round_time: number | null
-          junior_kyeshi_time: number | null
-          junior_rest_between_rounds: number | null
-          senior_round_time: number | null
-          senior_kyeshi_time: number | null
-          senior_rest_between_rounds: number | null
-          id: string
-          max_divisions_per_day: number | null
-          tournament_id: string
-          updated_at: string | null
-        }
-        Insert: {
-          courts?: number
-          created_at?: string | null
-          daily_end_time?: string
-          daily_start_time?: string
-          default_breaking_duration?: number | null
-          default_poomsae_duration?: number | null
-          default_sparring_duration?: number | null
-          gradeschool_round_time?: number | null
-          gradeschool_kyeshi_time?: number | null
-          gradeschool_rest_between_rounds?: number | null
-          cadet_round_time?: number | null
-          cadet_kyeshi_time?: number | null
-          cadet_rest_between_rounds?: number | null
-          junior_round_time?: number | null
-          junior_kyeshi_time?: number | null
-          junior_rest_between_rounds?: number | null
-          senior_round_time?: number | null
-          senior_kyeshi_time?: number | null
-          senior_rest_between_rounds?: number | null
-          id?: string
-          max_divisions_per_day?: number | null
-          tournament_id: string
-          updated_at?: string | null
-        }
-        Update: {
-          courts?: number
-          created_at?: string | null
-          daily_end_time?: string
-          daily_start_time?: string
-          default_breaking_duration?: number | null
-          default_poomsae_duration?: number | null
-          default_sparring_duration?: number | null
-          gradeschool_round_time?: number | null
-          gradeschool_kyeshi_time?: number | null
-          gradeschool_rest_between_rounds?: number | null
-          cadet_round_time?: number | null
-          cadet_kyeshi_time?: number | null
-          cadet_rest_between_rounds?: number | null
-          junior_round_time?: number | null
-          junior_kyeshi_time?: number | null
-          junior_rest_between_rounds?: number | null
-          senior_round_time?: number | null
-          senior_kyeshi_time?: number | null
-          senior_rest_between_rounds?: number | null
-          id?: string
-          max_divisions_per_day?: number | null
-          tournament_id?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "tournament_schedule_config_tournament_id_fkey"
-            columns: ["tournament_id"]
-            isOneToOne: true
-            referencedRelation: "tournaments"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
       tournament_registrations: {
         Row: {
           actual_height: number | null
           actual_weight: number | null
           category_id: string | null
-          coach_id: string
+          coach_id: string | null
           created_at: string
           disqualification_reason: string | null
-          disqualified: boolean | null
+          disqualified: boolean
           division_id: string | null
           id: string
-          payment_status: string | null
           player_id: string
           status: string
           team_id: string
           tournament_id: string
           updated_at: string
-          weigh_in_selected: boolean | null
+          weigh_in_selected: boolean
           weighed_in_at: string | null
         }
         Insert: {
           actual_height?: number | null
           actual_weight?: number | null
           category_id?: string | null
-          coach_id: string
+          coach_id?: string | null
           created_at?: string
           disqualification_reason?: string | null
-          disqualified?: boolean | null
+          disqualified?: boolean
           division_id?: string | null
           id?: string
-          payment_status?: string | null
           player_id: string
-          status: string
+          status?: string
           team_id: string
           tournament_id: string
           updated_at?: string
-          weigh_in_selected?: boolean | null
+          weigh_in_selected?: boolean
           weighed_in_at?: string | null
         }
         Update: {
           actual_height?: number | null
           actual_weight?: number | null
           category_id?: string | null
-          coach_id?: string
+          coach_id?: string | null
           created_at?: string
           disqualification_reason?: string | null
-          disqualified?: boolean | null
+          disqualified?: boolean
           division_id?: string | null
           id?: string
-          payment_status?: string | null
           player_id?: string
           status?: string
           team_id?: string
           tournament_id?: string
           updated_at?: string
-          weigh_in_selected?: boolean | null
+          weigh_in_selected?: boolean
           weighed_in_at?: string | null
         }
         Relationships: [
@@ -671,7 +678,7 @@ export type Database = {
             columns: ["coach_id"]
             isOneToOne: false
             referencedRelation: "users"
-            referencedColumns: ["id"]
+            referencedColumns: ["user_id"]
           },
           {
             foreignKeyName: "tournament_registrations_division_id_fkey"
@@ -703,70 +710,201 @@ export type Database = {
           },
         ]
       }
+      tournament_schedule_config: {
+        Row: {
+          cadet_kyeshi_time: number | null
+          cadet_rest_between_rounds: number | null
+          cadet_round_time: number | null
+          courts: number
+          created_at: string | null
+          daily_end_time: string
+          daily_start_time: string
+          default_breaking_duration: number | null
+          default_poomsae_duration: number | null
+          default_sparring_duration: number | null
+          gradeschool_kyeshi_time: number | null
+          gradeschool_rest_between_rounds: number | null
+          gradeschool_round_time: number | null
+          id: string
+          junior_kyeshi_time: number | null
+          junior_rest_between_rounds: number | null
+          junior_round_time: number | null
+          max_divisions_per_day: number | null
+          senior_kyeshi_time: number | null
+          senior_rest_between_rounds: number | null
+          senior_round_time: number | null
+          tournament_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          cadet_kyeshi_time?: number | null
+          cadet_rest_between_rounds?: number | null
+          cadet_round_time?: number | null
+          courts?: number
+          created_at?: string | null
+          daily_end_time?: string
+          daily_start_time?: string
+          default_breaking_duration?: number | null
+          default_poomsae_duration?: number | null
+          default_sparring_duration?: number | null
+          gradeschool_kyeshi_time?: number | null
+          gradeschool_rest_between_rounds?: number | null
+          gradeschool_round_time?: number | null
+          id?: string
+          junior_kyeshi_time?: number | null
+          junior_rest_between_rounds?: number | null
+          junior_round_time?: number | null
+          max_divisions_per_day?: number | null
+          senior_kyeshi_time?: number | null
+          senior_rest_between_rounds?: number | null
+          senior_round_time?: number | null
+          tournament_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          cadet_kyeshi_time?: number | null
+          cadet_rest_between_rounds?: number | null
+          cadet_round_time?: number | null
+          courts?: number
+          created_at?: string | null
+          daily_end_time?: string
+          daily_start_time?: string
+          default_breaking_duration?: number | null
+          default_poomsae_duration?: number | null
+          default_sparring_duration?: number | null
+          gradeschool_kyeshi_time?: number | null
+          gradeschool_rest_between_rounds?: number | null
+          gradeschool_round_time?: number | null
+          id?: string
+          junior_kyeshi_time?: number | null
+          junior_rest_between_rounds?: number | null
+          junior_round_time?: number | null
+          max_divisions_per_day?: number | null
+          senior_kyeshi_time?: number | null
+          senior_rest_between_rounds?: number | null
+          senior_round_time?: number | null
+          tournament_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tournament_schedule_config_tournament_id_fkey"
+            columns: ["tournament_id"]
+            isOneToOne: true
+            referencedRelation: "tournaments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tournament_staff: {
+        Row: {
+          created_at: string | null
+          email: string
+          id: string
+          last_invited_at: string | null
+          role: string
+          status: string
+          tournament_id: string
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          id?: string
+          last_invited_at?: string | null
+          role: string
+          status?: string
+          tournament_id: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          id?: string
+          last_invited_at?: string | null
+          role?: string
+          status?: string
+          tournament_id?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tournament_staff_tournament_id_fkey"
+            columns: ["tournament_id"]
+            isOneToOne: false
+            referencedRelation: "tournaments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tournament_staff_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       tournaments: {
         Row: {
-          accommodation: string | null
-          address: string
-          city: string
+          courts: number | null
           created_at: string
-          deleted_at: string | null
           description: string | null
-          end_date: string
-          entry_fee: number
+          division_move_policy:
+            | Database["public"]["Enums"]["division_move_policy"]
+            | null
+          end_date: string | null
+          entry_fee: number | null
           id: string
-          max_teams: number | null
+          max_players: number | null
           name: string
           organizer_id: string
-          prizes: string | null
           registration_deadline: string | null
-          rule_set: string | null
-          schedule: string | null
-          start_date: string
-          status: string | null
+          start_date: string | null
+          status: string
+          tournament_type: string
           updated_at: string
           venue: string | null
         }
         Insert: {
-          accommodation?: string | null
-          address: string
-          city: string
+          courts?: number | null
           created_at?: string
-          deleted_at?: string | null
           description?: string | null
-          end_date: string
-          entry_fee: number
+          division_move_policy?:
+            | Database["public"]["Enums"]["division_move_policy"]
+            | null
+          end_date?: string | null
+          entry_fee?: number | null
           id?: string
-          max_teams?: number | null
+          max_players?: number | null
           name: string
           organizer_id: string
-          prizes?: string | null
           registration_deadline?: string | null
-          rule_set?: string | null
-          schedule?: string | null
-          start_date: string
-          status?: string | null
+          start_date?: string | null
+          status?: string
+          tournament_type?: string
           updated_at?: string
           venue?: string | null
         }
         Update: {
-          accommodation?: string | null
-          address?: string
-          city?: string
+          courts?: number | null
           created_at?: string
-          deleted_at?: string | null
           description?: string | null
-          end_date?: string
-          entry_fee?: number
+          division_move_policy?:
+            | Database["public"]["Enums"]["division_move_policy"]
+            | null
+          end_date?: string | null
+          entry_fee?: number | null
           id?: string
-          max_teams?: number | null
+          max_players?: number | null
           name?: string
           organizer_id?: string
-          prizes?: string | null
           registration_deadline?: string | null
-          rule_set?: string | null
-          schedule?: string | null
-          start_date?: string
-          status?: string | null
+          start_date?: string | null
+          status?: string
+          tournament_type?: string
           updated_at?: string
           venue?: string | null
         }
@@ -776,46 +914,37 @@ export type Database = {
             columns: ["organizer_id"]
             isOneToOne: false
             referencedRelation: "users"
-            referencedColumns: ["id"]
+            referencedColumns: ["user_id"]
           },
         ]
       }
       users: {
         Row: {
-          contact_number: string | null
-          country: string | null
           created_at: string
           email: string
           first_name: string | null
-          gym: string | null
-          id: string
           last_name: string | null
           role: string
           updated_at: string
+          user_id: string
         }
         Insert: {
-          contact_number?: string | null
-          country?: string | null
           created_at?: string
           email: string
           first_name?: string | null
-          gym?: string | null
-          id: string
           last_name?: string | null
-          role?: string
+          role: string
           updated_at?: string
+          user_id?: string
         }
         Update: {
-          contact_number?: string | null
-          country?: string | null
           created_at?: string
           email?: string
           first_name?: string | null
-          gym?: string | null
-          id?: string
           last_name?: string | null
           role?: string
           updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -825,23 +954,29 @@ export type Database = {
     }
     Functions: {
       archive_match_numbers: {
-        Args: {
-          p_tournament_id: string
-        }
-        Returns: void
+        Args: { p_tournament_id: string }
+        Returns: undefined
+      }
+      get_match_readiness_status: {
+        Args: { p_match_id: string }
+        Returns: {
+          athlete1_called: boolean
+          athlete2_called: boolean
+        }[]
+      }
+      initialize_match_readiness: {
+        Args: { p_match_id: string }
+        Returns: undefined
       }
     }
     Enums: {
-      belt_level: "White" | "Yellow" | "Green" | "Blue" | "Red" | "Brown" | "Black"
-      gender: "male" | "female"
-      match_status: "pending" | "in_progress" | "completed"
-      payment_status: "pending" | "verified" | "rejected" | "unpaid" | "paid"
-      tournament_status:
-      | "upcoming"
-      | "registration_open"
-      | "registration_closed"
-      | "live"
-      | "completed"
+      division_move_policy: "allow_move" | "disqualify_only"
+      match_lifecycle_state:
+        | "AUTO_ADVANCE"
+        | "WAITING"
+        | "CONTEST"
+        | "IN_PROGRESS"
+        | "COMPLETED"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -849,99 +984,138 @@ export type Database = {
   }
 }
 
-type PublicSchema = Database[Extract<keyof Database, "public">]
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<
-  PublicTableNameOrOptions extends
-  | keyof (PublicSchema["Tables"] & PublicSchema["Views"])
-  | { schema: keyof Database },
-  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-  ? keyof ((Database[PublicTableNameOrOptions["schema"]] extends { Tables: infer T } ? T : never) &
-    (Database[PublicTableNameOrOptions["schema"]] extends { Views: infer V } ? V : never))
-  : never = never,
-> = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? ((Database[PublicTableNameOrOptions["schema"]] extends { Tables: infer T } ? T : never) &
-    (Database[PublicTableNameOrOptions["schema"]] extends { Views: infer V } ? V : never))[TableName] extends {
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
-  ? R
-  : never
-  : PublicTableNameOrOptions extends keyof (PublicSchema["Tables"] &
-    PublicSchema["Views"])
-  ? (PublicSchema["Tables"] &
-    PublicSchema["Views"])[PublicTableNameOrOptions] extends {
-      Row: infer R
-    }
-  ? R
-  : never
-  : never
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
 
 export type TablesInsert<
-  PublicTableNameOrOptions extends
-  | keyof PublicSchema["Tables"]
-  | { schema: keyof Database },
-  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-  ? keyof (Database[PublicTableNameOrOptions["schema"]] extends { Tables: infer T } ? T : never)
-  : never = never,
-> = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? (Database[PublicTableNameOrOptions["schema"]] extends { Tables: infer T } ? T : never)[TableName] extends {
-    Insert: infer I
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
   }
-  ? I
-  : never
-  : PublicTableNameOrOptions extends keyof PublicSchema["Tables"]
-  ? PublicSchema["Tables"][PublicTableNameOrOptions] extends {
-    Insert: infer I
-  }
-  ? I
-  : never
-  : never
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
 
 export type TablesUpdate<
-  PublicTableNameOrOptions extends
-  | keyof PublicSchema["Tables"]
-  | { schema: keyof Database },
-  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-  ? keyof (Database[PublicTableNameOrOptions["schema"]] extends { Tables: infer T } ? T : never)
-  : never = never,
-> = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? (Database[PublicTableNameOrOptions["schema"]] extends { Tables: infer T } ? T : never)[TableName] extends {
-    Update: infer U
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
   }
-  ? U
-  : never
-  : PublicTableNameOrOptions extends keyof PublicSchema["Tables"]
-  ? PublicSchema["Tables"][PublicTableNameOrOptions] extends {
-    Update: infer U
-  }
-  ? U
-  : never
-  : never
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
 
 export type Enums<
-  PublicEnumNameOrOptions extends
-  | keyof PublicSchema["Enums"]
-  | { schema: keyof Database },
-  EnumName extends PublicEnumNameOrOptions extends { schema: keyof Database }
-  ? keyof (Database[PublicEnumNameOrOptions["schema"]] extends { Enums: infer E } ? E : never)
-  : never = never,
-> = PublicEnumNameOrOptions extends { schema: keyof Database }
-  ? (Database[PublicEnumNameOrOptions["schema"]] extends { Enums: infer E } ? E : never)[EnumName]
-  : PublicEnumNameOrOptions extends keyof PublicSchema["Enums"]
-  ? PublicSchema["Enums"][PublicEnumNameOrOptions]
-  : never
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-  | keyof PublicSchema["CompositeTypes"]
-  | { schema: keyof Database },
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-  ? keyof (Database[PublicCompositeTypeNameOrOptions["schema"]] extends { CompositeTypes: infer C } ? C : never)
-  : never = never,
-> = PublicCompositeTypeNameOrOptions extends { schema: keyof Database }
-  ? (Database[PublicCompositeTypeNameOrOptions["schema"]] extends { CompositeTypes: infer C } ? C : never)[CompositeTypeName]
-  : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
-  ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-  : never
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
+  public: {
+    Enums: {
+      division_move_policy: ["allow_move", "disqualify_only"],
+      match_lifecycle_state: [
+        "AUTO_ADVANCE",
+        "WAITING",
+        "CONTEST",
+        "IN_PROGRESS",
+        "COMPLETED",
+      ],
+    },
+  },
+} as const
+

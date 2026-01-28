@@ -39,19 +39,19 @@ export default async function StaffPage({ params, searchParams }: StaffPageProps
 
   return (
     <DashboardShell>
+      <div className="mb-4">
+        <Button variant="outline" asChild className="w-fit">
+           <Link href={routes.organizer.tournamentDetail(tournament.id)}>
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to Dashboard
+           </Link>
+        </Button>
+      </div>
       <PageHeader
         title="Tournament Staff"
         description={`Manage access for ${tournament.name}`}
         action={
-           <div className="flex gap-2">
-            <Button variant="outline" asChild>
-                <Link href={routes.organizer.tournamentDetail(tournament.id)}>
-                    <ArrowLeft className="mr-2 h-4 w-4" />
-                    Back to Dashboard
-                </Link>
-            </Button>
-            <InviteStaffDialog tournamentId={tournament.id} />
-           </div>
+            <InviteStaffDialog tournamentId={tournament.id} triggerClassName="w-full sm:w-auto" />
         }
       />
 

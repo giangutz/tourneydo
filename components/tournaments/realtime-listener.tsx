@@ -1,12 +1,12 @@
 'use client'
 
-import { useTournamentRealtime } from '@/hooks/use-tournament-realtime'
+import { useAdminChannel } from '@/lib/realtime/admin-channel'
 
 interface RealtimeListenerProps {
   tournamentId: string
 }
 
 export function RealtimeListener({ tournamentId }: RealtimeListenerProps) {
-  useTournamentRealtime(tournamentId)
+  useAdminChannel(tournamentId)
   return null
 }

@@ -152,8 +152,8 @@ export function TournamentList({ tournaments, teams, registrations, coachId }: T
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row gap-4 justify-between items-center">
-        <div className="relative w-full sm:w-[300px]">
+      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+        <div className="relative w-full sm:flex-1">
            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
            <Input
             placeholder="Search tournaments..."
@@ -188,7 +188,7 @@ export function TournamentList({ tournaments, teams, registrations, coachId }: T
           }
         />
       ) : (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 md:grid-cols-2">
           {filteredTournaments.map((tournament) => (
         <Card key={tournament.id} className="flex flex-col">
           <CardHeader>
@@ -291,7 +291,7 @@ export function TournamentList({ tournaments, teams, registrations, coachId }: T
 
                 return (
                   <Link href={`/dashboard/coach/tournaments/${tournament.id}/payment`} className="flex-1">
-                    <Button className="bg-green-600 hover:bg-green-700 text-white w-full">
+                    <Button className="bg-green-600 hover:bg-green-700 text-white w-full" size="sm">
                       <CreditCard className="mr-2 h-4 w-4" />
                       Make Payment
                     </Button>

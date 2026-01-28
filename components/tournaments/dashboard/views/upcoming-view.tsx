@@ -5,11 +5,15 @@ import { useSession } from '@clerk/nextjs'
 import { createClerkSupabaseClient } from '@/lib/supabase/client'
 import { KPICard } from '../kpi-card'
 import { Users, AlertCircle, Shield, CreditCard } from 'lucide-react'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
+
+
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { 
   Table, 
   TableBody, 
+ 
   TableCell, 
   TableHead, 
   TableHeader, 
@@ -21,13 +25,14 @@ import { UpcomingViewSkeleton } from './skeletons'
 
 interface UpcomingViewProps {
   tournamentId: string
+  userId: string
 }
 
 type RegistrationWithTeam = Database['public']['Tables']['tournament_registrations']['Row'] & {
   teams: { name: string } | null
 }
 
-export function UpcomingView({ tournamentId }: UpcomingViewProps) {
+export function UpcomingView({ tournamentId, userId }: UpcomingViewProps) {
   const { session } = useSession()
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({
@@ -46,6 +51,7 @@ export function UpcomingView({ tournamentId }: UpcomingViewProps) {
 
     const fetchData = async () => {
       setLoading(true)
+      
       const supabase = createClerkSupabaseClient({ session })
 
       const [registrationsRes, divisionsRes, tournamentRes] = await Promise.all([
@@ -157,19 +163,32 @@ export function UpcomingView({ tournamentId }: UpcomingViewProps) {
         />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
         <Card className="col-span-1">
           <CardHeader>
             <CardTitle>Division Health</CardTitle>
           </CardHeader>
           <CardContent className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={divisionData}>
+              <BarChart data={divisionData} margin={{ bottom: 40 }}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="value" fill="var(--chart-1)" name="Athletes" />
+                <XAxis 
+                  dataKey="name" 
+                  angle={-45} 
+                  textAnchor="end" 
+                  height={60} 
+                  interval={0}
+                  fontSize={12}
+                />
+                <YAxis allowDecimals={false} />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', color: 'hsl(var(--foreground))' }}
+                />
+                <Bar dataKey="value" name="Athletes" radius={[4, 4, 0, 0]}>
+                  {divisionData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={`var(--chart-${(index % 5) + 1})`} />
+                  ))}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -180,28 +199,32 @@ export function UpcomingView({ tournamentId }: UpcomingViewProps) {
             <CardTitle>Team Status</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="max-h-[300px] overflow-y-auto">
+              <div className="max-h-[300px] overflow-y-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Team</TableHead>
-                    <TableHead>Athletes</TableHead>
-                    <TableHead>Unpaid</TableHead>
+                    <TableHead className="w-[50%]">Team</TableHead>
+                    <TableHead className="text-right">Athletes</TableHead>
+                    <TableHead className="text-right">Unpaid</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {teamData.map((team, i) => (
                     <TableRow key={i}>
-                      <TableCell className="font-medium">{team.name}</TableCell>
-                      <TableCell>{team.count}</TableCell>
-                      <TableCell className={team.unpaid > 0 ? "text-red-500 font-bold" : "text-green-600"}>
+                      <TableCell className="font-medium">
+                        <div className="truncate max-w-[120px] sm:max-w-[200px]" title={team.name}>
+                          {team.name}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">{team.count}</TableCell>
+                      <TableCell className={`text-right ${team.unpaid > 0 ? "text-destructive font-bold" : "text-green-600"}`}>
                         {team.unpaid}
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
-            </div>
+              </div>
           </CardContent>
         </Card>
       </div>

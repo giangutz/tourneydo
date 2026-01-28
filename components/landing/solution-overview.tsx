@@ -28,14 +28,14 @@ export function SolutionOverview() {
   ]
 
   return (
-    <section className="py-24 bg-slate-50 overflow-hidden">
+    <section className="py-24 bg-muted/30 overflow-hidden">
       <div className="container mx-auto px-4">
         
         <div className="text-center max-w-3xl mx-auto mb-20">
-            <h2 className="text-4xl md:text-5xl font-bold text-slate-900 mb-6">
+            <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-6">
                 A Unified Platform for <span className="text-primary">Modern Tournaments</span>
             </h2>
-            <p className="text-lg text-slate-600">
+            <p className="text-lg text-muted-foreground">
                 Replace your stack of disconnected apps with one seamless operating system.
             </p>
         </div>
@@ -47,16 +47,16 @@ export function SolutionOverview() {
               {/* Text Side */}
               <div className="flex-1 space-y-8">
                 <div className="flex items-center gap-4">
-                    <div className="h-12 w-12 rounded-xl bg-white shadow-sm flex items-center justify-center border border-slate-100">
+                    <div className="h-12 w-12 rounded-xl bg-background shadow-sm flex items-center justify-center border">
                         <step.icon className="w-6 h-6 text-primary" />
                     </div>
-                    <span className="text-sm font-bold tracking-wider text-slate-500 uppercase">Step 0{index + 1}</span>
+                    <span className="text-sm font-bold tracking-wider text-muted-foreground uppercase">Step 0{index + 1}</span>
                 </div>
                 
-                <h3 className="text-3xl md:text-4xl font-bold text-slate-900">
+                <h3 className="text-3xl md:text-4xl font-bold text-foreground">
                     {step.title}
                 </h3>
-                <p className="text-lg text-slate-600 leading-relaxed">
+                <p className="text-lg text-muted-foreground leading-relaxed">
                     {step.description}
                 </p>
 
@@ -64,7 +64,7 @@ export function SolutionOverview() {
                     {step.points.map((point, i) => (
                         <li key={i} className="flex items-center gap-3">
                             <CheckCircle2 className="w-5 h-5 text-green-500 flex-shrink-0" />
-                            <span className="text-slate-700 font-medium">{point}</span>
+                            <span className="text-foreground font-medium">{point}</span>
                         </li>
                     ))}
                 </ul>

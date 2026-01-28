@@ -34,9 +34,9 @@ export default async function PrintIDsPage({ params, searchParams }: PrintIDsPag
   // Filter participants
   let filteredParticipants = participants
   if (teamId) {
-    filteredParticipants = participants.filter(p => p.team_id === teamId)
+    filteredParticipants = participants.filter((p: any) => p.team_id === teamId)
   } else if (coachId) {
-    filteredParticipants = participants.filter(p => p.coach_id === coachId)
+    filteredParticipants = participants.filter((p: any) => p.coach_id === coachId)
   }
 
   // Get team name if filtering by team
@@ -47,7 +47,7 @@ export default async function PrintIDsPage({ params, searchParams }: PrintIDsPag
   
   if (coachId) {
     // Find any registration with this coach to get their details
-    const registration = participants.find(p => p.coach_id === coachId)
+    const registration = participants.find((p: any) => p.coach_id === coachId)
     if (registration && registration.team) {
        // We need the coach's name. We updated the query to fetch it.
        // registration.team.users contains the coach's user data
@@ -62,7 +62,7 @@ export default async function PrintIDsPage({ params, searchParams }: PrintIDsPag
     }
   } else if (teamId) {
     // If printing for a team, include the coach(es) of that team
-    filteredParticipants.forEach(p => {
+    filteredParticipants.forEach((p: any) => {
       if (p.coach_id && p.team) {
         const coachUser = (p.team as any).users
         if (coachUser) {
@@ -186,7 +186,7 @@ export default async function PrintIDsPage({ params, searchParams }: PrintIDsPag
             ))}
 
             {/* Athletes */}
-            {filteredParticipants.map(p => (
+            {filteredParticipants.map((p: any) => (
               <div key={p.id} className="print:inline-block print:m-1 break-inside-avoid">
                 <IDCard
                   name={`${p.player?.first_name} ${p.player?.last_name}`}

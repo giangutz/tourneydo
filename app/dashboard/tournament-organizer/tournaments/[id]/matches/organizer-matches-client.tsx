@@ -5,7 +5,7 @@ import { Tournament, Match, Team } from '@/types/models'
 
 import { Card, CardContent } from '@/components/ui/card'
 import { CourtManager } from '@/components/tournaments/court-manager'
-import { useTournamentRealtime } from '@/hooks/use-tournament-realtime'
+import { useAdminChannel } from '@/lib/realtime/admin-channel'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 
@@ -16,7 +16,7 @@ interface OrganizerMatchesClientProps {
 }
 
 export function OrganizerMatchesClient({ tournament, matches, participants }: OrganizerMatchesClientProps) {
-  useTournamentRealtime(tournament.id)
+  useAdminChannel(tournament.id)
 
   // Calculate current tournament day
   const getCurrentDay = (): number => {

@@ -42,7 +42,7 @@ export function TagsSelector({ tags, selectedTags, onTagsChange }: TagsSelectorP
   return (
     <div className="p-1 max-w-lg w-full flex flex-col">
       <motion.div
-        className="w-full flex items-center justify-start gap-1.5 bg-white border min-h-14 mt-2 mb-3 overflow-x-auto p-1.5 no-scrollbar"
+        className="w-full flex items-center justify-start gap-1.5 bg-background border min-h-14 mt-2 mb-3 overflow-x-auto p-1.5 no-scrollbar"
         style={{
           borderRadius: 16,
         }}
@@ -55,7 +55,7 @@ export function TagsSelector({ tags, selectedTags, onTagsChange }: TagsSelectorP
         {selectedTags.map((tag) => (
           <motion.div
             key={tag.id}
-            className="flex items-center gap-1 pl-3 pr-1 py-1 bg-white shadow-md border h-full shrink-0"
+            className="flex items-center gap-1 pl-3 pr-1 py-1 bg-background shadow-sm border h-full shrink-0"
             style={{
               borderRadius: 14,
             }}
@@ -63,23 +63,23 @@ export function TagsSelector({ tags, selectedTags, onTagsChange }: TagsSelectorP
           >
             <motion.span
               layoutId={`tag-${tag.id}-label`}
-              className="text-gray-700 font-medium text-sm"
+              className="text-foreground font-medium text-sm"
             >
               {tag.label}
             </motion.span>
             <button
               type="button"
               onClick={() => removeSelectedTag(tag.id)}
-              className="p-1 rounded-full hover:bg-gray-100"
+              className="p-1 rounded-full hover:bg-muted"
             >
-              <X className="size-4 text-gray-500" />
+              <X className="size-4 text-muted-foreground" />
             </button>
           </motion.div>
         ))}
       </motion.div>
       {tags.length > selectedTags.length && (
         <motion.div
-          className="bg-white shadow-sm p-2 border w-full"
+          className="bg-card shadow-sm p-2 border w-full text-card-foreground"
           style={{
             borderRadius: 16,
           }}
@@ -96,7 +96,7 @@ export function TagsSelector({ tags, selectedTags, onTagsChange }: TagsSelectorP
                   key={tag.id}
                   type="button"
                   layoutId={`tag-${tag.id}`}
-                  className="flex items-center gap-1 px-3 py-1.5 bg-gray-100/60 rounded-full shrink-0 hover:bg-gray-200/60 transition-colors"
+                  className="flex items-center gap-1 px-3 py-1.5 bg-muted/60 rounded-full shrink-0 hover:bg-muted transition-colors"
                   onClick={() => addSelectedTag(tag)}
                   style={{
                     borderRadius: 14,
@@ -104,7 +104,7 @@ export function TagsSelector({ tags, selectedTags, onTagsChange }: TagsSelectorP
                 >
                   <motion.span
                     layoutId={`tag-${tag.id}-label`}
-                    className="text-gray-700 font-medium text-sm"
+                    className="text-foreground font-medium text-sm"
                   >
                     {tag.label}
                   </motion.span>

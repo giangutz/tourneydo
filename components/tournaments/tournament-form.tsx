@@ -164,7 +164,7 @@ export function TournamentForm({ tournament, initialEnabledDivisions, availableD
               )}
             />
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="start_date"
@@ -193,7 +193,7 @@ export function TournamentForm({ tournament, initialEnabledDivisions, availableD
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="weigh_in_start"
@@ -236,7 +236,7 @@ export function TournamentForm({ tournament, initialEnabledDivisions, availableD
               )}
             />
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="entry_fee"
@@ -372,7 +372,7 @@ export function TournamentForm({ tournament, initialEnabledDivisions, availableD
                       Select the gender format for this tournament. This will automatically configure the available categories.
                     </FormDescription>
                   </div>
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     {[
                       { value: 'mixed', label: 'Mixed (All)' },
                       { value: 'male', label: 'Male Only' },
@@ -456,7 +456,7 @@ export function TournamentForm({ tournament, initialEnabledDivisions, availableD
                       Select which belt groups can interact/register for this tournament.
                     </FormDescription>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {['Beginner', 'Novice I', 'Novice II', 'Advanced'].map((group) => (
                       <div key={group} className="flex items-center space-x-2">
                         <input
@@ -495,7 +495,7 @@ export function TournamentForm({ tournament, initialEnabledDivisions, availableD
                       Select which divisions to include. You can always change this later in Division Settings.
                     </FormDescription>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {(availableDivisions.length > 0 ? availableDivisions : [{name: 'Gradeschool'}, {name: 'Cadet'}, {name: 'Junior'}, {name: 'Senior'}]).map((div) => (
                       <div key={div.name} className="flex items-center space-x-2">
                          <input

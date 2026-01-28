@@ -9,6 +9,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Match } from '@/types/models'
 import { saveMatchScores } from '@/lib/actions/save-match-scores'
+import { broadcastManager } from '@/lib/realtime/broadcast'
 import { fetchMatchRounds } from '@/lib/actions/fetch-match-rounds'
 import { toast } from 'sonner'
 import { Loader2, Trophy, CheckCircle2 } from 'lucide-react'
@@ -200,6 +201,18 @@ export function MatchResultDialog({ match, open, onOpenChange, participants }: M
         } else {
           toast.success('Match scores saved')
         }
+        
+        // Broadcast update to passive viewers
+        broadcastManager.publish(match.tournament_id, 'score_update', {
+            matchId: match.id,
+            scores: {
+                round1: { player1: round1Score1, player2: round1Score2 },
+                round2: { player1: round2Score1, player2: round2Score2 },
+                round3: { player1: round3Score1, player2: round3Score2 }
+            },
+            winnerId: result.hasWinner ? (manualWinner1 || manualWinner2 || manualWinner3) : null
+        });
+
         onOpenChange(false)
         router.refresh()
       } else {

@@ -146,7 +146,12 @@ export async function regenerateBracketSchedule(
     const endMinutes = timeToMinutes(scheduleConfig.daily_end_time)
     const dailyMinutes = endMinutes - startMinutes
     const totalAvailableMinutes = dailyMinutes * scheduleConfig.courts * totalDays
-    const totalRequiredMinutes = assignments.reduce((sum, m) => sum + (m.duration || 10), 0)
+    const totalRequiredMinutes = assignments.reduce((sum, m) => {
+      const start = new Date(m.scheduledStartTime)
+      const end = new Date(m.scheduledEndTime)
+      const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60)
+      return sum + durationMinutes
+    }, 0)
     const utilizationPercent = (totalRequiredMinutes / totalAvailableMinutes) * 100
 
     const scheduleSummary = {
@@ -156,8 +161,8 @@ export async function regenerateBracketSchedule(
       dailyHours: dailyMinutes / 60,
       utilizationPercent,
       matchesPerDay,
-      earliestStart: earliestStart ? earliestStart.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : undefined,
-      latestEnd: latestEnd ? latestEnd.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : undefined
+      earliestStart: earliestStart !== null ? (earliestStart as Date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : undefined,
+      latestEnd: latestEnd !== null ? (latestEnd as Date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : undefined
     }
 
     revalidatePath(`/dashboard/tournament-organizer/tournaments/${tournamentId}`)

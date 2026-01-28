@@ -5,6 +5,7 @@ import { Poppins } from 'next/font/google'
 import './globals.css'
 import { siteConfig } from '@/config/site'
 import { ThemeProvider } from "@/components/theme-provider"
+import { TooltipProvider } from "@/components/ui/tooltip"
 
 const poppins = Poppins({
   variable: '--font-poppins',
@@ -37,7 +38,9 @@ export default function RootLayout({
             enableSystem
             disableTransitionOnChange
           >
-            {children}
+            <TooltipProvider>
+              {children}
+            </TooltipProvider>
             <Toaster />
           </ThemeProvider>
         </body>

@@ -32,6 +32,30 @@ export function DivisionBreakdown({ matches, participants = [] }: DivisionBreakd
     rows: Map<string, { category: string, skill: string, playerCount: Set<string>, matchCount: number, completedCount: number }>
   }> = {}
 
+  // Pre-pass: Find representative belt for each Division+Category group
+  const repBeltMap = new Map<string, string>()
+  
+  if (matches.length > 0) {
+    matches.forEach((m: any) => {
+      const divName = m.tournament_divisions?.name
+      const catName = m.tournament_categories?.name
+      if (!divName || !catName) return
+      
+      const key = `${divName}::${catName}`
+      if (!repBeltMap.has(key)) {
+         // Try to find belt from players
+         let belt = m.player1?.belt_level || m.player2?.belt_level
+         if (!belt && participants.length > 0) {
+            const p1 = participants.find((p: any) => p.player_id === m.player1_id)
+            const p2 = participants.find((p: any) => p.player_id === m.player2_id)
+            belt = p1?.player?.belt_level || p2?.player?.belt_level
+         }
+         
+         if (belt) repBeltMap.set(key, belt)
+      }
+    })
+  }
+
   // Filter matches to only include relevant lifecycle states
   const relevantMatches = matches.filter((m: any) => {
     const state = m.lifecycle_state
@@ -79,6 +103,15 @@ export function DivisionBreakdown({ matches, participants = [] }: DivisionBreakd
         if (p2Belt) {
           skill = getBeltSkillCategory(p2Belt)
         }
+      }
+      
+      // If still empty, try Representative Belt for the entire group (Division + Category)
+      if (!skill) {
+         const key = `${divName}::${catName}`
+         const repBelt = repBeltMap.get(key)
+         if (repBelt) {
+            skill = getBeltSkillCategory(repBelt)
+         }
       }
       
       // If still empty, mark as Unknown for display

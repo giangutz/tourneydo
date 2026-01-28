@@ -40,18 +40,18 @@ export default async function PaymentSubmissionsPage(props: PaymentSubmissionsPa
 
   return (
     <DashboardShell>
-      <div className="mb-6">
-        <Button variant="ghost" size="sm" asChild className="mb-4">
+      <div className="mb-4">
+        <Button variant="outline" asChild className="w-fit">
           <Link href={`/dashboard/tournament-organizer/tournaments/${id}`}>
             <ArrowLeftIcon className="mr-2 h-4 w-4" />
             Back to Dashboard
           </Link>
         </Button>
-        <PageHeader
-          title="Payment Submissions"
+      </div>
+      <PageHeader
+        title="Payment Submissions"
           description={`Manage payment verifications for ${tournament.name}`}
         />
-      </div>
 
       <Card>
         <CardHeader>
@@ -78,3 +78,4 @@ export default async function PaymentSubmissionsPage(props: PaymentSubmissionsPa
     </DashboardShell>
   )
 }
+

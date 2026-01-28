@@ -26,10 +26,12 @@ import { createClerkSupabaseClient } from "@/lib/supabase/client"
 import { useSession } from "@clerk/nextjs"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Loader2 } from "lucide-react"
+import { ArrowLeft, Loader2 } from "lucide-react"
 import { TagsSelector, Tag } from "@/components/ui/tags-selector"
 import { calculateAge } from "@/lib/utils"
 import type { BeltLevel } from "@/types/models"
+import { routes } from "@/config/routes"
+import Link from 'next/link'
 
 const BELT_LEVELS: BeltLevel[] = ['White', 'Yellow', 'Blue', 'Red', 'Brown', 'Black']
 
@@ -180,6 +182,15 @@ export function EditPlayerForm({ player, availableTeams, currentAssignments }: E
 
   return (
     <div className="max-w-2xl mx-auto">
+      <div className="mb-6">
+        <Button variant="outline" asChild className="w-fit mb-4">
+          <Link href={routes.coach.players}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Players
+          </Link>
+        </Button>
+      </div>
+
       <Card>
         <CardHeader>
           <CardTitle>Edit Player</CardTitle>
@@ -190,7 +201,7 @@ export function EditPlayerForm({ player, availableTeams, currentAssignments }: E
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
                   name="first_name"

@@ -14,7 +14,7 @@ interface TournamentEditPageProps {
   }>
 }
 
-import { TournamentBreadcrumbs } from '@/components/tournaments/tournament-breadcrumbs'
+
 
 export default async function TournamentEditPage({ params }: TournamentEditPageProps) {
   const { id } = await params
@@ -39,18 +39,17 @@ export default async function TournamentEditPage({ params }: TournamentEditPageP
 
   return (
     <DashboardShell>
-      <TournamentBreadcrumbs tournamentName={tournament.name} tournamentId={tournament.id} pageName="Settings" hideParent />
-      <PageHeader
-        title="Settings"
-        description="Update tournament details and settings."
-        action={
-          <Button variant="outline" asChild>
+      <div className="mb-4">
+          <Button variant="outline" asChild className="w-fit">
             <Link href={routes.organizer.tournamentDetail(tournament.id)}>
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back to Dashboard
             </Link>
           </Button>
-        }
+      </div>
+      <PageHeader
+        title="Settings"
+        description="Update tournament details and settings."
       />
       <div className="max-w-2xl mx-auto">
         <EditTournamentClient 

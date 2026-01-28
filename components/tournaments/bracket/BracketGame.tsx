@@ -32,6 +32,82 @@ interface BracketGameProps {
   bottomText?: (game: Game) => string;
 }
 
+const SideComponent = ({ 
+  bx, 
+  by, 
+  side, 
+  onHover, 
+  isWinner, 
+  athleteCalled,
+  teamNameStyle,
+  teamScoreStyle
+}: { 
+  bx: number; 
+  by: number; 
+  side: SideInfo; 
+  onHover: (id: string | null) => void; 
+  isWinner?: boolean;
+  athleteCalled?: boolean;
+  teamNameStyle: React.CSSProperties;
+  teamScoreStyle: React.CSSProperties;
+}) => {
+  const tooltip = side.seed && side.team ? <title>{side.seed.displayName}</title> : null;
+  const playerName = side.seed ? side.seed.displayName : 'BYE';
+  const teamName = side.team ? side.team.name : '';
+  
+  const isBye = !side.team && !side.seed;
+
+  return (
+    <g 
+      onMouseEnter={() => side.team && onHover(side.team.id)} 
+      onMouseLeave={() => onHover(null)}
+      style={{ cursor: 'pointer' }}
+    >
+      {/* trigger mouse events on the entire block */}
+      <rect x={bx} y={by} height={30} width={200} fillOpacity={0}>
+        {tooltip}
+      </rect>
+
+      <RectClipped x={bx} y={by} height={30} width={170}>
+        {/* Player name */}
+        <text x={bx + 8} y={by + 16}
+              style={{ 
+                ...teamNameStyle, 
+                fontSize: 12,
+                fontStyle: side.seed && side.seed.sourcePool ? 'italic' : undefined,
+                fontWeight: isWinner ? 'bold' : 'normal'
+              }}>
+          {isBye ? 'BYE' : (
+            <>
+              {side.isDisqualified && <tspan fill="#ef4444" fontWeight="bold">(DQ) </tspan>}
+              <tspan style={{ textDecoration: side.isDisqualified ? 'line-through' : 'none', opacity: side.isDisqualified ? 0.7 : 1 }}>
+                {playerName}
+              </tspan>
+            </>
+          )}
+        </text>
+        
+        {/* Team name */}
+        {!isBye && teamName && (
+          <text x={bx + 8} y={by + 26}
+                style={{ 
+                  ...teamNameStyle, 
+                  fontSize: 8,
+                  fill: '#aaa',
+                  fontWeight: 'normal'
+                }}>
+            {teamName}
+          </text>
+        )}
+      </RectClipped>
+
+      <text x={bx + 185} y={by + 20} style={teamScoreStyle} textAnchor="middle">
+        {side.score ? side.score.score : null}
+      </text>
+    </g>
+  );
+};
+
 export default class BracketGame extends React.PureComponent<BracketGameProps> {
   static defaultProps: Partial<BracketGameProps> = {
     homeOnTop: true,
@@ -98,71 +174,6 @@ export default class BracketGame extends React.PureComponent<BracketGameProps> {
     const hasScores = top?.score && bottom?.score;
     const isTopWinner = hasScores && topScore > bottomScore;
     const isBottomWinner = hasScores && bottomScore > topScore;
-
-    const SideComponent = ({ bx, by, side, onHover, isWinner, athleteCalled }: { 
-      bx: number; 
-      by: number; 
-      side: SideInfo; 
-      onHover: (id: string | null) => void; 
-      isWinner?: boolean;
-      athleteCalled?: boolean;
-    }) => {
-      const tooltip = side.seed && side.team ? <title>{side.seed.displayName}</title> : null;
-      const playerName = side.seed ? side.seed.displayName : 'BYE';
-      const teamName = side.team ? side.team.name : '';
-      
-      const isBye = !side.team && !side.seed;
-
-      return (
-        <g 
-          onMouseEnter={() => side.team && onHover(side.team.id)} 
-          onMouseLeave={() => onHover(null)}
-          style={{ cursor: 'pointer' }}
-        >
-          {/* trigger mouse events on the entire block */}
-          <rect x={bx} y={by} height={30} width={200} fillOpacity={0}>
-            {tooltip}
-          </rect>
-
-          <RectClipped x={bx} y={by} height={30} width={170}>
-            {/* Player name */}
-            <text x={bx + 8} y={by + 16}
-                  style={{ 
-                    ...teamNameStyle, 
-                    fontSize: 12,
-                    fontStyle: side.seed && side.seed.sourcePool ? 'italic' : undefined,
-                    fontWeight: isWinner ? 'bold' : 'normal'
-                  }}>
-              {isBye ? 'BYE' : (
-                <>
-                  {side.isDisqualified && <tspan fill="#ef4444" fontWeight="bold">(DQ) </tspan>}
-                  <tspan style={{ textDecoration: side.isDisqualified ? 'line-through' : 'none', opacity: side.isDisqualified ? 0.7 : 1 }}>
-                    {playerName}
-                  </tspan>
-                </>
-              )}
-            </text>
-            
-            {/* Team name */}
-            {!isBye && teamName && (
-              <text x={bx + 8} y={by + 26}
-                    style={{ 
-                      ...teamNameStyle, 
-                      fontSize: 8,
-                      fill: '#aaa',
-                      fontWeight: 'normal'
-                    }}>
-                {teamName}
-              </text>
-            )}
-          </RectClipped>
-
-          <text x={bx + 185} y={by + 20} style={teamScoreStyle} textAnchor="middle">
-            {side.score ? side.score.score : null}
-          </text>
-        </g>
-      );
-    };
 
     const topHovered = (top && top.team && top.team.id === hoveredTeamId),
       bottomHovered = (bottom && bottom.team && bottom.team.id === hoveredTeamId);
@@ -234,6 +245,8 @@ export default class BracketGame extends React.PureComponent<BracketGameProps> {
                 onHover={onHoveredTeamIdChange || (() => {})} 
                 isWinner={isTopWinner} 
                 athleteCalled={homeOnTop ? originalMatch?.athlete1_called : originalMatch?.athlete2_called}
+                teamNameStyle={teamNameStyle}
+                teamScoreStyle={teamScoreStyle}
               />
             ) : null
           }
@@ -245,6 +258,8 @@ export default class BracketGame extends React.PureComponent<BracketGameProps> {
                 onHover={onHoveredTeamIdChange || (() => {})} 
                 isWinner={isBottomWinner} 
                 athleteCalled={homeOnTop ? originalMatch?.athlete2_called : originalMatch?.athlete1_called}
+                teamNameStyle={teamNameStyle}
+                teamScoreStyle={teamScoreStyle}
               />
             ) : null
           }

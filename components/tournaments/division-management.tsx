@@ -93,15 +93,52 @@ export function DivisionManagement({ tournamentId, divisions: initialDivisions }
   const [filterGender, setFilterGender] = useState<'all' | 'male' | 'female'>('all')
 
   // Filter divisions to show only categories matching the filter
-  const filteredDivisions = divisions.map(div => ({
-    ...div,
-    tournament_categories: div.tournament_categories.filter(cat => {
-      if (filterGender === 'all') return true
-      if (filterGender === 'male') return cat.gender === 'male' || cat.gender === 'both'
-      if (filterGender === 'female') return cat.gender === 'female' || cat.gender === 'both'
-      return true
-    })
-  }))
+  const filteredDivisions = divisions.map(div => {
+    const measurementType = div.name.toLowerCase().includes('gradeschool') ? 'height' : 'weight'
+    
+    return {
+      ...div,
+      tournament_categories: div.tournament_categories
+        .filter(cat => {
+          if (filterGender === 'all') return true
+          if (filterGender === 'male') return cat.gender === 'male' || cat.gender === 'both'
+          if (filterGender === 'female') return cat.gender === 'female' || cat.gender === 'both'
+          return true
+        })
+        .sort((a, b) => {
+          // 1. Sort by Gender (Male/Both first, then Female)
+          const genderOrder = { 'male': 1, 'both': 2, 'female': 3 }
+          const genderDiff = (genderOrder[a.gender] || 99) - (genderOrder[b.gender] || 99)
+          if (genderDiff !== 0) return genderDiff
+
+          // 2. Sort by Size (Min value ascending)
+          const getVal = (c: Category, type: 'height' | 'weight') => {
+             return (type === 'height' ? c.min_height : c.min_weight) ?? -Infinity
+          }
+          
+          const valA = getVal(a, measurementType)
+          const valB = getVal(b, measurementType)
+          
+          if (valA !== valB) {
+            return valA - valB
+          }
+
+          // 3. Fallback: Sort by Max Value
+          const getMax = (c: Category, type: 'height' | 'weight') => {
+              return (type === 'height' ? c.max_height : c.max_weight) ?? Infinity
+          }
+          const maxA = getMax(a, measurementType)
+          const maxB = getMax(b, measurementType)
+          
+          if (maxA !== maxB) {
+            return maxA - maxB
+          }
+
+          // 4. Fallback: Natural Name Sort (Group 1, Group 2, Group 10)
+          return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
+        })
+    }
+  })
 
   const handleToggleDivision = async (divisionId: string, enabled: boolean) => {
     const result = await updateDivisionStatus(tournamentId, divisionId, enabled)
@@ -294,30 +331,32 @@ export function DivisionManagement({ tournamentId, divisions: initialDivisions }
       <Accordion type="multiple" className="space-y-4">
         {filteredDivisions.map((division) => {
           const measurementType = getMeasurementType(division.name)
-          const enabledCategories = division.tournament_categories.length
+            const originalDivision = divisions.find(d => d.id === division.id)
+            const enabledCategories = originalDivision?.tournament_categories.length || 0
           
-          return (
+            return (
             <AccordionItem key={division.id} value={division.id} className="border rounded-lg group">
               <Card className={!division.enabled ? 'opacity-60' : ''}>
-                <div className="flex items-center justify-between w-full pr-4 py-4">
-                    <AccordionTrigger className="hover:no-underline py-0 pr-0 flex-1 [&>svg]:hidden">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between w-full pr-4 py-4 gap-2">
+                    <AccordionTrigger className="hover:no-underline py-0 pr-0 flex-1 [&>svg]:hidden w-full">
                       <div className="text-left pl-6">
-                        <CardTitle className="text-lg">{division.name}</CardTitle>
+                        <div className="flex items-center gap-3">
+                          <CardTitle className="text-lg">{division.name}</CardTitle>
+                          <Badge variant={division.enabled ? 'default' : 'secondary'} className="text-xs font-bold">
+                            {division.enabled ? 'Enabled' : 'Disabled'}
+                          </Badge>
+                        </div>
                         <CardDescription className="text-sm mt-1">
                           Ages: {division.min_age || '0'} - {division.max_age || '∞'} • {enabledCategories} categories
                         </CardDescription>
                       </div>
                     </AccordionTrigger>
                     
-                    <div className="flex items-center gap-3 pl-4 pr-2">
-                      <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
-                        <Badge variant={division.enabled ? 'default' : 'secondary'}>
-                          {division.enabled ? 'Enabled' : 'Disabled'}
-                        </Badge>
-                        
+                    <div className="flex items-center gap-1 pl-6 sm:pl-4 pr-2 w-full sm:w-auto justify-end">
+                      <div className="flex items-center justify-center h-8 w-8" onClick={(e) => e.stopPropagation()}>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 flex items-center justify-center">
                               <MoreVertical className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
@@ -337,11 +376,9 @@ export function DivisionManagement({ tournamentId, divisions: initialDivisions }
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
-
-                        <div className="h-6 w-px bg-border mx-1" />
                       </div>
 
-                      <AccordionTrigger className="flex-none h-8 w-8 p-0 hover:bg-muted hover:no-underline rounded-md justify-center [&>svg]:size-5 [&>svg]:text-foreground">
+                      <AccordionTrigger className="flex-none h-8 w-8 p-0 hover:bg-muted hover:no-underline rounded-md justify-center [&>svg]:size-4 [&>svg]:text-foreground items-center">
                       </AccordionTrigger>
                     </div>
                   </div>
@@ -349,7 +386,7 @@ export function DivisionManagement({ tournamentId, divisions: initialDivisions }
                 <AccordionContent>
                   <CardContent className="pt-4 space-y-4">
                     {/* ... existing content ... */}
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col xs:flex-row items-start xs:items-center justify-between gap-3">
                       <h4 className="font-semibold text-sm flex items-center gap-2">
                         {measurementType === 'height' ? <Ruler className="h-4 w-4" /> : <Weight className="h-4 w-4" />}
                         Categories ({measurementType === 'height' ? 'Height-based' : 'Weight-based'})
@@ -357,6 +394,7 @@ export function DivisionManagement({ tournamentId, divisions: initialDivisions }
                       <Button
                         size="sm"
                         variant="outline"
+                        className="w-full xs:w-auto"
                         onClick={() => setAddingCategory(division.id)}
                         disabled={!division.enabled}
                       >
@@ -472,11 +510,11 @@ function CategoryCard({
   }
 
   return (
-    <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3 border rounded-lg bg-muted/30 gap-3">
       <div className="flex-1">
-        <div className="flex items-center gap-2">
-          <span className="font-medium">{category.name}</span>
-          <Badge variant="outline" className="text-xs">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-medium break-all">{category.name}</span>
+          <Badge variant="outline" className="text-xs shrink-0">
             {getGenderLabel(divisionName, category.gender)}
           </Badge>
         </div>
@@ -488,7 +526,7 @@ function CategoryCard({
           )}
         </div>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 self-end sm:self-auto">
         <Button size="sm" variant="ghost" onClick={onEdit}>
           <Edit2 className="h-4 w-4" />
         </Button>
@@ -541,8 +579,8 @@ function CategoryEditDialog({
             Update the name and {measurementType} limits for this category
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4">
-          <div>
+        <div className="space-y-6 py-4">
+          <div className="grid gap-3">
             <Label>Category Name</Label>
              <Input
               value={name}
@@ -550,7 +588,7 @@ function CategoryEditDialog({
               placeholder="e.g., Heavyweight"
             />
           </div>
-          <div>
+          <div className="grid gap-3">
             <Label>Minimum {measurementType === 'height' ? 'Height (cm)' : 'Weight (kg)'}</Label>
             <Input
               type="number"
@@ -560,7 +598,7 @@ function CategoryEditDialog({
               placeholder="No minimum"
             />
           </div>
-          <div>
+          <div className="grid gap-3">
             <Label>Maximum {measurementType === 'height' ? 'Height (cm)' : 'Weight (kg)'}</Label>
             <Input
               type="number"
@@ -571,7 +609,7 @@ function CategoryEditDialog({
             />
           </div>
         </div>
-        <DialogFooter>
+        <DialogFooter className="gap-2 sm:gap-0">
           <Button variant="outline" onClick={onClose} disabled={isSubmitting}>
             Cancel
           </Button>
@@ -625,15 +663,15 @@ function AddCategoryDialog({
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-[425px] w-[95vw] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add Category to {divisionName}</DialogTitle>
           <DialogDescription>
             Create a new {measurementType}-based category
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4">
-          <div>
+        <div className="space-y-6 py-4">
+          <div className="grid gap-3">
             <Label>Category Name</Label>
             <Input
               value={name}
@@ -641,10 +679,10 @@ function AddCategoryDialog({
               placeholder="e.g., Super Heavy"
             />
           </div>
-          <div>
+          <div className="grid gap-3">
             <Label>Gender</Label>
             <select
-              className="w-full border rounded-md p-2"
+              className="w-full border rounded-md p-2 bg-background"
               value={gender}
               onChange={(e) => setGender(e.target.value as 'male' | 'female')}
             >
@@ -652,7 +690,7 @@ function AddCategoryDialog({
               <option value="female">{divisionName.toLowerCase().includes('gradeschool') || divisionName.toLowerCase().includes('cadet') ? 'Girls' : 'Women'}</option>
             </select>
           </div>
-          <div>
+          <div className="grid gap-3">
             <Label>Minimum {measurementType === 'height' ? 'Height (cm)' : 'Weight (kg)'}</Label>
             <Input
               type="number"
@@ -662,7 +700,7 @@ function AddCategoryDialog({
               placeholder="No minimum"
             />
           </div>
-          <div>
+          <div className="grid gap-3">
             <Label>Maximum {measurementType === 'height' ? 'Height (cm)' : 'Weight (kg)'}</Label>
             <Input
               type="number"
@@ -673,11 +711,11 @@ function AddCategoryDialog({
             />
           </div>
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={isSubmitting}>
+        <DialogFooter className="flex-col gap-2 sm:gap-0">
+          <Button variant="outline" onClick={onClose} disabled={isSubmitting} className="w-full sm:w-auto">
             Cancel
           </Button>
-          <Button onClick={handleAdd} disabled={isSubmitting}>
+          <Button onClick={handleAdd} disabled={isSubmitting} className="w-full sm:w-auto">
             {isSubmitting ? 'Adding...' : 'Add Category'}
           </Button>
         </DialogFooter>
@@ -719,8 +757,8 @@ function DivisionDialog({
             {division ? 'Update division details' : 'Define a new division and its age requirements'}
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4">
-          <div className="grid gap-2">
+        <div className="space-y-6 py-4">
+          <div className="grid gap-3">
             <Label>Division Name</Label>
             <Input
               value={name}
@@ -728,8 +766,8 @@ function DivisionDialog({
               placeholder="e.g., Ultra Heavy"
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="grid gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid gap-3">
               <Label>Min Age (Optional)</Label>
               <Input
                 type="number"
@@ -738,7 +776,7 @@ function DivisionDialog({
                 placeholder="No min"
               />
             </div>
-            <div className="grid gap-2">
+            <div className="grid gap-3">
               <Label>Max Age (Optional)</Label>
               <Input
                 type="number"
@@ -749,7 +787,7 @@ function DivisionDialog({
             </div>
           </div>
         </div>
-        <DialogFooter>
+        <DialogFooter className="gap-2 sm:gap-0">
           <Button variant="outline" onClick={onClose} disabled={isSubmitting}>
             Cancel
           </Button>

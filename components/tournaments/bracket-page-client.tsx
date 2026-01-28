@@ -55,7 +55,7 @@ interface BracketPageClientProps {
   userRole?: TournamentRole | 'admin' | null
 }
 
-import { useTournamentRealtime } from '@/hooks/use-tournament-realtime'
+import { useAdminChannel } from '@/lib/realtime/admin-channel'
 import { BracketGenerationModal } from './bracket/bracket-generation-modal'
 import { BracketValidationDialog } from './bracket/bracket-validation-dialog'
 import { DivisionBreakdown } from './shared/division-breakdown'
@@ -66,7 +66,7 @@ import { getBeltSkillCategory, getCategoryDisplayName } from '@/lib/utils'
 const SKILL_ORDER = ['Beginner', 'Novice I', 'Novice II', 'Advanced', 'Unknown']
 
 export function BracketPageClient({ tournament, participants, matches, userRole }: BracketPageClientProps) {
-  useTournamentRealtime(tournament.id)
+  useAdminChannel(tournament.id)
   const router = useRouter()
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -328,11 +328,10 @@ export function BracketPageClient({ tournament, participants, matches, userRole 
 
   return (
     <div className="space-y-6 w-full max-w-full overflow-hidden">
-      <div className="flex justify-end">
-          <div className="flex gap-2">
+      <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 w-full">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="gap-2">
+                <Button variant="outline" className="gap-2 w-full sm:w-auto">
                   <Printer className="h-4 w-4" />
                   Print / Export
                 </Button>
@@ -359,7 +358,7 @@ export function BracketPageClient({ tournament, participants, matches, userRole 
                   setDeleteDialogOpen(true)
                 }}
                 disabled={generating || deleting}
-                className="gap-2"
+                className="gap-2 w-full sm:w-auto"
               >
                 {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                 Delete Bracket
@@ -371,7 +370,7 @@ export function BracketPageClient({ tournament, participants, matches, userRole 
                 onClick={handleGenerateSchedule} 
                 disabled={generating || deleting || generatingSchedule}
                 variant="secondary"
-                className="gap-2"
+                className="gap-2 w-full sm:w-auto"
               >
                 {generatingSchedule && <Loader2 className="h-4 w-4 animate-spin" />}
                 {!generatingSchedule && <Calendar className="h-4 w-4" />}
@@ -380,12 +379,15 @@ export function BracketPageClient({ tournament, participants, matches, userRole 
             )}
 
             {userRole !== 'bracket_manager' && (
-              <Button onClick={handleGenerate} disabled={generating || deleting || generatingSchedule}>
+              <Button 
+                onClick={handleGenerate} 
+                disabled={generating || deleting || generatingSchedule}
+                className="w-full sm:w-auto"
+              >
                 {generating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {matches.length > 0 ? 'Regenerate Bracket' : 'Generate Bracket'}
               </Button>
             )}
-          </div>
       </div>
 
       {matches.length > 0 && (
@@ -520,3 +522,4 @@ export function BracketPageClient({ tournament, participants, matches, userRole 
     </div>
   )
 }
+

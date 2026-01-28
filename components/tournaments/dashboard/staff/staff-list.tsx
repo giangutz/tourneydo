@@ -135,7 +135,7 @@ export function StaffList({ staff, tournamentId, totalPages, currentPage }: Staf
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
         <div className="relative flex-1">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
@@ -149,7 +149,7 @@ export function StaffList({ staff, tournamentId, totalPages, currentPage }: Staf
             defaultValue={searchParams.get('role')?.toString() || "all"}
             onValueChange={handleRoleFilter}
         >
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-full sm:w-[180px]">
                 <SelectValue placeholder="Filter by Role" />
             </SelectTrigger>
             <SelectContent>
@@ -164,7 +164,74 @@ export function StaffList({ staff, tournamentId, totalPages, currentPage }: Staf
         </Select>
       </div>
 
-      <div className="rounded-md border">
+      {/* Mobile Card View */}
+      <div className="space-y-4 md:hidden">
+        {staff.length === 0 ? (
+          <div className="text-center p-8 border rounded-lg text-muted-foreground bg-muted/10">
+            No staff members found.
+          </div>
+        ) : (
+          staff.map((member) => (
+             <div key={member.id} className="border rounded-lg p-4 space-y-3 shadow-sm bg-card">
+                <div className="flex justify-between items-start">
+                   <div className="space-y-1">
+                      <div className="font-medium truncate pr-4">{member.email}</div>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground capitalize">
+                        {getRoleIcon(member.role)}
+                        {member.role.replace('_', ' ')}
+                      </div>
+                   </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="h-8 w-8 p-0">
+                          <span className="sr-only">Open menu</span>
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                              className="cursor-pointer"
+                              onClick={() => setEditingStaff(member)}
+                          >
+                              <Shield className="mr-2 h-4 w-4" />
+                              Change Role
+                          </DropdownMenuItem>
+                         <DropdownMenuItem 
+                          className="cursor-pointer"
+                          onClick={() => handleResend(member.id)}
+                          disabled={loadingId === member.id}
+                        >
+                          <Mail className="mr-2 h-4 w-4" />
+                          Resend Invitation
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          className="text-destructive focus:text-destructive cursor-pointer"
+                          onClick={() => handleRemove(member.id)}
+                          disabled={loadingId === member.id}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Remove Access
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
+                
+                <div className="flex items-center justify-between text-sm pt-2 border-t">
+                    <Badge variant={member.status === 'active' ? 'default' : 'secondary'}>
+                      {member.status}
+                    </Badge>
+                    <span className="text-muted-foreground">
+                        Joined {formatShortDate(member.created_at)}
+                    </span>
+                </div>
+             </div>
+          ))
+        )}
+      </div>
+
+      <div className="rounded-md border hidden md:block">
         <Table>
           <TableHeader>
             <TableRow>

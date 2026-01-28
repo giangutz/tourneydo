@@ -124,9 +124,9 @@ export function OrganizerPaymentsTable({ payments, tournamentId }: OrganizerPaym
 
   return (
     <>
-      <div className="flex items-center justify-between py-4 min-h-[56px]">
+      <div className="flex items-center justify-between py-4 min-h-[56px] flex-wrap gap-2">
         {selectedRefs.length > 0 && (
-          <div className="flex items-center gap-2 animate-in fade-in slide-in-from-left-2 transition-all">
+          <div className="flex flex-wrap items-center gap-2 animate-in fade-in slide-in-from-left-2 transition-all w-full sm:w-auto">
             <span className="text-sm font-medium text-muted-foreground mr-2">
               {selectedRefs.length} selected
             </span>
@@ -153,7 +153,97 @@ export function OrganizerPaymentsTable({ payments, tournamentId }: OrganizerPaym
         )}
       </div>
 
-      <div className="rounded-md border overflow-hidden">
+      {/* Mobile Card View */}
+      <div className="space-y-4 md:hidden">
+        {payments.length === 0 ? (
+           <div className="text-center p-8 border rounded-lg text-muted-foreground bg-muted/10">
+            No payment submissions found.
+          </div>
+        ) : (
+          payments.map((group) => (
+            <div 
+              key={group.reference_number} 
+              className={`border rounded-lg p-4 space-y-3 shadow-sm bg-card ${selectedRefs.includes(group.reference_number) ? 'border-primary ring-1 ring-primary bg-primary/5' : ''}`}
+            >
+              <div className="flex justify-between items-start">
+                 <div className="flex items-start gap-3">
+                    <Checkbox
+                      checked={selectedRefs.includes(group.reference_number)}
+                      onCheckedChange={() => toggleSelection(group.reference_number)}
+                      className="mt-1"
+                    />
+                    <div>
+                      <div className="font-mono font-semibold">{group.reference_number}</div>
+                      <div className="text-sm text-muted-foreground">{formatShortDate(group.created_at)}</div>
+                    </div>
+                 </div>
+                 <div>
+                    {group.status === 'mixed' ? (
+                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 flex items-center gap-1 w-fit">
+                        <Layers className="h-3 w-3" />
+                        Mixed
+                      </Badge>
+                    ) : (
+                      <Badge
+                        variant={
+                          group.status === 'verified'
+                            ? 'default'
+                            : group.status === 'rejected'
+                            ? 'destructive'
+                            : 'secondary'
+                        }
+                      >
+                        {group.status.charAt(0).toUpperCase() + group.status.slice(1)}
+                      </Badge>
+                    )}
+                 </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                 <div>
+                    <span className="text-muted-foreground block text-xs">Total Amount</span>
+                    <span className="font-semibold">₱{group.total_amount.toLocaleString()}</span>
+                 </div>
+                 <div>
+                    <span className="text-muted-foreground block text-xs">Records</span>
+                    <span>{group.payment_count}</span>
+                 </div>
+                 <div className="col-span-2">
+                    <span className="text-muted-foreground block text-xs">Teams</span>
+                    <span className="font-medium text-xs truncate block">{group.team_names.join(', ')}</span>
+                 </div>
+              </div>
+
+              {/* Actions Footer */}
+              {(group.status === 'pending' || group.status === 'mixed') && (
+                <div className="flex gap-2 pt-2 border-t">
+                  <Button
+                    size="sm"
+                    className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                    onClick={() => handleApprove([group.reference_number])}
+                    disabled={isProcessing}
+                  >
+                    <Check className="mr-2 h-3 w-3" />
+                    Approve
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    className="flex-1"
+                     onClick={() => handleRejectClick([group.reference_number])}
+                    disabled={isProcessing}
+                  >
+                    <X className="mr-2 h-3 w-3" />
+                    Reject
+                  </Button>
+                </div>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+
+      <div className="rounded-md border overflow-hidden hidden md:block">
         <Table>
           <TableHeader>
             <TableRow>

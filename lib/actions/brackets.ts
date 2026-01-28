@@ -58,14 +58,14 @@ export async function generateTournamentBracket(tournamentId: string): Promise<G
     // 3. Fetch participants
     const { data: participants } = await getTournamentParticipants(tournamentId, { limit: 1000 })
 
-    const confirmedParticipants = participants.filter(p => (p.status === 'verified' || p.status === 'paid') && !p.disqualified)
+    const confirmedParticipants = participants.filter((p: any) => (p.status === 'verified' || p.status === 'paid') && !p.disqualified)
 
     if (confirmedParticipants.length < 2) {
       return { success: false, error: 'Need at least 2 verified/paid participants to generate brackets', errorType: 'general' }
     }
 
     // 3.5. Validate all confirmed participants have completed weigh-in
-    const participantsWithoutWeighIn = confirmedParticipants.filter(p => {
+    const participantsWithoutWeighIn = confirmedParticipants.filter((p: any) => {
       // Check if weigh-in is completed
       if (!p.weighed_in_at) return true
 
@@ -85,7 +85,7 @@ export async function generateTournamentBracket(tournamentId: string): Promise<G
         success: false,
         error: 'Some participants have not completed weigh-in',
         errorType: 'unweighed',
-        participants: participantsWithoutWeighIn.map(p => ({
+        participants: participantsWithoutWeighIn.map((p: any) => ({
           id: p.id,
           name: `${p.player?.first_name} ${p.player?.last_name}`,
           reason: 'Missing weigh-in data'
@@ -95,8 +95,26 @@ export async function generateTournamentBracket(tournamentId: string): Promise<G
 
     // 3.8 Validate all confirmed participants have valid belt levels (for Standard tournaments)
     if (!isOpenBelt) {
-      const participantsWithInvalidBelts = confirmedParticipants.filter(p => {
+      const participantsWithInvalidBelts = confirmedParticipants.filter((p: any) => {
         if (!p.player?.belt_level) return true // Missing belt entirely
+
+        const belt = p.player.belt_level.toLowerCase()
+        // Allowed: White, Yellow, Blue, Red, Brown, Black
+        // (Includes variations like "High Yellow" if they contain the base color, 
+        // but explicit checks for invalid ones like Green/Orange are needed if strict)
+
+        const allowedColors = ['white', 'yellow', 'blue', 'red', 'brown', 'black']
+        const hasValidColor = allowedColors.some(c => belt.includes(c))
+
+        // Also ensure it doesn't contain forbidden colors if we want to be super strict?
+        // User request: "only recognize W, Y, B, R, B, Black"
+        // If someone has "Green Belt", hasValidColor is false. 
+        // If someone has "Blue-Green", hasValidColor is true (Blue). 
+        // Let's assume the user wants to ban purely non-standard belts.
+
+        if (!hasValidColor) return true
+
+        // Also check getBeltSkillCategory to ensure it maps to a valid group
         const skillCategory = getBeltSkillCategory(p.player.belt_level)
         return skillCategory === 'Unknown' || !skillCategory
       })
@@ -106,7 +124,7 @@ export async function generateTournamentBracket(tournamentId: string): Promise<G
           success: false,
           error: 'Some participants have invalid or unknown belt levels',
           errorType: 'invalid_belt',
-          participants: participantsWithInvalidBelts.map(p => ({
+          participants: participantsWithInvalidBelts.map((p: any) => ({
             id: p.id,
             name: `${p.player?.first_name} ${p.player?.last_name}`,
             reason: `Invalid belt: ${p.player?.belt_level || 'None'}`
@@ -218,7 +236,7 @@ export async function generateTournamentBracket(tournamentId: string): Promise<G
 
     // Double check that everyone we expect to be assigned is actually assigned
     const participantsWithDivisions = assignedParticipants.filter(
-      p => (p.status === 'verified' || p.status === 'paid') && p.division_id && p.category_id && !p.disqualified
+      (p: any) => (p.status === 'verified' || p.status === 'paid') && p.division_id && p.category_id && !p.disqualified
     )
 
     // 6. Group participants by division, category, and optionally belt skill category

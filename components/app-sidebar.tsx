@@ -4,21 +4,28 @@ import * as React from "react"
 import {
   Sidebar,
   SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
+  SidebarFooter,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar"
-import { useUser } from "@clerk/nextjs"
+import { useUser, UserButton } from "@clerk/nextjs"
 import { usePathname } from "next/navigation"
 import Link from "next/link"
-import { Calendar, Users, Trophy, LayoutDashboard, Shield, CreditCard } from "lucide-react"
+import { 
+  LayoutDashboard, 
+  Trophy, 
+  Shield, 
+  Users, 
+  CreditCard,
+  Settings,
+  HelpCircle,
+  Search,
+  FileText
+} from "lucide-react"
 import Image from "next/image"
-
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { user } = useUser()
@@ -64,12 +71,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       url: "/dashboard/tournament-organizer/tournaments",
       icon: Trophy,
     },
+    // Adding some placeholder items to match the "dense" feel of the reference if needed, 
+    // but strictly keeping to functional items first.
   ]
 
   const isOrganizerRoute = pathname?.startsWith("/dashboard/tournament-organizer")
   
-  // Use organizer items if on organizer route OR role is organizer
-  // Use coach items only if on coach route/neutral AND role is coach
   const items = isOrganizerRoute 
     ? organizerItems 
     : role === "coach" 
@@ -77,22 +84,28 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       : organizerItems
 
   return (
-    <Sidebar {...props}>
-      <SidebarHeader>
-        <div className="flex items-center gap-2 px-4 py-2">
-          <Image src="/td-blue.svg" alt="TourneyDo Logo" width={32} height={32} className="h-8 w-8" />
-          <div className="font-semibold">TourneyDo</div>
-          {/* Debug: {pathname} of {role} */}
-        </div>
+    <Sidebar collapsible="icon" {...props} className="border-none pt-2">
+      <SidebarHeader className="group-data-[collapsible=icon]:!pt-4">
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton size="lg" asChild>
+              <Link href="/dashboard">
+                <div className="flex aspect-square size-8 items-center justify-center rounded-lg text-sidebar-primary-foreground">
+                  <Image src="/td-blue.svg" alt="TourneyDo Logo" width={32} height={32} className="size-6" />
+                </div>
+                <div className="flex flex-1 items-center text-left text-sm leading-tight">
+                  <span className="truncate font-bold text-lg">TourneyDo</span>
+                </div>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarHeader>
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>{isOrganizerRoute ? "Tournament Organizer" : role === "coach" ? "Coach" : "Tournament Organizer"}</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {items.map((item) => (
+      <SidebarContent className="px-2 group-data-[collapsible=icon]:!px-2 group-data-[collapsible=icon]:!pt-2">
+        <SidebarMenu>
+             {items.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={pathname === item.url}>
+                  <SidebarMenuButton asChild tooltip={item.title} isActive={pathname === item.url}>
                     <Link href={item.url}>
                       <item.icon />
                       <span>{item.title}</span>
@@ -100,11 +113,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        </SidebarMenu>
       </SidebarContent>
-      <SidebarRail />
     </Sidebar>
   )
 }

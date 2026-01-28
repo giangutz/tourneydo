@@ -252,7 +252,7 @@ export async function getPendingPaymentsByOrganizer(organizerId: string) {
       teams (
         id,
         name,
-        user_id // coach_id
+        user_id
       )
     `)
     .eq('tournaments.organizer_id', organizerId)
@@ -609,4 +609,66 @@ export async function getTournamentPaymentGroupsPaginated(
     data: paginatedData,
     totalPages: Math.ceil(groupedArray.length / pageSize)
   }
+}
+
+/**
+ * Get recent payments for an organizer (regardless of status)
+ */
+export async function getRecentPaymentsByOrganizer(organizerId: string, limit: number = 10, offset: number = 0) {
+  const supabase = createServerSupabaseClient()
+
+  const { data, error } = await (supabase as any)
+    .from('payments')
+    .select(`
+      *,
+      tournaments!inner (
+        id,
+        name,
+        organizer_id
+      ),
+      teams (
+        id,
+        name,
+        user_id
+      )
+    `)
+    .eq('tournaments.organizer_id', organizerId)
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1)
+
+  if (error) {
+    throw new Error(`Failed to fetch recent payments: ${error.message}`)
+  }
+
+  return data || []
+}
+
+/**
+ * Get recent payments for a coach
+ */
+export async function getRecentPaymentsByCoachId(coachId: string, limit: number = 10) {
+  const supabase = createServerSupabaseClient()
+
+  const { data, error } = await (supabase as any)
+    .from('payments')
+    .select(`
+      *,
+      tournaments (
+        id,
+        name
+      ),
+      teams (
+        id,
+        name
+      )
+    `)
+    .eq('coach_id', coachId)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (error) {
+    throw new Error(`Failed to fetch recent coach payments: ${error.message}`)
+  }
+
+  return data || []
 }

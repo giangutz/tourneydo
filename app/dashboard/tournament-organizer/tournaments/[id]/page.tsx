@@ -1,4 +1,5 @@
 import { notFound, redirect } from 'next/navigation'
+import { auth } from "@clerk/nextjs/server"
 import { getTournamentById } from '@/lib/db/queries/tournaments'
 import { getPendingPaymentsByTournament } from '@/lib/db/queries/payments'
 import { checkTournamentAccess } from '@/lib/auth/tournament-access'
@@ -65,6 +66,11 @@ export default async function TournamentDashboardPage({ params }: TournamentDash
   const canManageStaff = isOrganizer || role === 'admin'
   const canWeighIn = isOrganizer || role === 'admin' || role === 'staff' || role === 'official' || role === 'weigh_in_staff'
 
+  const { userId } = await auth()
+  if (!userId) {
+     redirect('/sign-in')
+  }
+
   return (
     <DashboardShell>
       {/* ... header */}
@@ -90,7 +96,7 @@ export default async function TournamentDashboardPage({ params }: TournamentDash
       />
 
       <PhaseProvider tournament={tournament}>
-        <DashboardContent tournamentId={tournament.id} />
+        <DashboardContent tournamentId={tournament.id} userId={userId} />
       </PhaseProvider>
       <RealtimeListener tournamentId={tournament.id} />
 

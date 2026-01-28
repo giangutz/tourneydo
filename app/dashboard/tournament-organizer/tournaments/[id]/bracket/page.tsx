@@ -16,7 +16,7 @@ interface BracketPageProps {
   }>
 }
 
-import { TournamentBreadcrumbs } from '@/components/tournaments/tournament-breadcrumbs'
+
 import { checkTournamentAccess } from '@/lib/auth/tournament-access'
 
 export default async function BracketPage({ params }: BracketPageProps) {
@@ -41,18 +41,17 @@ export default async function BracketPage({ params }: BracketPageProps) {
 
   return (
     <DashboardShell>
-      <TournamentBreadcrumbs tournamentName={tournament.name} tournamentId={tournament.id} pageName="Bracket" hideParent />
+      <div className="mb-4">
+        <Button variant="outline" asChild className="w-fit">
+          <Link href={routes.organizer.tournamentDetail(id)}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Tournament
+          </Link>
+        </Button>
+      </div>
       <PageHeader
         title="Bracket"
         description="Manage tournament bracket and results."
-        action={
-          <Button variant="outline" asChild>
-            <Link href={routes.organizer.tournamentDetail(id)}>
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Tournament
-            </Link>
-          </Button>
-        }
       />
       <BracketPageClient 
         tournament={tournament} 

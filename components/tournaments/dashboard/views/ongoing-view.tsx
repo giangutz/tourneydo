@@ -63,11 +63,15 @@ export function OngoingView({ tournamentId }: OngoingViewProps) {
           }
         })
 
+        // Real calculations for Ongoing stats
+        const activeMatches = matches.filter(m => m.lifecycle_state === 'IN_PROGRESS').length
+        const stagingMatches = matches.filter(m => m.lifecycle_state === 'CONTEST').length
+
         setStats({
           scheduleVariance: Math.round(varianceMinutes),
-          activeCheckIns: 0, 
+          activeCheckIns: activeMatches, 
           matchesPerHour: matchesLastHour,
-          stagingQueue: 0 
+          stagingQueue: stagingMatches 
         })
         
         setPaceData([

@@ -119,6 +119,14 @@ export function formatCurrency(amount: number, currency = 'PHP'): string {
   }).format(amount)
 }
 
+// Format Currency without currency symbol
+export function formatCurrencyNoSymbol(amount: number, currency = 'PHP'): string {
+  return new Intl.NumberFormat('en-PH', {
+    currency,
+    minimumFractionDigits: 2,
+  }).format(amount)
+}
+
 /**
  * Map belt level to skill category for Standard tournaments
  * White -> Beginner

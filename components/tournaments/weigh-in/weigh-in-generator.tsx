@@ -9,9 +9,10 @@ import { Dna, Shuffle } from 'lucide-react'
 interface WeighInGeneratorProps {
   tournamentId: string
   disabled?: boolean
+  className?: string
 }
 
-export function WeighInGenerator({ tournamentId, disabled }: WeighInGeneratorProps) {
+export function WeighInGenerator({ tournamentId, disabled, className }: WeighInGeneratorProps) {
   const [isPending, startTransition] = useTransition()
 
   function handleGenerate() {
@@ -29,7 +30,8 @@ export function WeighInGenerator({ tournamentId, disabled }: WeighInGeneratorPro
     <Button 
       onClick={handleGenerate} 
       disabled={disabled || isPending}
-      variant="secondary"
+      variant="default"
+      className={className}
     >
       {isPending ? (
         <Dna className="mr-2 h-4 w-4 animate-spin" />

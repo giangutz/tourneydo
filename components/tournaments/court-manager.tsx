@@ -8,6 +8,7 @@ import { MatchResultDialog } from '@/components/tournaments/match-result-dialog'
 import { Badge } from '@/components/ui/badge'
 import { AthleteReadinessToggle, ReadinessStatusBadge } from '@/components/tournaments/athlete-readiness-toggle'
 import { isMatchReady } from '@/lib/utils/match-lifecycle'
+import { broadcastManager } from '@/lib/realtime/broadcast'
 import {
   Dialog,
   DialogContent,
@@ -116,6 +117,7 @@ export function CourtManager({ tournament, matches, participants }: CourtManager
         toast.error(result.error)
       } else {
         toast.success("Match started")
+        broadcastManager.publish(match.tournament_id, 'bracket_update', { matchId: match.id, status: 'in_progress' })
       }
     } catch (error) {
       toast.error('Failed to start match')
@@ -137,6 +139,7 @@ export function CourtManager({ tournament, matches, participants }: CourtManager
       
       if (result.success) {
         toast.success(`Match moved to Court ${targetCourt}`)
+        broadcastManager.publish(matchToMove.tournament_id, 'bracket_update', { matchId: matchToMove.id, court: targetCourt })
         setMatchToMove(null)
         setTargetCourt("")
       } else {
@@ -158,6 +161,7 @@ export function CourtManager({ tournament, matches, participants }: CourtManager
       
       if (result.success) {
         toast.success("Match removed from court")
+        broadcastManager.publish(matchToRemove.tournament_id, 'bracket_update', { matchId: matchToRemove.id, status: 'removed' })
         setMatchToRemove(null)
       } else {
         toast.error(result.error)
@@ -187,6 +191,7 @@ export function CourtManager({ tournament, matches, participants }: CourtManager
       
       if (result.success) {
         toast.success(`${playerToDQ.name} disqualified. Match forfeited automatically.`)
+        broadcastManager.publish(tournament.id, 'score_update', { matchId: playerToDQ.matchId, disqualified: true })
         setPlayerToDQ(null)
         setDQReason('')
       } else {

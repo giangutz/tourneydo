@@ -1,13 +1,16 @@
 import Link from "next/link"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
-import { auth } from "@clerk/nextjs/server"
+
 import { UserNav } from "@/components/layouts/user-nav"
 import { ModeToggle } from "@/components/layouts/mode-toggle"
-import { SignedOut, SignedIn, UserButton } from "@clerk/nextjs"
+import { NotificationsNav } from "@/components/layouts/notifications-nav"
+import { MobileNav } from "@/components/layouts/mobile-nav"
+import { SignedOut, SignedIn, ClerkLoading, ClerkLoaded } from "@clerk/nextjs"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { LogIn, UserPlus } from "lucide-react"
 
-export async function SiteHeader() {
-  const { userId } = await auth()
+export function SiteHeader() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -35,18 +38,57 @@ export async function SiteHeader() {
           </div>
           <div className="flex items-center gap-4">
             <ModeToggle />
-            {userId ? (
-              <UserNav />
-            ) : (
-              <>
-                <Button variant="ghost" asChild>
-                  <Link href="/sign-in">Sign In</Link>
-                </Button>
-                <Button asChild>
-                  <Link href="/sign-up">Sign Up</Link>
-                </Button>
-              </>
-            )}
+            <ClerkLoading>
+              <div className="flex items-center gap-4">
+                 <div className="h-9 w-24 rounded-md bg-muted animate-pulse" />
+                 <div className="h-8 w-8 rounded-full bg-muted animate-pulse" />
+              </div>
+            </ClerkLoading>
+            <ClerkLoaded>
+              <SignedIn>
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" className="hidden md:flex" asChild>
+                    <Link href="/dashboard">
+                      Dashboard
+                    </Link>
+                  </Button>
+                  <NotificationsNav />
+                  <UserNav />
+                </div>
+              </SignedIn>
+              <SignedOut>
+                <div className="flex items-center gap-2">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="ghost" size="icon" asChild>
+                        <Link href="/sign-in">
+                          <LogIn className="h-[1.2rem] w-[1.2rem]" />
+                          <span className="sr-only">Sign In</span>
+                        </Link>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Sign In</p>
+                    </TooltipContent>
+                  </Tooltip>
+                  
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="outline" size="icon" asChild>
+                        <Link href="/sign-up">
+                          <UserPlus className="h-[1.2rem] w-[1.2rem]" />
+                          <span className="sr-only">Sign Up</span>
+                        </Link>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Sign Up</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+              </SignedOut>
+            </ClerkLoaded>
+            <MobileNav />
           </div>
         </div>
       </div>

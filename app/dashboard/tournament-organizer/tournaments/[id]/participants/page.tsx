@@ -17,7 +17,7 @@ interface ParticipantsPageProps {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }
 
-import { TournamentBreadcrumbs } from '@/components/tournaments/tournament-breadcrumbs'
+
 
 export default async function ParticipantsPage({ params, searchParams }: ParticipantsPageProps) {
   const { id } = await params
@@ -55,18 +55,17 @@ export default async function ParticipantsPage({ params, searchParams }: Partici
 
   return (
     <DashboardShell>
-      <TournamentBreadcrumbs tournamentName={tournament.name} tournamentId={tournament.id} pageName="Participants" hideParent />
+      <div className="mb-4">
+        <Button variant="outline" asChild className="w-fit">
+          <Link href={routes.organizer.tournamentDetail(id)}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Tournament
+          </Link>
+        </Button>
+      </div>
       <PageHeader
         title="Participants"
         description="Manage registered teams and athletes."
-        action={
-          <Button variant="outline" asChild>
-            <Link href={routes.organizer.tournamentDetail(id)}>
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Tournament
-            </Link>
-          </Button>
-        }
       />
       <ParticipantList 
         participants={participantsResult.data as any} 

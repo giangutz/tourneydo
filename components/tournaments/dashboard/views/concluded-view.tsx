@@ -71,15 +71,17 @@ export function ConcludedView({ tournamentId }: ConcludedViewProps) {
     setLoading(true)
     const supabase = createClerkSupabaseClient({ session })
 
-    // 1. Fetch Financials (Regs + Expenses)
-    const { data: regsData } = await supabase.from('tournament_registrations').select('*').eq('tournament_id', tournamentId)
+    // 1. Fetch Financials (Regs + Expenses) & Matches for Leaderboard
+    const { data: regsData } = await supabase.from('tournament_registrations').select('*, teams(name)').eq('tournament_id', tournamentId)
     const { data: expData } = await (supabase as any)
       .from('tournament_expenses')
       .select('*')
       .eq('tournament_id', tournamentId)
+    const { data: matchesData } = await supabase.from('matches').select('*').eq('tournament_id', tournamentId)
 
     const regs = regsData as Registration[] | null
     const exp = expData as any[] | null
+    const matches = matchesData as any[] | null
 
     // Calculate Revenue
     const revenue = (regs?.filter((r) => r.status === 'paid').length || 0) * 50 
@@ -93,14 +95,74 @@ export function ConcludedView({ tournamentId }: ConcludedViewProps) {
     const totalRegs = regs?.length || 1
     const showRate = Math.round((checkedIn / totalRegs) * 100)
 
-    // Team Leaderboard (Mocking medal counts)
-    const mockLeaderboard = [
-      { name: 'Cobra Kai', gold: 5, silver: 2, bronze: 1, points: 20 },
-      { name: 'Miyagi-Do', gold: 4, silver: 3, bronze: 3, points: 21 },
-      { name: 'Eagle Fang', gold: 2, silver: 5, bronze: 0, points: 16 },
-    ].sort((a,b) => b.points - a.points)
+    // Calculate Team Leaderboard
+    const teamStats: Record<string, {name: string, gold: number, silver: number, bronze: number, points: number}> = {}
     
-    setTeamLeaderboard(mockLeaderboard)
+    if (regs && matches) {
+        // Map Player -> Team Name
+        const playerTeamMap = new Map<string, string>()
+        regs.forEach((r: any) => {
+            if (r.teams?.name && r.player_id) {
+                playerTeamMap.set(r.player_id, r.teams.name)
+            }
+        })
+
+        // Helper to init team stats
+        const initTeam = (teamName: string) => {
+            if (!teamStats[teamName]) {
+                teamStats[teamName] = { name: teamName, gold: 0, silver: 0, bronze: 0, points: 0 }
+            }
+        }
+
+        // Identify Finals and Semi-Finals
+        const matchMap = new Map(matches.map(m => [m.id, m]))
+        
+        matches.forEach(m => {
+            if (m.status !== 'completed' || !m.winner_id) return
+
+            // Logic:
+            // Final: next_match_id is null
+            // Semi: next_match_id points to a Final
+            
+            const isFinal = !m.next_match_id
+            let isSemi = false
+            if (m.next_match_id) {
+                const nextMatch = matchMap.get(m.next_match_id)
+                if (nextMatch && !nextMatch.next_match_id) {
+                    isSemi = true
+                }
+            }
+
+            const winnerTeam = playerTeamMap.get(m.winner_id)
+            const loserId = m.winner_id === m.player1_id ? m.player2_id : m.player1_id
+            const loserTeam = loserId ? playerTeamMap.get(loserId) : null
+
+            if (isFinal) {
+                // Gold for Winner
+                if (winnerTeam) {
+                    initTeam(winnerTeam)
+                    teamStats[winnerTeam].gold++
+                    teamStats[winnerTeam].points += 5
+                }
+                // Silver for Loser
+                if (loserTeam) {
+                    initTeam(loserTeam)
+                    teamStats[loserTeam].silver++
+                    teamStats[loserTeam].points += 3
+                }
+            } else if (isSemi) {
+                // Bronze for Loser
+                if (loserTeam) {
+                    initTeam(loserTeam)
+                    teamStats[loserTeam].bronze++
+                    teamStats[loserTeam].points += 1
+                }
+            }
+        })
+    }
+    
+    const leaderboard = Object.values(teamStats).sort((a,b) => b.points - a.points)
+    setTeamLeaderboard(leaderboard) // No longer mock
 
     setStats({
       totalRevenue: revenue,
@@ -360,3 +422,4 @@ export function ConcludedView({ tournamentId }: ConcludedViewProps) {
     </div>
   )
 }
+

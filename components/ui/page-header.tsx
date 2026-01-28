@@ -14,14 +14,14 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, description, action }: PageHeaderProps) {
   return (
-    <div className="flex flex-col-reverse sm:flex-row sm:items-center items-start justify-between ">
-      <div>
+    <div className="flex flex-col gap-4 md:flex-row md:items-center items-start justify-between mb-6">
+      <div className="flex-1">
         <h1 className="text-3xl font-bold tracking-tight">{title}</h1>
         {description && (
-          <h2 className="text-muted-foreground mt-2">{description}</h2>
+          <p className="text-muted-foreground mt-2">{description}</p>
         )}
       </div>
-      {action && <div className="mb-4">{action}</div>}
+      {action && <div className="w-full md:w-auto flex flex-col sm:flex-row gap-2 [&>*]:w-full sm:[&>*]:w-auto">{action}</div>}
     </div>
   )
 }

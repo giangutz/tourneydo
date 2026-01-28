@@ -97,7 +97,7 @@ interface ParticipantListProps {
   teams: Team[]
 }
 
-import { useTournamentRealtime } from '@/hooks/use-tournament-realtime'
+import { useAdminChannel } from '@/lib/realtime/admin-channel'
 
 export function ParticipantList({ 
   participants, 
@@ -109,7 +109,7 @@ export function ParticipantList({
   tournamentType = 'standard', 
   teams 
 }: ParticipantListProps) {
-  useTournamentRealtime(tournamentId)
+  useAdminChannel(tournamentId)
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
@@ -508,7 +508,7 @@ export function ParticipantList({
         {count} participants found
       </div>
 
-      <div className="rounded-md border">
+      <div className="rounded-md border hidden md:block">
         <Table>
           <TableHeader>
             <TableRow>
@@ -671,15 +671,101 @@ export function ParticipantList({
           </TableBody>
         </Table>
       </div>
+
+      {/* Mobile Card View */}
+      <div className="md:hidden space-y-4">
+        {participants.length === 0 ? (
+          <div className="text-center py-12 border rounded-lg bg-muted/10">
+            <p className="text-muted-foreground">No participants found</p>
+          </div>
+        ) : (
+          participants.map((participant) => (
+            <div key={participant.id} className="border rounded-lg bg-card p-4 space-y-3 shadow-sm">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                     <Checkbox
+                      checked={selectedIds.includes(participant.id)}
+                      onCheckedChange={() => toggleSelection(participant.id)}
+                      aria-label="Select participant"
+                    />
+                    <div>
+                      <div className="font-semibold text-base">
+                        {participant.player?.first_name} {participant.player?.last_name}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {participant.team?.name || 'Unknown Team'}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="h-8 w-8 p-0">
+                          <span className="sr-only">Open menu</span>
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                        <DropdownMenuItem onClick={() => setEditingParticipant(participant)}>
+                          <Pencil className="mr-2 h-4 w-4" /> Edit Details
+                        </DropdownMenuItem>
+                         {participant.status === 'verified' && (
+                          <DropdownMenuItem asChild>
+                            <Link href={routes.organizer.participantWeighIn(tournamentId, participant.id)}>
+                              <Scale className="mr-2 h-4 w-4" /> Weigh In
+                            </Link>
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => handleStatusUpdate(participant.id, 'verified')}>
+                          <Check className="mr-2 h-4 w-4" /> Mark as Verified
+                        </DropdownMenuItem>
+                         <DropdownMenuItem onClick={() => handleStatusUpdate(participant.id, 'paid')}>
+                          <DollarSign className="mr-2 h-4 w-4" /> Mark as Paid
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                         <DropdownMenuItem 
+                          onClick={() => setDeletingParticipant(participant)}
+                          className="text-destructive focus:text-destructive"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" /> Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
+                
+                <div className="flex items-center justify-between text-sm">
+                   <div className="flex flex-wrap gap-2">
+                      <Badge variant="outline">{participant.player?.belt_level || 'No Belt'}</Badge>
+                      {participant.player?.weight && <Badge variant="secondary">{participant.player.weight}kg</Badge>}
+                   </div>
+                   <Badge 
+                      variant={
+                        participant.status === 'paid'
+                          ? 'default'
+                          : participant.status === 'verified'
+                          ? 'secondary'
+                          : 'outline'
+                      }
+                    >
+                      {participant.status}
+                    </Badge>
+                </div>
+            </div>
+          ))
+        )}
+      </div>
       
       {/* Pagination Controls */}
-      <div className="flex items-center justify-between px-2">
-        <div className="flex items-center gap-4">
-          <div className="text-sm text-muted-foreground">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between px-2 py-4">
+        <div className="flex items-center justify-between w-full sm:w-auto gap-4">
+          <div className="text-sm text-muted-foreground whitespace-nowrap">
             Page {page} of {totalPages}
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Rows per page</span>
+            <span className="text-sm text-muted-foreground hidden sm:inline">Rows per page</span>
+            <span className="text-sm text-muted-foreground sm:hidden">Rows</span>
             <Select
               value={limit.toString()}
               onValueChange={handleLimitChange}
@@ -697,14 +783,15 @@ export function ParticipantList({
             </Select>
           </div>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center w-full sm:w-auto gap-2">
           <Button
             variant="outline"
             size="sm"
             onClick={() => handlePageChange(page - 1)}
             disabled={page <= 1}
+            className="flex-1 sm:flex-none order-1"
           >
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronLeft className="h-4 w-4 mr-1" />
             Previous
           </Button>
           <Button
@@ -712,9 +799,10 @@ export function ParticipantList({
             size="sm"
             onClick={() => handlePageChange(page + 1)}
             disabled={page >= totalPages}
+            className="flex-1 sm:flex-none order-2"
           >
             Next
-            <ChevronRight className="h-4 w-4" />
+            <ChevronRight className="h-4 w-4 ml-1" />
           </Button>
         </div>
       </div>

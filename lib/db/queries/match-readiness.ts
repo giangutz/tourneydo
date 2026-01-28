@@ -50,6 +50,11 @@ export async function toggleAthleteReadiness(
 ): Promise<void> {
   const supabase = createServerSupabaseClient()
 
+  // Validate inputs
+  if (!matchId || !athleteId) {
+    throw new Error('Match ID and Athlete ID are required')
+  }
+
   // Upsert readiness record
   const { error } = await supabase
     .from('match_athlete_readiness')
@@ -167,11 +172,19 @@ export async function getMatchesWithReadiness(
     const match = transformMatch(m)
     const matchReadiness = readinessMap.get(match.id)
 
+    // Safely get readiness status with proper null checks
+    const athlete1_called = match.player1_id
+      ? (matchReadiness?.get(match.player1_id) ?? false)
+      : false
+    const athlete2_called = match.player2_id
+      ? (matchReadiness?.get(match.player2_id) ?? false)
+      : false
+
     return {
       ...match,
-      athlete1_called: matchReadiness?.get(match.player1_id || '') ?? false,
-      athlete2_called: matchReadiness?.get(match.player2_id || '') ?? false
-    }
+      athlete1_called,
+      athlete2_called
+    } as MatchWithReadiness
   })
 }
 
@@ -180,6 +193,11 @@ export async function getMatchesWithReadiness(
  */
 export async function initializeMatchReadiness(matchId: string): Promise<void> {
   const supabase = createServerSupabaseClient()
+
+  if (!matchId) {
+    console.error('Cannot initialize match readiness: matchId is required')
+    return
+  }
 
   const { error } = await supabase.rpc('initialize_match_readiness', {
     p_match_id: matchId

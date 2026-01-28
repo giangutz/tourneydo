@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+// Table imports removed as we switched to grid layout
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 
@@ -139,19 +139,21 @@ export function ScheduleConfigForm({ tournamentId, initialConfig, tournamentCour
 
   // Helper row component for the table
   const DurationRow = ({ label, prefix }: { label: string, prefix: 'gradeschool' | 'cadet' | 'junior' | 'senior' }) => (
-    <TableRow>
-      <TableCell className="font-medium">
-        <Badge variant="outline" className="bg-muted/50">{label}</Badge>
-      </TableCell>
-      <TableCell>
+    <div className="flex flex-col md:grid md:grid-cols-12 gap-4 p-4 md:p-2 border rounded-lg md:border-0 bg-muted/10 md:bg-transparent items-start md:items-center">
+      <div className="col-span-3 w-full md:w-auto flex justify-between md:block items-center mb-2 md:mb-0">
+        <Badge variant="outline" className="bg-muted/50 text-base md:text-sm px-3 py-1 md:px-2.5 md:py-0.5">{label}</Badge>
+      </div>
+      
+      <div className="col-span-3 w-full">
         <FormField
           control={form.control}
           name={`${prefix}_round_time` as any}
           render={({ field }) => (
-            <FormItem className="space-y-0">
+            <FormItem className="space-y-1 md:space-y-0">
+              <FormLabel className="md:hidden text-xs text-muted-foreground">Round Time</FormLabel>
               <FormControl>
                 <div className="relative">
-                  <Input type="number" {...field} className="pr-8 h-8" />
+                  <Input type="number" {...field} className="pr-8 h-9" />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">s</span>
                 </div>
               </FormControl>
@@ -159,16 +161,18 @@ export function ScheduleConfigForm({ tournamentId, initialConfig, tournamentCour
             </FormItem>
           )}
         />
-      </TableCell>
-      <TableCell>
+      </div>
+
+      <div className="col-span-3 w-full">
         <FormField
           control={form.control}
           name={`${prefix}_kyeshi_time` as any}
           render={({ field }) => (
-            <FormItem className="space-y-0">
+            <FormItem className="space-y-1 md:space-y-0">
+               <FormLabel className="md:hidden text-xs text-muted-foreground">Kyeshi (Medical)</FormLabel>
               <FormControl>
                 <div className="relative">
-                  <Input type="number" {...field} className="pr-8 h-8" />
+                  <Input type="number" {...field} className="pr-8 h-9" />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">s</span>
                 </div>
               </FormControl>
@@ -176,16 +180,18 @@ export function ScheduleConfigForm({ tournamentId, initialConfig, tournamentCour
             </FormItem>
           )}
         />
-      </TableCell>
-      <TableCell>
+      </div>
+
+      <div className="col-span-3 w-full">
         <FormField
           control={form.control}
           name={`${prefix}_rest_between_rounds` as any}
           render={({ field }) => (
-            <FormItem className="space-y-0">
+            <FormItem className="space-y-1 md:space-y-0">
+              <FormLabel className="md:hidden text-xs text-muted-foreground">Rest Interval</FormLabel>
               <FormControl>
                 <div className="relative">
-                  <Input type="number" {...field} className="pr-8 h-8" />
+                  <Input type="number" {...field} className="pr-8 h-9" />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">s</span>
                 </div>
               </FormControl>
@@ -193,8 +199,8 @@ export function ScheduleConfigForm({ tournamentId, initialConfig, tournamentCour
             </FormItem>
           )}
         />
-      </TableCell>
-    </TableRow>
+      </div>
+    </div>
   )
 
   return (
@@ -313,28 +319,28 @@ export function ScheduleConfigForm({ tournamentId, initialConfig, tournamentCour
                 Define timing rules for each age group to calculate accurate schedules.
               </CardDescription>
             </CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="w-[180px]">Age Group</TableHead>
-                    <TableHead>Round Time</TableHead>
-                    <TableHead>Kyeshi (Medical)</TableHead>
-                    <TableHead>Rest Interval</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+            <CardContent>
+              <div className="space-y-4">
+                {/* Desktop Header */}
+                <div className="hidden md:grid md:grid-cols-12 gap-4 px-2 py-2 text-sm font-medium text-muted-foreground border-b mb-2">
+                  <div className="col-span-3">Age Group</div>
+                  <div className="col-span-3">Round Time</div>
+                  <div className="col-span-3">Kyeshi (Medical)</div>
+                  <div className="col-span-3">Rest Interval</div>
+                </div>
+
+                <div className="space-y-4 md:space-y-0">
                   <DurationRow label="Gradeschool" prefix="gradeschool" />
                   <DurationRow label="Cadet" prefix="cadet" />
                   <DurationRow label="Junior" prefix="junior" />
                   <DurationRow label="Senior" prefix="senior" />
-                </TableBody>
-              </Table>
+                </div>
+              </div>
             </CardContent>
             <CardFooter className="bg-muted/30 p-4 border-t">
-              <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-                <Info className="h-3.5 w-3.5" />
-                Formula: (Round × 3) + (Rest × 2) + Kyeshi + 1m Transition = Total Match Time
+              <p className="text-xs text-muted-foreground flex items-start gap-1.5">
+                <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                <span>Formula: (Round × 3) + (Rest × 2) + Kyeshi + 1m Transition = Total Match Time</span>
               </p>
             </CardFooter>
           </Card>

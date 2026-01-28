@@ -14,7 +14,7 @@ export async function GET(request: Request) {
       limit: result.limit,
       page: result.page,
       totalPages: result.totalPages,
-      firstFew: result.data.slice(0, 3).map(p => ({
+      firstFew: result.data.slice(0, 3).map((p: any) => ({
         id: p.id,
         status: p.status,
         player: p.player ? `${p.player.first_name} ${p.player.last_name}` : 'N/A'

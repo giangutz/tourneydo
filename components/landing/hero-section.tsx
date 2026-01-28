@@ -1,71 +1,106 @@
 'use client'
 
 import Link from 'next/link'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, Trophy, Search } from 'lucide-react'
 import { MockTournamentCard } from './mock-tournament-card'
 import { HeroSearch } from './hero-search'
 import { HeroSearchMobile } from './hero-search-mobile'
+import { Button } from '@/components/ui/button'
+import { motion } from 'framer-motion'
 
 export function HeroSection() {
   return (
-    <section className="relative w-full overflow-hidden bg-white dark:bg-slate-950 pt-16 pb-20 lg:pt-24 lg:pb-32">
+    <section className="relative w-full overflow-hidden bg-background pt-16 pb-20 lg:pt-32 lg:pb-40">
+      
       {/* Background Decor */}
+      <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#000000_1px,transparent_1px)] dark:bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:24px_24px] pointer-events-none" />
+      
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full max-w-7xl pointer-events-none">
-         <div className="absolute top-20 left-10 w-72 h-72 bg-purple-200/30 rounded-full blur-3xl mix-blend-multiply dark:mix-blend-normal dark:bg-purple-900/10 animate-blob" />
-         <div className="absolute top-20 right-10 w-72 h-72 bg-indigo-200/30 rounded-full blur-3xl mix-blend-multiply dark:mix-blend-normal dark:bg-indigo-900/10 animate-blob animation-delay-2000" />
-         <div className="absolute -bottom-32 left-1/2 w-72 h-72 bg-blue-200/30 rounded-full blur-3xl mix-blend-multiply dark:mix-blend-normal dark:bg-blue-900/10 animate-blob animation-delay-4000" />
+         <div className="absolute top-20 left-10 w-[500px] h-[500px] bg-primary/20 rounded-full blur-[120px] mix-blend-multiply dark:mix-blend-screen animate-blob" />
+         <div className="absolute top-40 right-10 w-[400px] h-[400px] bg-secondary/20 rounded-full blur-[100px] mix-blend-multiply dark:mix-blend-screen animate-blob animation-delay-2000" />
       </div>
 
       <div className="container relative mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-20">
           
           {/* Text Content (Left) */}
-          <div className="flex-1 w-full max-w-2xl text-center lg:text-left">
-             <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/50 rounded-full text-primary dark:text-blue-400 text-sm font-medium mb-6">
-                <span className="flex h-2 w-2 rounded-full bg-primary dark:bg-blue-400"></span>
-                The #1 Platform for Taekwondo
-             </div>
+          <div className="flex-1 w-full max-w-2xl text-center lg:text-left z-10">
+             <motion.div 
+               initial={{ opacity: 0, y: 20 }}
+               animate={{ opacity: 1, y: 0 }}
+               transition={{ duration: 0.5 }}
+               className="inline-flex items-center gap-2 px-4 py-1.5 bg-muted/50 backdrop-blur-sm border rounded-full text-foreground/80 text-sm font-medium mb-8"
+             >
+                <Trophy className="h-4 w-4 text-primary" />
+                <span>The #1 Platform for Martial Arts</span>
+             </motion.div>
 
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-slate-900 dark:text-white leading-[1.15]">
-              Find & Compete in <br className="hidden lg:block"/>
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-blue-600 dark:from-blue-400 dark:to-blue-600">
-                Local Tournaments
+            <motion.h1 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1, duration: 0.5 }}
+              className="text-5xl sm:text-6xl lg:text-7xl font-black tracking-tighter text-foreground leading-[1.1] mb-6"
+            >
+              Master Your <br className="hidden lg:block"/>
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-primary/80 to-secondary animate-gradient-x">
+                Competition
               </span>
-            </h1>
+            </motion.h1>
             
-            <p className="mt-6 text-lg text-slate-600 dark:text-slate-300 leading-relaxed max-w-lg mx-auto lg:mx-0">
-              Discover tournaments in your area, register in seconds, and track your progress. The easiest way to compete.
-            </p>
+            <motion.p 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2, duration: 0.5 }}
+              className="mt-6 text-xl text-muted-foreground leading-relaxed max-w-lg mx-auto lg:mx-0 mb-10"
+            >
+              The complete ecosystem for martial arts tournaments. Organize events, track live brackets, and showcase your legacy.
+            </motion.p>
 
-            {/* Search Components */}
-            <HeroSearch />
-            <HeroSearchMobile />
-
-            {/* B2B Call to Action */}
-            <div className="mt-8 flex items-center justify-center lg:justify-start gap-2 text-sm text-slate-500">
-                <span>Are you an organizer?</span>
-                <Link href="/sign-up" className="font-semibold text-primary hover:text-blue-700 flex items-center group">
-                    Host your tournament <ArrowRight className="ml-1 w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-                </Link>
-            </div>
+            <motion.div
+               initial={{ opacity: 0, y: 20 }}
+               animate={{ opacity: 1, y: 0 }}
+               transition={{ delay: 0.3, duration: 0.5 }}
+               className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4"
+            >
+               <Button size="lg" className="h-12 px-8 text-base rounded-full shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all hover:scale-105" asChild>
+                  <Link href="/tournaments">
+                     Browse Tournaments
+                  </Link>
+               </Button>
+               <Button variant="outline" size="lg" className="h-12 px-8 text-base rounded-full hover:bg-muted/50 transition-all" asChild>
+                  <Link href="/sign-up">
+                    Host an Event
+                  </Link>
+               </Button>
+            </motion.div>
           </div>
 
           {/* Visual Content (Right) */}
-          <div className="flex-1 w-full flex justify-center lg:justify-end relative">
-            {/* The abstract card representation */}
-            <div className="relative w-full max-w-[400px] lg:max-w-none perspective-1000">
-                 <div className="absolute inset-0 bg-gradient-to-tr from-indigo-500 to-blue-500 rounded-[2.5rem] rotate-6 scale-95 opacity-20 blur-xl"></div>
-                 <MockTournamentCard />
-                 
-                 {/* Floating Elements (Decor) */}
-                 <div className="absolute -top-6 -left-6 bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-lg border border-slate-100 dark:border-slate-700 animate-bounce-slow hidden sm:block">
-                    <p className="text-xs text-slate-400 uppercase font-bold tracking-wider mb-1">Live Now</p>
-                    <div className="flex items-center gap-2">
-                        <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
-                        <span className="font-bold text-slate-900 dark:text-white">NY Open 2025</span>
-                    </div>
+          <div className="flex-1 w-full flex justify-center lg:justify-end relative z-10">
+            <motion.div 
+               initial={{ opacity: 0, scale: 0.9, rotate: -5 }}
+               animate={{ opacity: 1, scale: 1, rotate: 0 }}
+               transition={{ delay: 0.2, duration: 0.8, type: "spring" }}
+               className="relative w-full max-w-[450px]"
+            >
+                 <div className="absolute inset-0 bg-gradient-to-tr from-primary to-secondary rounded-[2.5rem] rotate-6 scale-95 opacity-20 blur-2xl animate-pulse-slow"></div>
+                 <div className="relative bg-card/50 backdrop-blur-xl border border-white/10 dark:border-white/5 rounded-3xl p-2 shadow-2xl">
+                    <MockTournamentCard />
                  </div>
-            </div>
+                 
+                 {/* Floating Badge */}
+                 <motion.div 
+                    initial={{ y: 20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: 0.8 }}
+                    className="absolute -top-10 -right-4 bg-background/80 backdrop-blur-md p-4 rounded-2xl shadow-xl border border-border/50 animate-bounce-slow"
+                 >
+                    <div className="flex items-center gap-3">
+                        <div className="h-3 w-3 rounded-full bg-red-500 animate-ping" />
+                        <span className="font-bold text-sm">Live Updates</span>
+                    </div>
+                 </motion.div>
+            </motion.div>
           </div>
 
         </div>

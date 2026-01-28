@@ -16,8 +16,8 @@ export function PhaseToggle() {
   ]
 
   return (
-    <div className="flex flex-col space-y-2">
-      <div className="flex items-center space-x-2 bg-muted p-1 rounded-lg w-fit">
+    <div className="flex flex-col space-y-2 w-full sm:w-auto">
+      <div className="grid grid-cols-2 gap-1 sm:flex sm:space-x-1 sm:gap-0 bg-muted p-1 rounded-lg w-full sm:w-fit">
         {phases.map((phase) => (
           <Button
             key={phase.id}
@@ -25,7 +25,7 @@ export function PhaseToggle() {
             size="sm"
             onClick={() => setManualPhase(phase.id)}
             className={cn(
-              "relative",
+              "relative w-full sm:w-auto justify-start sm:justify-center px-3",
               currentPhase === phase.id && "shadow-sm"
             )}
           >
@@ -49,3 +49,4 @@ export function PhaseToggle() {
     </div>
   )
 }
+

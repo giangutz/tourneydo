@@ -40,7 +40,7 @@ export default async function WeighInParticipantPage({
          categoryName = details.category.name
          categoryLimits = {
             minWeight: details.category.min_weight,
-            maxWeight: details.category.max_weight,
+            maxWeight: details.category.max_weight ? Number((details.category.max_weight * 1.05).toFixed(2)) : details.category.max_weight,
             minHeight: details.category.min_height,
             maxHeight: details.category.max_height
          }
@@ -64,6 +64,7 @@ export default async function WeighInParticipantPage({
           divisionName={divisionName}
           categoryName={categoryName}
           categoryLimits={categoryLimits}
+          title="Random Weigh-In Check"
         />
       </div>
     )

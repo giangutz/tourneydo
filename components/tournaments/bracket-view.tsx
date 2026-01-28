@@ -580,20 +580,21 @@ export function BracketView({
 
           {/* Pagination Controls */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between border-t pt-4">
-              <div className="text-sm text-muted-foreground">
+            <div className="flex flex-col sm:flex-row items-center justify-between border-t pt-4 gap-4 sm:gap-0">
+              <div className="text-sm text-muted-foreground order-2 sm:order-1">
                 Showing {startIndex + 1}-{Math.min(endIndex, groupedBrackets.length)} of {groupedBrackets.length} divisions
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 order-1 sm:order-2 w-full sm:w-auto justify-center">
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
+                  className="flex-1 sm:flex-none"
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
-                <div className="text-sm font-medium">
+                <div className="text-sm font-medium whitespace-nowrap min-w-[80px] text-center">
                   Page {currentPage} of {totalPages}
                 </div>
                 <Button
@@ -601,6 +602,7 @@ export function BracketView({
                   size="sm"
                   onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                   disabled={currentPage === totalPages}
+                  className="flex-1 sm:flex-none"
                 >
                   <ChevronRight className="h-4 w-4" />
                 </Button>
@@ -641,3 +643,4 @@ export function BracketView({
     </div>
   )
 }
+

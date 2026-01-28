@@ -21,6 +21,7 @@ interface SchedulerMatch extends Omit<Match, 'created_at' | 'updated_at' | 'stat
   winner_id: string | null
   duration: number
   beltPriority: number
+  category_name?: string
   // Helpers for grouping
   groupId: string        // Atomic Block ID (e.g. Div-Cat-Weight)
   blockSetId: string     // Higher Level Group (Div-Cat) - used for day-spanning logic if needed
@@ -77,13 +78,50 @@ const BELT_PRIORITY: Record<string, number> = {
   'advanced': 40
 }
 
+const WEIGHT_PRIORITY: Record<string, number> = {
+  // Traditional Names
+  'fin': 10,
+  'fly': 20,
+  'bantam': 30,
+  'feather': 40,
+  'light': 50,
+  'welter': 60,
+  'light middle': 65, // Rare variations
+  'middle': 70,
+  'light heavy': 80,
+  'heavy': 90,
+  // Group Names (Gradeschool/Kids)
+  'group 0': 10,
+  'group 1': 20,
+  'group 2': 30,
+  'group 3': 40,
+  'group 4': 50,
+  'group 5': 60,
+  'group 6': 70,
+  'group 7': 80
+}
+
 function normalizeBelt(belt: string = ''): number {
   const b = belt.toLowerCase()
+  // Beginner (10)
   if (b.includes('white') || b.includes('beginner')) return 10
-  if (b.includes('yellow') || b.includes('blue') || b.includes('novice i') || b.includes('novice 1')) return 20
-  if (b.includes('red') || b.includes('brown') || b.includes('novice ii') || b.includes('novice 2')) return 30
-  if (b.includes('black') || b.includes('poom') || b.includes('dan') || b.includes('advanced')) return 40
+  // Novice I (20)
+  if (b.includes('yellow') || b.includes('blue')) return 20
+  // Novice II (30)
+  if (b.includes('red') || b.includes('brown')) return 30
+  // Advanced (40)
+  if (b.includes('black')) return 40
   return 99
+  return 99
+}
+
+function normalizeWeightPriority(categoryName: string = ''): number {
+  const c = categoryName.toLowerCase()
+  // 1. Direct match check
+  for (const [key, val] of Object.entries(WEIGHT_PRIORITY)) {
+    if (c.includes(key)) return val
+  }
+  return 99 // Catch-all for unknown
 }
 
 function calculateMinutes(startTime: string, endTime: string): number {
@@ -107,6 +145,55 @@ function formatTimeAMPM(time: string): string {
   return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
 }
 
+function normalizeAgeGroup(divisionName: string = ''): 'gradeschool' | 'cadet' | 'junior' | 'senior' | 'default' {
+  const d = divisionName.toLowerCase()
+  if (d.includes('grade') || d.includes('toddler') || d.includes('kids')) return 'gradeschool'
+  if (d.includes('cadet')) return 'cadet'
+  if (d.includes('junior')) return 'junior'
+  if (d.includes('senior') || d.includes('adult')) return 'senior'
+  return 'default'
+}
+
+function calculateSmartDuration(ageGroup: string, config: TournamentScheduleConfig, defaultDuration: number): number {
+  // Formula: (Round × 3) + (Rest × 2) + Kyeshi + 1m Transition
+  // Values in Config are in SECONDS
+  let roundTime = 0
+  let restTime = 0
+  let kyeshiTime = 0
+
+  switch (ageGroup) {
+    case 'gradeschool':
+      roundTime = config.gradeschool_round_time || 60
+      restTime = config.gradeschool_rest_between_rounds || 30
+      kyeshiTime = config.gradeschool_kyeshi_time || 60
+      break
+    case 'cadet':
+      roundTime = config.cadet_round_time || 90
+      restTime = config.cadet_rest_between_rounds || 30
+      kyeshiTime = config.cadet_kyeshi_time || 60
+      break
+    case 'junior':
+      roundTime = config.junior_round_time || 90
+      restTime = config.junior_rest_between_rounds || 30
+      kyeshiTime = config.junior_kyeshi_time || 60
+      break
+    case 'senior':
+      roundTime = config.senior_round_time || 120
+      restTime = config.senior_rest_between_rounds || 30
+      kyeshiTime = config.senior_kyeshi_time || 60
+      break
+    default:
+      return defaultDuration
+  }
+
+  const totalSeconds = (roundTime * 3) + (restTime * 2) + kyeshiTime + 60 // +1m transition
+  return Math.ceil(totalSeconds / 60) // Return in minutes
+}
+
+// ============================================================================
+// Phase A: Scheduling Engine
+// ============================================================================
+
 // ============================================================================
 // Phase A: Scheduling Engine
 // ============================================================================
@@ -118,37 +205,70 @@ export function calculateSchedule(input: ScheduleInput, strict: boolean): {
 } {
   const { tournamentConfig, matches, startDate, endDate } = input
 
+  // Determine Tournament Type (Default to 'standard' if not provided explicitly in future)
+  // Logic: We assume 'standard' uses Belt Priority. 'open-belt' ignores it.
+  // For now, let's look for a flag or default to True (Standard) as per requirement.
+  const isStandardTournament = true // TODO: Pass this from input.tournamentConfig.tournament_type
+
   // 0. Setup Context
   const dailyMinutes = calculateMinutes(tournamentConfig.daily_start_time, tournamentConfig.daily_end_time)
   const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
   const totalDailyCapacity = dailyMinutes * tournamentConfig.courts
 
   // 1. Enrich Matches & Filter Valid
+  // Pre-pass: Find representative belt for each Division+Category group to handle TBD matches
+  const repBeltPriorityMap = new Map<string, number>()
+
+  for (const m of matches) {
+    if (!m.divisionId || !m.categoryId) continue
+    const key = `${m.divisionId}-${m.categoryId}`
+
+    // Check strict belt priority for this match
+    const p = normalizeBelt(m.belt_level)
+
+    // If it's a valid priority (not 99), store it as representative for the group
+    if (p !== 99) {
+      if (!repBeltPriorityMap.has(key)) {
+        repBeltPriorityMap.set(key, p)
+      }
+    }
+  }
+
   const validMatches: SchedulerMatch[] = matches
     .filter(m => m.status !== 'completed' && m.winner_id === null)
     .map((m, idx) => {
       const divConfig = input.divisionConfigs.find(d => d.division_id === m.divisionId)
-      const duration = divConfig?.avg_match_duration || tournamentConfig.default_sparring_duration || 10
 
-      const distinctGroupId = `${m.divisionId}-${m.categoryId}`
-      const blockSetId = m.divisionId // Or Division+Belt+Gender+Age
+      // Calculate Exact Duration
+      const ageGroup = normalizeAgeGroup(m.division_name || '')
+      const calculatedDuration = calculateSmartDuration(ageGroup, tournamentConfig, tournamentConfig.default_sparring_duration || 10)
 
-      // return enriched object
-      // We must satisfy SchedulerMatch which extends Match
-      // We cast to any to bypass the huge list of Match properties (created_at etc) that we simulated
+      // Use helper if detected, otherwise fallback to existing logic
+      const duration = (ageGroup !== 'default') ? calculatedDuration : (divConfig?.avg_match_duration || tournamentConfig.default_sparring_duration || 10)
+
+      // Determine Belt Priority: Own > Representative > Default(99)
+      const ownPriority = normalizeBelt(m.belt_level)
+      const repPriority = repBeltPriorityMap.get(`${m.divisionId}-${m.categoryId}`)
+      const effectivePriority = (ownPriority !== 99) ? ownPriority : (repPriority || 99)
+
+      // CRITICAL: Split blocks by Priority to ensure strict scheduling order (e.g. White before Yellow)
+      // regardless of whether they share a Category ID.
+      const distinctGroupId = `${m.divisionId}-${m.categoryId}-${effectivePriority}`
+      const blockSetId = m.divisionId
+
       return {
         ...m,
         duration,
-        beltPriority: normalizeBelt(m.belt_level),
+        beltPriority: effectivePriority,
         groupId: distinctGroupId,
         blockSetId,
-        sourceIndex: idx, // Capture original order for stable sort
-        winner_id: m.winner_id || null, // Ensure type compatibility
-        // Mock missing fields for strict typing if necessary, or cast as any downstream
+        sourceIndex: idx,
+        winner_id: m.winner_id || null,
         tournament_id: 'temp',
         match_number: m.match_number || 0,
         ageGroup: 'temp',
-        weightGroup: 'temp'
+        weightGroup: 'temp',
+        category_name: m.category_name
       } as unknown as SchedulerMatch
     })
 
@@ -175,77 +295,48 @@ export function calculateSchedule(input: ScheduleInput, strict: boolean): {
   }
 
   // Finalize Block Metrics
-  const ROUND_DEPTH_WEIGHT = 1.5 // Multiplier for round depth urgency
+  const ROUND_DEPTH_WEIGHT = 1.5
 
   for (const block of blocksMap.values()) {
     block.bracketSize = block.matches.length
-    // Add overhead estimate for bin packing (2m per match)
-    block.totalMinutes += (block.matches.length * 2)
+    // Add overhead estimate (2m per match) - REMOVED for strict fit
+    // block.totalMinutes += (block.matches.length * 2)
 
-    // Calculate Urgency Score
-    // (depth * W) + (remainingMinutes)
-    // Higher score = More urgent (schedule earlier)
-    const remainingMinutes = block.matches.length * 10 // approx duration
+    const remainingMinutes = block.matches.length * 10
     block.urgencyScore = (block.maxRound * 100 * ROUND_DEPTH_WEIGHT) + remainingMinutes
   }
 
-  // 3. Phase A2: Global Priority Ordering (Two-Level Sort)
-
-  // 3a. Group Atomic Blocks into BlockSets
-  const blockSets = new Map<string, {
-    id: string
-    blocks: GroupBlock[]
-    maxUrgency: number
-    beltPriority: number
-    totalMinutes: number
-  }>()
-
-  for (const block of blocksMap.values()) {
-    if (!blockSets.has(block.blockSetId)) {
-      blockSets.set(block.blockSetId, {
-        id: block.blockSetId,
-        blocks: [],
-        maxUrgency: 0,
-        beltPriority: block.beltPriority, // Assume consistency within set
-        totalMinutes: 0
-      })
+  // 3. Phase A2: Global Priority Sorting
+  const sortedBlocks = Array.from(blocksMap.values()).sort((a, b) => {
+    // 1. Belt Priority (Strict for Standard)
+    if (isStandardTournament) {
+      if (a.beltPriority !== b.beltPriority) return a.beltPriority - b.beltPriority
     }
-    const set = blockSets.get(block.blockSetId)!
-    set.blocks.push(block)
-    set.maxUrgency = Math.max(set.maxUrgency, block.urgencyScore)
-    set.totalMinutes += block.totalMinutes
-  }
 
-  // 3b. Sort BlockSets
-  const sortedSets = Array.from(blockSets.values()).sort((setA, setB) => {
-    // 1. Belt Priority (Ascending) - STRICT First Sort Key
-    // User Requirement: "Advanced cannot be earlier than Novice".
-    if (setA.beltPriority !== setB.beltPriority) return setA.beltPriority - setB.beltPriority
+    // 2. Volume Priority (Larger Brackets First)
+    // Note: We want LARGEST first (Descending).
+    if (a.bracketSize !== b.bracketSize) return b.bracketSize - a.bracketSize
 
-    // 2. Max Urgency (Descending)
-    return setB.maxUrgency - setA.maxUrgency
+    // 3. Weight/Group Priority (Fin -> Heavy) (Ascending)
+    // We need to look up the Category Name from one of the matches
+    const catA = a.matches[0]?.category_name || ''
+    const catB = b.matches[0]?.category_name || ''
+    const weightA = normalizeWeightPriority(catA)
+    const weightB = normalizeWeightPriority(catB)
+
+    if (weightA !== weightB) return weightA - weightB
+
+    // 4. Tie-Breaker: Alphabetical / ID
+    return a.id.localeCompare(b.id)
   })
 
-  // 3c. Flatten to Sorted Blocks (Intra-Set Sort)
-  const sortedBlocks: GroupBlock[] = []
-
-  for (const set of sortedSets) {
-    // Sort blocks WITHIN the set
-    set.blocks.sort((a, b) => {
-      // 1. Urgency (Descending)
-      if (Math.abs(a.urgencyScore - b.urgencyScore) > 50) return b.urgencyScore - a.urgencyScore
-      // 2. Bracket Size (Descending)
-      return b.bracketSize - a.bracketSize
-    })
-    sortedBlocks.push(...set.blocks)
-  }
-
-  // 4. Phase A3: Day Assignment (Bin Packing)
-  const dayLoads = new Map<number, number>() // Day Index -> Minutes Used
+  // 4. Phase A3: Day Assignment (Atomic Bin Packing)
+  // "Next Fit" / "First Fit" strategy for Day Assignment
+  const dayLoads = new Map<number, number>()
   const blockAssignments: AssignedBlock[] = []
 
   // Initialize days
-  for (let d = 0; d < totalDays + 5; d++) { // Allow overflow days
+  for (let d = 0; d < totalDays + 5; d++) {
     dayLoads.set(d, 0)
   }
 
@@ -254,10 +345,11 @@ export function calculateSchedule(input: ScheduleInput, strict: boolean): {
   for (const block of sortedBlocks) {
     let assignedDay = -1
 
-    // Try to fit in existing days
+    // Try to fit strict in existing days
     for (let d = 0; d < totalDays; d++) {
       const currentLoad = dayLoads.get(d) || 0
-      // Check if fits
+
+      // ATOMIC CHECK: Must fit entirely
       if (currentLoad + block.totalMinutes <= totalDailyCapacity) {
         assignedDay = d
         dayLoads.set(d, currentLoad + block.totalMinutes)
@@ -265,10 +357,19 @@ export function calculateSchedule(input: ScheduleInput, strict: boolean): {
       }
     }
 
-    // Strict Mode: If it doesn't fit in valid days, it's overflow
+    // If it didn't fit in any valid day:
     if (assignedDay === -1) {
+      // Check if it's IMPOSSIBLE (Block > Daily Capacity)
+      if (block.totalMinutes > totalDailyCapacity) {
+        // Critical Error: Immediate Overflow
+        // This bracket *cannot* be scheduled atomically under current settings.
+        overflow.count++
+        overflow.minutes += block.totalMinutes
+        continue
+      }
+
       if (strict) {
-        // Just put it in overflow list, don't schedule
+        // Valid block, but days are full -> Overflow
         overflow.count++
         overflow.minutes += block.totalMinutes
         continue
@@ -283,8 +384,7 @@ export function calculateSchedule(input: ScheduleInput, strict: boolean): {
             break
           }
           d++
-          // Safety break
-          if (d > totalDays + 10) break
+          if (d > totalDays + 20) break // Safety break
         }
       }
     }
@@ -295,37 +395,32 @@ export function calculateSchedule(input: ScheduleInput, strict: boolean): {
   }
 
   // 5. Phase A4: Intra-Day Sequencing & Court Assignment
-  // We process each day independently
   const finalAssignments: MatchAssignment[] = []
   const dayStats = new Map<number, number>()
-
-  // Group assignments by day
   const assignmentsByDay = new Map<number, AssignedBlock[]>()
+
   for (const ba of blockAssignments) {
     if (!assignmentsByDay.has(ba.dayIndex)) assignmentsByDay.set(ba.dayIndex, [])
     assignmentsByDay.get(ba.dayIndex)!.push(ba)
   }
 
-  // Lunch Break Constants (12:00 - 13:00)
-  // We need to know start time. Assume daily_start_time is standardized (e.g. 09:00).
-  const tournamentStartMin = 0 // Relative to daily_start_time
-  // Calculate relative Minutes for Lunch
   const [startH, startM] = tournamentConfig.daily_start_time.split(':').map(Number)
   const startTimeInDayMins = startH * 60 + startM
-  const lunchStartAbs = 12 * 60 // 12:00 PM
-  const lunchEndAbs = 13 * 60   // 1:00 PM
-
-  // Relative to tournament start
+  const lunchStartAbs = 12 * 60
+  const lunchEndAbs = 13 * 60
   const lunchStartRel = Math.max(0, lunchStartAbs - startTimeInDayMins)
   const lunchEndRel = Math.max(0, lunchEndAbs - startTimeInDayMins)
   const hasLunch = input.forceLunchBreak !== false && lunchEndRel > lunchStartRel
 
-  // Process each day
   for (const [dayIdx, dayBlocks] of assignmentsByDay.entries()) {
     const actualDay = dayIdx + 1
-
-    // Collect all matches for this day
     let dayMatches: SchedulerMatch[] = []
+
+    // Sort blocks WITHIN the day (Maintain Global Sort Order)
+    // Actually, dayBlocks is already pushed in sorted order, but let's ensure stability.
+    // They were pushed in loop of `sortedBlocks`. So order corresponds to Priority.
+    // We want to process matches in that order.
+
     for (const b of dayBlocks) {
       dayMatches.push(...b.block.matches)
     }
@@ -335,74 +430,55 @@ export function calculateSchedule(input: ScheduleInput, strict: boolean): {
       id: idx + 1,
       currentMinutes: 0
     }))
-
-    // Predictive Availability Map: AthleteID -> Available Minute (Relative)
     const athleteAvailability = new Map<string, number>()
     const minRecoveryMinutes = 15
 
-    // Round Gate Tracking: GroupID -> Round -> Count Completed
-    // We need to know total matches per round to enforce gates
-    // Simple Gate: R32 needs 50% R64.
-    // Logic: We simply deprioritize or block matches if gate not met.
-    // Better: Just use availability. If Round 1 match finishes, winner advances.
-    // The scheduler input has 'round'. We assume structure is valid.
-    // Dependency: A Round 2 match involving Winner(M1) cannot start until M1 is done.
-    // BUT we don't know who winner is! We only schedule placeholders.
-    // Ah, Upgrade B says: "all athletes.nextAvailableTime <= proposedStartTime".
-    // For TBD matches (future rounds), we don't have athletes yet strictly.
-    // However, the *structure* dictates dependency.
-    // We can infer dependency: A Round 2 match depends on 2 matches in R1.
-    // We roughly know R2 should verify R1 completion.
-    // Simplified Gate: "Are there pending matches in Round X-1 for this block?"
-    // If yes, prefer Round X-1.
-
     // Sort matches for the "Ready Queue" priority
-    // 1. Round (Earlier rounds first: R64 -> R32)
+    // CRITICAL: We need to respect the Block Priority Order
+    // But also enforce Round dependencies (R64 > R32)
     dayMatches.sort((a, b) => {
-      // Round order descending (assuming R64 > R32 in number? specific logic needed)
-      if (a.round !== b.round) return a.round - b.round
-
-      // Block Priority (Belt)
       const blockA = blocksMap.get(a.groupId)!
       const blockB = blocksMap.get(b.groupId)!
 
-      // STRICT Belt Order first (Avoid interleaving Novice and Advanced)
-      if (blockA.beltPriority !== blockB.beltPriority) return blockA.beltPriority - blockB.beltPriority
+      // 1. Block Priority (Belt > Volume > Weight)
+      // Since `sortedBlocks` already established the "Wave" order, 
+      // we can rely on `blockA` vs `blockB` index? 
+      // Or just re-run the same high-level sort logic comparison.
 
-      // Urgency (tiebreaker for same belt)
-      if (Math.abs(blockA.urgencyScore - blockB.urgencyScore) > 100) {
-        return blockB.urgencyScore - blockA.urgencyScore
+      // Let's implement the comparison logic directly to be safe
+
+      if (blockA.id !== blockB.id) {
+        // Use the established sort logic
+        if (isStandardTournament) {
+          if (blockA.beltPriority !== blockB.beltPriority) return blockA.beltPriority - blockB.beltPriority
+        }
+        if (blockA.bracketSize !== blockB.bracketSize) return blockB.bracketSize - blockA.bracketSize
+
+        const catA = blockA.matches[0]?.category_name || ''
+        const catB = blockB.matches[0]?.category_name || ''
+        const weightA = normalizeWeightPriority(catA)
+        const weightB = normalizeWeightPriority(catB)
+        if (weightA !== weightB) return weightA - weightB
+
+        return blockA.id.localeCompare(blockB.id)
       }
 
-      // Block ID Grouping (Avoid interleaving equals)
-      if (a.groupId !== b.groupId) {
-        return a.groupId.localeCompare(b.groupId)
-      }
+      // 2. Round Dependency (Within same block)
+      if (a.round !== b.round) return a.round - b.round
 
-      // Final Tiebreaker: Bracket Structure (Source Index)
       return a.sourceIndex - b.sourceIndex
     })
 
     const pendingMatches = [...dayMatches]
     const scheduledDayMatches: any[] = []
 
-    // Simulation Loop
-    // We iterate until all matches scheduled.
-    // In each step, we look for the *Earliest Available Court*.
-    // We then find the *Best Match* for that court/time.
-
     while (pendingMatches.length > 0) {
-      // 1. Find court with lowest time
       courtTimers.sort((a, b) => a.currentMinutes - b.currentMinutes)
       const bestCourt = courtTimers[0]
       let currentTime = bestCourt.currentMinutes
 
-      // 2. Enforce Lunch Break
+      // Lunch Logic
       if (hasLunch) {
-        // If match starts before lunch but ends inside/after, Push to Lunch End.
-        // Actually simplest: If currentTime is inside lunch, or close enough that match won't fit?
-        // Let's just say: If currentTime < LunchEnd and (currentTime >= LunchStart OR (currentTime + minMatchDuration > LunchStart))
-        // We hard pad.
         if (currentTime >= lunchStartRel && currentTime < lunchEndRel) {
           bestCourt.currentMinutes = lunchEndRel
           currentTime = lunchEndRel
@@ -411,25 +487,19 @@ export function calculateSchedule(input: ScheduleInput, strict: boolean): {
 
       let matchFoundIndex = -1
 
-      // 3. Find Candidate
       for (let i = 0; i < pendingMatches.length; i++) {
         const m = pendingMatches[i]
 
-        // Lunch Check for specific match duration
+        // Check Lunch Fit
         if (hasLunch) {
           if (currentTime < lunchStartRel && (currentTime + m.duration) > lunchStartRel) {
-            // Cannot start now, would overlap lunch. 
-            // Note: We don't advance court here yet, we try other matches that might fit.
             continue
           }
         }
 
-        // Recovery / Availability Check
-        // If TBD players, we assume available immediately (logic handled by Round ordering)
-        // If known players, check map.
+        // Recovery Check
         const p1 = (m as any).player1_id
         const p2 = (m as any).player2_id
-
         const readyTime1 = p1 ? (athleteAvailability.get(p1) || 0) : 0
         const readyTime2 = p2 ? (athleteAvailability.get(p2) || 0) : 0
         const requiredStart = Math.max(readyTime1, readyTime2)
@@ -441,13 +511,10 @@ export function calculateSchedule(input: ScheduleInput, strict: boolean): {
       }
 
       if (matchFoundIndex !== -1) {
-        // Schedule Match
         const match = pendingMatches.splice(matchFoundIndex, 1)[0]
         const endMin = currentTime + match.duration
-
         bestCourt.currentMinutes = endMin
 
-        // Update Prediction
         if ((match as any).player1_id) athleteAvailability.set((match as any).player1_id, endMin + minRecoveryMinutes)
         if ((match as any).player2_id) athleteAvailability.set((match as any).player2_id, endMin + minRecoveryMinutes)
 
@@ -459,22 +526,10 @@ export function calculateSchedule(input: ScheduleInput, strict: boolean): {
           endMin
         })
       } else {
-        // No match fits right now.
-        // Either:
-        // A) Lunch conflict for all candidates.
-        // B) Recovery conflict for all candidates.
-
-        // Action: Advance court time to next significant event.
-        // 1. Lunch End (if we are blocked by lunch approach)
-        // 2. Next Availability of a pending player
-
+        // Time Jump
         let nextJump = Infinity
+        if (hasLunch && currentTime < lunchStartRel) nextJump = lunchEndRel
 
-        if (hasLunch && currentTime < lunchStartRel) {
-          nextJump = lunchEndRel // Jump to after lunch
-        }
-
-        // Find min recovery of pending
         for (const m of pendingMatches) {
           const p1 = (m as any).player1_id
           const p2 = (m as any).player2_id
@@ -487,17 +542,14 @@ export function calculateSchedule(input: ScheduleInput, strict: boolean): {
         if (nextJump !== Infinity && nextJump > currentTime) {
           bestCourt.currentMinutes = nextJump
         } else {
-          // Fallback increment
           bestCourt.currentMinutes += 5
         }
       }
     }
 
-    // Convert to Assignments
     for (const sm of scheduledDayMatches) {
       const startClock = addMinutesToTime(tournamentConfig.daily_start_time, sm.startMin)
       const endClock = addMinutesToTime(tournamentConfig.daily_start_time, sm.endMin)
-
       const matchDate = new Date(startDate)
       matchDate.setDate(matchDate.getDate() + (sm.day - 1))
 
@@ -513,7 +565,7 @@ export function calculateSchedule(input: ScheduleInput, strict: boolean): {
         matchId: sm.match.id,
         matchNumber: '',
         day: sm.day,
-        court: sm.courtId, // Now number
+        court: sm.courtId,
         sequence: 0,
         estimatedStartTime: formatTimeAMPM(startClock),
         scheduledStartTime: isoStart.toISOString(),
@@ -522,47 +574,31 @@ export function calculateSchedule(input: ScheduleInput, strict: boolean): {
         categoryId: sm.match.categoryId
       })
     }
-
-    // Stats
     const totalDayMins = scheduledDayMatches.reduce((acc, curr) => acc + curr.match.duration, 0)
     dayStats.set(actualDay, totalDayMins)
   }
 
   // 6. Phase B: Match Numbering (Court-Encoded)
-  // [CourtID][Sequence] -> 101, 102...
-  // CRITICAL: Sequence is GLOBAL per court across ALL days, not per day-court
-
-  // Group by Court ONLY (not day-court) to ensure unique numbering
   const matchesByCourt = new Map<number, MatchAssignment[]>()
-
   for (const assign of finalAssignments) {
-    if (!matchesByCourt.has(assign.court)) {
-      matchesByCourt.set(assign.court, [])
-    }
+    if (!matchesByCourt.has(assign.court)) matchesByCourt.set(assign.court, [])
     matchesByCourt.get(assign.court)!.push(assign)
   }
 
   for (const [courtId, courtMatches] of matchesByCourt.entries()) {
-    // Sort by Day first, then Start Time within day
     courtMatches.sort((a, b) => {
-      // Primary: Day number
       if (a.day !== b.day) return a.day - b.day
-      // Secondary: Start time
       return new Date(a.scheduledStartTime).getTime() - new Date(b.scheduledStartTime).getTime()
     })
 
-    // Assign Numbers with GLOBAL sequence per court
     let seq = 1
     for (const m of courtMatches) {
-      // Format: Court * 100 + Seq (e.g. 101, 201)
-      // If seq > 99, it becomes 1100, which is fine, readable.
       const matchNum = (courtId * 100) + seq
       m.matchNumber = matchNum.toString()
       m.sequence = seq
       seq++
     }
   }
-
 
   return {
     assignments: finalAssignments,
@@ -599,7 +635,7 @@ export function validateSchedule(input: ScheduleInput): ScheduleValidationResult
     // Calculate all three options whenever schedule is infeasible
     const overflowHours = overflow.minutes / 60
     const currentCapacity = dailyMinutes * tournamentConfig.courts * totalDays
-    const requiredCapacity = currentCapacity + overflow.minutes
+    const requiredCapacity = totalRequiredMinutes + overflow.minutes
 
     // Option 1: Add more courts (always show)
     const courtsNeeded = Math.ceil(requiredCapacity / (dailyMinutes * totalDays))

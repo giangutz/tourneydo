@@ -141,9 +141,10 @@ export type GetParticipantsOptions = {
  */
 export async function getTournamentParticipants(
   tournamentId: string,
-  options: GetParticipantsOptions = {}
+  options: GetParticipantsOptions = {},
+  supabaseClient?: ReturnType<typeof createServerSupabaseClient> | any // Allow service client
 ) {
-  const supabase = createServerSupabaseClient()
+  const supabase = supabaseClient || createServerSupabaseClient()
   const {
     page = 1,
     limit = 10,
@@ -245,7 +246,7 @@ export async function getTournamentParticipants(
       .select('id')
       .ilike('name', `%${query}%`)
 
-    const matchingTeamIds = matchingTeams?.map(t => t.id) || []
+    const matchingTeamIds = matchingTeams?.map((t: any) => t.id) || []
 
     // Build a list of registration IDs that match our search criteria
     const matchingRegistrationIds = new Set<string>()
@@ -257,7 +258,7 @@ export async function getTournamentParticipants(
       .eq('tournament_id', tournamentId)
       .ilike('players.first_name', `%${query}%`)
 
-    firstNameMatches?.forEach(r => matchingRegistrationIds.add(r.id))
+    firstNameMatches?.forEach((r: any) => matchingRegistrationIds.add(r.id))
 
     // Get registrations by player last name
     const { data: lastNameMatches } = await supabase
@@ -266,7 +267,7 @@ export async function getTournamentParticipants(
       .eq('tournament_id', tournamentId)
       .ilike('players.last_name', `%${query}%`)
 
-    lastNameMatches?.forEach(r => matchingRegistrationIds.add(r.id))
+    lastNameMatches?.forEach((r: any) => matchingRegistrationIds.add(r.id))
 
     // Get registrations by team ID
     if (matchingTeamIds.length > 0) {
@@ -276,7 +277,7 @@ export async function getTournamentParticipants(
         .eq('tournament_id', tournamentId)
         .in('team_id', matchingTeamIds)
 
-      teamMatches?.forEach(r => matchingRegistrationIds.add(r.id))
+      teamMatches?.forEach((r: any) => matchingRegistrationIds.add(r.id))
     }
 
     // Filter main query to only include matching registration IDs
@@ -336,7 +337,7 @@ export async function getTournamentParticipants(
 
   // Transform the data to match expected structure
   // Spread all original fields first to preserve weighed_in_by and other fields
-  const transformedData = data?.map(item => ({
+  const transformedData = data?.map((item: any) => ({
     ...item, // Preserve all original fields including weighed_in_by
     player: item.players,
     team: item.teams,
@@ -570,7 +571,7 @@ export async function getTotalRegistrationsByOrganizerId(organizerId: string): P
 /**
  * Get recent registrations for all tournaments organized by a user
  */
-export async function getRecentRegistrationsByOrganizerId(organizerId: string, limit: number = 5) {
+export async function getRecentRegistrationsByOrganizerId(organizerId: string, limit: number = 5, offset: number = 0) {
   const supabase = createServerSupabaseClient()
 
   const { data, error } = await supabase
@@ -587,11 +588,15 @@ export async function getRecentRegistrationsByOrganizerId(organizerId: string, l
         id,
         name,
         organizer_id
+      ),
+      teams (
+        id,
+        name
       )
     `)
     .eq('tournaments.organizer_id', organizerId)
     .order('created_at', { ascending: false })
-    .limit(limit)
+    .range(offset, offset + limit - 1)
 
   if (error) {
     throw new Error(`Failed to fetch recent registrations: ${error.message}`)
@@ -620,4 +625,36 @@ export async function clearWeighInSelected(tournamentId: string): Promise<void> 
   if (error) {
     throw new Error(`Failed to clear weigh-in selection: ${error.message}`)
   }
+}
+
+/**
+ * Get recent registrations for a coach
+ */
+export async function getRecentRegistrationsByCoachId(coachId: string, limit: number = 5) {
+  const supabase = createServerSupabaseClient()
+
+  const { data, error } = await supabase
+    .from('tournament_registrations')
+    .select(`
+      id,
+      created_at,
+      status,
+      players (
+        first_name,
+        last_name
+      ),
+      tournaments (
+        id,
+        name
+      )
+    `)
+    .eq('coach_id', coachId)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (error) {
+    throw new Error(`Failed to fetch recent coach registrations: ${error.message}`)
+  }
+
+  return data || []
 }

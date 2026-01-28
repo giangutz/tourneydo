@@ -31,7 +31,7 @@ export default async function WeighInPage({ params, searchParams }: WeighInPageP
   const { page, query, status, divisionId, categoryId } = await searchParams
   
   const currentPage = Number(page) || 1
-  const limit = 20 // Reasonable page size for weigh-in list
+  const limit = 10 // Reasonable page size for weigh-in list
 
   const tournament = await getTournamentById(id)
 
@@ -64,18 +64,21 @@ export default async function WeighInPage({ params, searchParams }: WeighInPageP
 
   return (
     <DashboardShell>
+      <div className="mb-4">
+        <Button variant="outline" asChild className="w-fit">
+          <Link href={routes.organizer.tournamentDetail(tournament.id)}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Dashboard
+          </Link>
+        </Button>
+      </div>
+
       <PageHeader
         title="Random Weigh-In Check"
         description="Manage competition day surprise weigh-ins. Select participants and verify their weight."
         action={
-          <div className="flex items-center gap-2">
-            <Button variant="outline" asChild>
-              <Link href={routes.organizer.tournamentDetail(tournament.id)}>
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Dashboard
-              </Link>
-            </Button>
-            <WeighInGenerator tournamentId={tournament.id} />
+          <div className="w-full lg:w-auto">
+             <WeighInGenerator tournamentId={tournament.id} className="w-full lg:w-auto" />
           </div>
         }
       />

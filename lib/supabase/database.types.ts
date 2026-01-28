@@ -104,6 +104,54 @@ export type Database = {
           },
         ]
       }
+      match_athlete_readiness: {
+        Row: {
+          athlete_id: string
+          called: boolean
+          called_at: string | null
+          called_by: string | null
+          created_at: string
+          id: string
+          match_id: string
+          updated_at: string
+        }
+        Insert: {
+          athlete_id: string
+          called?: boolean
+          called_at?: string | null
+          called_by?: string | null
+          created_at?: string
+          id?: string
+          match_id: string
+          updated_at?: string
+        }
+        Update: {
+          athlete_id?: string
+          called?: boolean
+          called_at?: string | null
+          called_by?: string | null
+          created_at?: string
+          id?: string
+          match_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "match_athlete_readiness_athlete_id_fkey"
+            columns: ["athlete_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_athlete_readiness_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       match_rounds: {
         Row: {
           created_at: string | null
@@ -157,12 +205,17 @@ export type Database = {
       }
       matches: {
         Row: {
+          athlete1_available_at: string | null
+          athlete2_available_at: string | null
           category_id: string | null
           court_number: number | null
           created_at: string
           day_number: number | null
           division_id: string | null
           id: string
+          lifecycle_state:
+            | Database["public"]["Enums"]["match_lifecycle_state"]
+            | null
           match_number: number
           match_number_formatted: string | null
           match_number_legacy: string | null
@@ -171,6 +224,8 @@ export type Database = {
           player1_id: string | null
           player2_id: string | null
           round: number
+          scheduled_end_time: string | null
+          scheduled_start_time: string | null
           score_player1: number | null
           score_player2: number | null
           score_round1_player1: number
@@ -180,6 +235,7 @@ export type Database = {
           score_round3_player1: number
           score_round3_player2: number
           source_match_id: string | null
+          source_match_ids: string[] | null
           status: string
           tournament_id: string
           updated_at: string
@@ -189,12 +245,17 @@ export type Database = {
           winner_round3: string | null
         }
         Insert: {
+          athlete1_available_at?: string | null
+          athlete2_available_at?: string | null
           category_id?: string | null
           court_number?: number | null
           created_at?: string
           day_number?: number | null
           division_id?: string | null
           id?: string
+          lifecycle_state?:
+            | Database["public"]["Enums"]["match_lifecycle_state"]
+            | null
           match_number: number
           match_number_formatted?: string | null
           match_number_legacy?: string | null
@@ -203,6 +264,8 @@ export type Database = {
           player1_id?: string | null
           player2_id?: string | null
           round: number
+          scheduled_end_time?: string | null
+          scheduled_start_time?: string | null
           score_player1?: number | null
           score_player2?: number | null
           score_round1_player1?: number
@@ -212,6 +275,7 @@ export type Database = {
           score_round3_player1?: number
           score_round3_player2?: number
           source_match_id?: string | null
+          source_match_ids?: string[] | null
           status?: string
           tournament_id: string
           updated_at?: string
@@ -221,12 +285,17 @@ export type Database = {
           winner_round3?: string | null
         }
         Update: {
+          athlete1_available_at?: string | null
+          athlete2_available_at?: string | null
           category_id?: string | null
           court_number?: number | null
           created_at?: string
           day_number?: number | null
           division_id?: string | null
           id?: string
+          lifecycle_state?:
+            | Database["public"]["Enums"]["match_lifecycle_state"]
+            | null
           match_number?: number
           match_number_formatted?: string | null
           match_number_legacy?: string | null
@@ -235,6 +304,8 @@ export type Database = {
           player1_id?: string | null
           player2_id?: string | null
           round?: number
+          scheduled_end_time?: string | null
+          scheduled_start_time?: string | null
           score_player1?: number | null
           score_player2?: number | null
           score_round1_player1?: number
@@ -244,6 +315,7 @@ export type Database = {
           score_round3_player1?: number
           score_round3_player2?: number
           source_match_id?: string | null
+          source_match_ids?: string[] | null
           status?: string
           tournament_id?: string
           updated_at?: string
@@ -554,6 +626,7 @@ export type Database = {
           team_id: string
           tournament_id: string
           updated_at: string
+          weigh_in_selected: boolean
           weighed_in_at: string | null
         }
         Insert: {
@@ -571,6 +644,7 @@ export type Database = {
           team_id: string
           tournament_id: string
           updated_at?: string
+          weigh_in_selected?: boolean
           weighed_in_at?: string | null
         }
         Update: {
@@ -588,6 +662,7 @@ export type Database = {
           team_id?: string
           tournament_id?: string
           updated_at?: string
+          weigh_in_selected?: boolean
           weighed_in_at?: string | null
         }
         Relationships: [
@@ -882,9 +957,26 @@ export type Database = {
         Args: { p_tournament_id: string }
         Returns: undefined
       }
+      get_match_readiness_status: {
+        Args: { p_match_id: string }
+        Returns: {
+          athlete1_called: boolean
+          athlete2_called: boolean
+        }[]
+      }
+      initialize_match_readiness: {
+        Args: { p_match_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       division_move_policy: "allow_move" | "disqualify_only"
+      match_lifecycle_state:
+        | "AUTO_ADVANCE"
+        | "WAITING"
+        | "CONTEST"
+        | "IN_PROGRESS"
+        | "COMPLETED"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1016,6 +1108,13 @@ export const Constants = {
   public: {
     Enums: {
       division_move_policy: ["allow_move", "disqualify_only"],
+      match_lifecycle_state: [
+        "AUTO_ADVANCE",
+        "WAITING",
+        "CONTEST",
+        "IN_PROGRESS",
+        "COMPLETED",
+      ],
     },
   },
 } as const

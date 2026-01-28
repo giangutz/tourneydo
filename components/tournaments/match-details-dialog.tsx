@@ -14,6 +14,7 @@ interface MatchDetailsDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   participants: any[]
+  hideReadiness?: boolean
 }
 
 interface RoundData {
@@ -25,7 +26,7 @@ interface RoundData {
   status: string | null
 }
 
-export function MatchDetailsDialog({ match, open, onOpenChange, participants }: MatchDetailsDialogProps) {
+export function MatchDetailsDialog({ match, open, onOpenChange, participants, hideReadiness = false }: MatchDetailsDialogProps) {
   const typedMatch = match as MatchWithReadiness
   const [rounds, setRounds] = useState<RoundData[]>([])
   const [loading, setLoading] = useState(false)
@@ -81,7 +82,7 @@ export function MatchDetailsDialog({ match, open, onOpenChange, participants }: 
         <DialogHeader>
           <div className="flex items-center justify-between">
             <DialogTitle className="text-xl">Match Details - Best of 3</DialogTitle>
-            {typedMatch && typedMatch.lifecycle_state === 'CONTEST' && (
+            {typedMatch && typedMatch.lifecycle_state === 'CONTEST' && !hideReadiness && (
               <ReadinessStatusBadge 
                 athlete1Called={typedMatch.athlete1_called || false}
                 athlete2Called={typedMatch.athlete2_called || false}
@@ -100,7 +101,7 @@ export function MatchDetailsDialog({ match, open, onOpenChange, participants }: 
         ) : (
           <div className="space-y-4">
             {/* Athlete Readiness Section */}
-            {typedMatch && typedMatch.lifecycle_state === 'CONTEST' && (
+            {typedMatch && typedMatch.lifecycle_state === 'CONTEST' && !hideReadiness && (
               <Card className="border-primary/20 bg-primary/5">
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-2 mb-4">

@@ -7,14 +7,9 @@ import { getTournamentDivisions } from '@/lib/db/queries/divisions'
 import { DashboardShell } from '@/components/layouts/dashboard-shell'
 import { PageHeader } from '@/components/ui/page-header'
 import { PaymentClient } from '@/app/dashboard/coach/tournaments/[id]/payment/payment-client'
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator
-} from '@/components/ui/breadcrumb'
+import { Button } from '@/components/ui/button'
+import { ArrowLeft } from 'lucide-react'
+import Link from 'next/link'
 
 export default async function PaymentPage({ params }: { params: { id: string } }) {
   const { userId } = await auth()
@@ -32,30 +27,22 @@ export default async function PaymentPage({ params }: { params: { id: string } }
   if (!tournament) notFound()
 
   // Filter to only this coach's registrations
-  const myRegistrations = registrations.data.filter(r => r.coach_id === userId)
+  const myRegistrations = registrations.data.filter((r: any) => r.coach_id === userId)
 
   return (
     <DashboardShell>
-      <Breadcrumb className="mb-4">
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink href="/dashboard/coach/tournaments">Tournaments</BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbLink href="/dashboard/coach/tournaments">{tournament.name}</BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage>Payment</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
-
-      <PageHeader
-        title={`Submit Payment - ${tournament.name}`}
-        description="Select players to pay for and submit payment proof for verification."
-      />
+      <div className="mb-6">
+        <Button variant="outline" asChild className="w-fit mb-4">
+          <Link href={`/dashboard/coach/tournaments`}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Tournaments
+          </Link>
+        </Button>
+        <PageHeader
+          title={`Submit Payment - ${tournament.name}`}
+          description="Select players to pay for and submit payment proof for verification."
+        />
+      </div>
 
       <PaymentClient
         tournament={tournament}

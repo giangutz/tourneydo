@@ -27,9 +27,10 @@ import { TournamentRole } from '@/types/models'
 
 interface InviteStaffDialogProps {
   tournamentId: string
+  triggerClassName?: string
 }
 
-export function InviteStaffDialog({ tournamentId }: InviteStaffDialogProps) {
+export function InviteStaffDialog({ tournamentId, triggerClassName }: InviteStaffDialogProps) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [email, setEmail] = useState('')
@@ -64,7 +65,7 @@ export function InviteStaffDialog({ tournamentId }: InviteStaffDialogProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>
+        <Button className={triggerClassName}>
           <UserPlus className="mr-2 h-4 w-4" />
           Invite Staff
         </Button>
