@@ -79,39 +79,62 @@ export default async function CoachDashboard() {
         )}
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {/* Quick Actions */}
-        <div className="md:col-span-2 grid gap-4 grid-cols-1 sm:grid-cols-2">
-           <Link href="/dashboard/coach/players/new" className="group p-6 rounded-xl border bg-card text-card-foreground shadow-sm hover:shadow-md hover:border-primary/50 transition-all">
-              <div className="h-10 w-10 text-primary bg-primary/10 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                 <Users className="h-5 w-5" />
+      <div className="space-y-6">
+        <h2 className="text-xl font-semibold tracking-tight">Quick Actions</h2>
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+           {/* 1. Find Tournaments */}
+           <Link href="/dashboard/coach/tournaments" className="group p-6 rounded-xl border bg-card text-card-foreground shadow-sm hover:shadow-md hover:border-primary/50 transition-all flex flex-col items-center text-center">
+              <div className="h-12 w-12 text-blue-500 bg-blue-500/10 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                 <Trophy className="h-6 w-6" />
               </div>
-              <h3 className="font-semibold text-lg mb-1">Add New Athlete</h3>
-              <p className="text-sm text-muted-foreground">Create profiles for your team members to register them easily.</p>
+              <h3 className="font-semibold text-base mb-1">Find Tournaments</h3>
+              <p className="text-xs text-muted-foreground">Browse & register</p>
            </Link>
 
-           <Link href="/tournaments" className="group p-6 rounded-xl border bg-card text-card-foreground shadow-sm hover:shadow-md hover:border-primary/50 transition-all">
-              <div className="h-10 w-10 text-blue-500 bg-blue-500/10 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                 <Trophy className="h-5 w-5" />
+           {/* 2. Create Team */}
+           <Link href="/dashboard/coach/teams/new" className="group p-6 rounded-xl border bg-card text-card-foreground shadow-sm hover:shadow-md hover:border-primary/50 transition-all flex flex-col items-center text-center">
+              <div className="h-12 w-12 text-indigo-500 bg-indigo-500/10 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                 <Users className="h-6 w-6" />
               </div>
-              <h3 className="font-semibold text-lg mb-1">Find Tournaments</h3>
-              <p className="text-sm text-muted-foreground">Browse upcoming events and register your team.</p>
+              <h3 className="font-semibold text-base mb-1">Create Team</h3>
+              <p className="text-xs text-muted-foreground">Add a new team roster</p>
+           </Link>
+
+           {/* 3. Add Athlete */}
+           <Link href="/dashboard/coach/players/new" className="group p-6 rounded-xl border bg-card text-card-foreground shadow-sm hover:shadow-md hover:border-primary/50 transition-all flex flex-col items-center text-center">
+              <div className="h-12 w-12 text-primary bg-primary/10 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                 <Users className="h-6 w-6" />
+              </div>
+              <h3 className="font-semibold text-base mb-1">Add Athlete</h3>
+              <p className="text-xs text-muted-foreground">Register new players</p>
+           </Link>
+
+           {/* 4. Payment History */}
+           <Link href="/dashboard/coach/payments" className="group p-6 rounded-xl border bg-card text-card-foreground shadow-sm hover:shadow-md hover:border-primary/50 transition-all flex flex-col items-center text-center">
+              <div className="h-12 w-12 text-green-500 bg-green-500/10 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                 <Calendar className="h-6 w-6" />
+              </div>
+              <h3 className="font-semibold text-base mb-1">Payment History</h3>
+              <p className="text-xs text-muted-foreground">Track financial records</p>
            </Link>
         </div>
+      </div>
         
-        {/* Staff / System Notification */}
-        {isStaff && (
-             <div className="md:col-span-2 lg:col-span-1 rounded-xl border bg-gradient-to-br from-primary/10 via-background to-background p-6 flex flex-col justify-center items-start gap-4">
+      {/* Staff / System Notification */}
+      {isStaff && (
+         <div className="space-y-4">
+            <h2 className="text-xl font-semibold tracking-tight">System Access</h2>
+            <div className="rounded-xl border bg-gradient-to-br from-primary/10 via-background to-background p-6 flex flex-col sm:flex-row justify-between items-center gap-6">
                 <div>
                    <h3 className="font-semibold text-lg text-foreground">Organizer Access</h3>
                    <p className="text-sm text-muted-foreground mt-1">You have staff access to {staffTournaments.length} tournaments.</p>
                 </div>
-                <Link href="/dashboard/tournament-organizer" className="w-full inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow hover:bg-primary/90 h-9 px-4 py-2">
+                <Link href="/dashboard/tournament-organizer" className="w-full sm:w-auto inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow hover:bg-primary/90 h-10 px-6 py-2">
                    Switch to Organizer View
                 </Link>
              </div>
-        )}
-      </div>
+         </div>
+      )}
     </div>
   )
 }
