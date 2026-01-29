@@ -409,6 +409,18 @@ export async function forfeitMatch(matchId: string, disqualifiedPlayerId: string
 
       await supabase.from('matches').update(updateData).eq('id', typedMatch.next_match_id)
       console.log(`[FORFEIT] Advanced winner ${winnerId} to ${typedMatch.next_match_id} (${targetSlot})`)
+
+      // Check if next match is now ready
+      const nextMatchHasP1 = updateData.player1_id || nextMatch.player1_id
+      const nextMatchHasP2 = updateData.player2_id || nextMatch.player2_id
+
+      if (nextMatchHasP1 && nextMatchHasP2) {
+        console.log(`[FORFEIT] Next match ${typedMatch.next_match_id} is now ready (CONTEST)`)
+        await supabase
+          .from('matches')
+          .update({ lifecycle_state: 'CONTEST' })
+          .eq('id', typedMatch.next_match_id)
+      }
     }
   }
 }

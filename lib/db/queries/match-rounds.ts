@@ -180,6 +180,18 @@ export async function checkAndUpdateMatchWinner(matchId: string): Promise<{
             console.error(`[ADVANCEMENT ERROR] Failed to update next match:`, updateError)
           } else {
             console.log(`[ADVANCEMENT SUCCESS] Winner ${winnerId} advanced to next match ${match.next_match_id}`)
+
+            // Check if next match is now ready (has both players)
+            const updatedP1 = updateData.player1_id || nextMatch.player1_id
+            const updatedP2 = updateData.player2_id || nextMatch.player2_id
+
+            if (updatedP1 && updatedP2) {
+              console.log(`[ADVANCEMENT] Next match ${match.next_match_id} is now ready (CONTEST)`)
+              await (supabase as any)
+                .from('matches')
+                .update({ lifecycle_state: 'CONTEST' })
+                .eq('id', match.next_match_id)
+            }
           }
         }
       }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useSession } from '@clerk/nextjs';
 import { createClerkSupabaseClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
@@ -9,6 +9,18 @@ export function useAdminChannel(tournamentId: string) {
   const { session } = useSession();
   const router = useRouter();
   const [isConnected, setIsConnected] = useState(false);
+  const refreshTimeout = useRef<NodeJS.Timeout | null>(null);
+
+  const debouncedRefresh = () => {
+    if (refreshTimeout.current) {
+      clearTimeout(refreshTimeout.current);
+    }
+    refreshTimeout.current = setTimeout(() => {
+      console.log('[AdminChannel] Debounced refresh triggering...');
+      router.refresh();
+      refreshTimeout.current = null;
+    }, 1000);
+  };
 
   useEffect(() => {
     if (!tournamentId || !session) return;
@@ -31,8 +43,8 @@ export function useAdminChannel(tournamentId: string) {
             filter: `tournament_id=eq.${tournamentId}`
           },
           (payload) => {
-            console.log('[AdminChannel] Match update:', payload);
-            router.refresh();
+            console.log('[AdminChannel] Match update received, scheduling refresh...');
+            debouncedRefresh();
           }
         )
         .on(
@@ -43,7 +55,10 @@ export function useAdminChannel(tournamentId: string) {
             table: 'tournament_registrations',
             filter: `tournament_id=eq.${tournamentId}`
           },
-          () => router.refresh()
+          () => {
+            console.log('[AdminChannel] Registration update received, scheduling refresh...');
+            debouncedRefresh();
+          }
         )
         .subscribe((status) => {
           if (status === 'SUBSCRIBED') {
@@ -83,6 +98,7 @@ export function useAdminChannel(tournamentId: string) {
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
+      if (refreshTimeout.current) clearTimeout(refreshTimeout.current);
       cleanupConnection();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       client.realtime.disconnect(); // Ensure socket is closed on unmount

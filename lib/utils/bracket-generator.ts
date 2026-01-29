@@ -304,7 +304,7 @@ export function generateBracket(
         player2_id: slotB.player_id,
         winner_id: null,
         status: 'scheduled',
-        lifecycle_state: 'WAITING',
+        lifecycle_state: 'CONTEST',
         // ...boilerplate
         score_player1: 0, score_player2: 0,
         score_round1_player1: 0, score_round1_player2: 0,

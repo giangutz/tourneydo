@@ -579,6 +579,14 @@ export function calculateSchedule(input: ScheduleInput, strict: boolean): {
   }
 
   // 6. Phase B: Match Numbering (Court-Encoded)
+  // Logic: (CourtID * 1000) + Sequence
+  // This ensures unique numbers per court and allows instant visual identification.
+  // Sequence matches the Chronological Schedule Order.
+  //
+  // Priority Flow affecting this order:
+  // 1. Division Priority (Novice > Advanced)
+  // 2. Round Priority (Round 1 > Round 2)
+  // 3. Bracket Position (Top > Bottom)
   const matchesByCourt = new Map<number, MatchAssignment[]>()
   for (const assign of finalAssignments) {
     if (!matchesByCourt.has(assign.court)) matchesByCourt.set(assign.court, [])
@@ -587,13 +595,14 @@ export function calculateSchedule(input: ScheduleInput, strict: boolean): {
 
   for (const [courtId, courtMatches] of matchesByCourt.entries()) {
     courtMatches.sort((a, b) => {
+      // Sort strictly by Day -> Time
       if (a.day !== b.day) return a.day - b.day
       return new Date(a.scheduledStartTime).getTime() - new Date(b.scheduledStartTime).getTime()
     })
 
     let seq = 1
     for (const m of courtMatches) {
-      const matchNum = (courtId * 100) + seq
+      const matchNum = (courtId * 1000) + seq
       m.matchNumber = matchNum.toString()
       m.sequence = seq
       seq++
