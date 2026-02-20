@@ -16,10 +16,12 @@ import { getTeamById } from '@/lib/db/queries/teams'
 import { createPlayer, updatePlayer } from '@/lib/db/queries/players'
 import { addPlayerToTeam } from '@/lib/db/queries/teams'
 import { createRegistration } from '@/lib/db/queries/registrations'
+import { getTournamentById } from '@/lib/db/queries/tournaments'
 import { revalidatePath } from 'next/cache'
 import { routes } from '@/config/routes'
 import { successResponse, errorResponse, ERROR_CODE, HTTP_STATUS } from '@/lib/utils/api-response'
 import { addParticipantSchema } from '@/lib/validations/participants'
+import { invalidateTournamentCache } from '@/lib/cache/result-cache'
 import * as Sentry from '@sentry/nextjs'
 
 export async function POST(request: NextRequest) {
@@ -75,12 +77,25 @@ export async function POST(request: NextRequest) {
       beltLevel,
     } = validationResult.data
 
-    // 3. AUTHORIZE (verify team ownership)
-    const team = await getTeamById(teamId)
+    // 3. AUTHORIZE & FETCH DATA IN PARALLEL
+    // OPTIMIZATION: Use Promise.all for independent queries
+    const [team, tournament] = await Promise.all([
+      getTeamById(teamId),
+      getTournamentById(tournamentId),
+    ])
+
     if (!team) {
       return errorResponse(
         ERROR_CODE.NOT_FOUND,
         'Team not found',
+        HTTP_STATUS.NOT_FOUND
+      )
+    }
+
+    if (!tournament) {
+      return errorResponse(
+        ERROR_CODE.NOT_FOUND,
+        'Tournament not found',
         HTTP_STATUS.NOT_FOUND
       )
     }
@@ -161,15 +176,17 @@ export async function POST(request: NextRequest) {
       throw error
     }
 
-    // 5. LOG SUCCESS
+    // 5. INVALIDATE CACHE AND REVALIDATE
+    invalidateTournamentCache(tournamentId)
+    revalidatePath(routes.organizer.tournamentParticipants(tournamentId))
+
+    // 6. LOG SUCCESS
     console.log('Participant added', {
       userId,
       teamId,
       playerId: finalPlayerId,
       tournamentId,
     })
-
-    revalidatePath(routes.organizer.tournamentParticipants(tournamentId))
 
     return successResponse(
       { playerId: finalPlayerId, status: 'verified' },
