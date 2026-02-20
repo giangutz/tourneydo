@@ -1,5 +1,8 @@
 'use server'
 
+// Reuse the logic from regenerate-bracket-schedule to ensure consistency
+import { regenerateBracketSchedule } from '@/lib/actions/regenerate-bracket-schedule'
+
 import { auth } from '@clerk/nextjs/server'
 import { revalidatePath } from 'next/cache'
 import type { ActionResult } from '@/types/api'
@@ -100,5 +103,18 @@ export async function saveTournamentScheduleConfig(
       success: false,
       error: error instanceof Error ? error.message : 'Failed to save schedule config'
     }
+  }
+}
+
+export async function generateSchedule(tournamentId: string): Promise<ActionResult<void>> {
+  const result = await regenerateBracketSchedule(tournamentId)
+
+  if (result.success) {
+    return { success: true, data: undefined }
+  } else {
+    // Check if result has error structure from regenerateBracketSchedule
+    // The types might be slightly different so we map safely
+    const errorMsg = 'error' in result ? result.error : 'Failed to generate schedule'
+    return { success: false, error: errorMsg }
   }
 }

@@ -457,7 +457,7 @@ export function TournamentForm({ tournament, initialEnabledDivisions, availableD
                     </FormDescription>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {['Beginner', 'Novice I', 'Novice II', 'Advanced'].map((group) => (
+                    {['Beginner', 'Novice', 'Advanced I', 'Advanced II'].map((group) => (
                       <div key={group} className="flex items-center space-x-2">
                         <input
                           type="checkbox"
@@ -465,7 +465,7 @@ export function TournamentForm({ tournament, initialEnabledDivisions, availableD
                           defaultChecked={tournament?.allowed_belt_groups ? tournament.allowed_belt_groups.includes(group) : true}
                           className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
                           onChange={(e) => {
-                             const current = form.getValues('allowed_belt_groups') || ['Beginner', 'Novice I', 'Novice II', 'Advanced']
+                             const current = form.getValues('allowed_belt_groups') || ['Beginner', 'Novice', 'Advanced I', 'Advanced II']
                              let next: string[]
                              if (e.target.checked) {
                                next = [...current, group]

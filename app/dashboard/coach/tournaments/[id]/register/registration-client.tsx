@@ -15,7 +15,7 @@ import { toast } from "sonner"
 import { manageTournamentRegistrations } from "../../actions"
 import { useRouter } from "next/navigation"
 
-const ITEMS_PER_PAGE = 10
+
 
 interface RegistrationClientProps {
   tournament: Tournament
@@ -64,11 +64,12 @@ export function RegistrationClient({
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
 
   // Reset pagination when team changes, but NOT selections
   useEffect(() => {
     setCurrentPage(1)
-  }, [selectedTeam])
+  }, [selectedTeam, pageSize])
 
   // Compute filtered players
   // STRICTLY filter by the selected Team.
@@ -95,10 +96,10 @@ export function RegistrationClient({
   }, [players, selectedTeam, searchQuery])
 
   // Pagination Logic
-  const totalPages = Math.ceil(filteredPlayers.length / ITEMS_PER_PAGE)
+  const totalPages = Math.ceil(filteredPlayers.length / pageSize)
   const paginatedPlayers = filteredPlayers.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE, 
-    currentPage * ITEMS_PER_PAGE
+    (currentPage - 1) * pageSize, 
+    currentPage * pageSize
   )
 
   // Validation Logic
@@ -524,31 +525,49 @@ export function RegistrationClient({
               </div>
               
               {/* Pagination Controls */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between px-4 py-4 border-t bg-muted/50">
-                  <div className="text-sm text-muted-foreground">
-                    Page {currentPage} of {totalPages}
+              <div className="flex flex-col sm:flex-row items-center justify-between px-4 py-4 border-t bg-muted/50 gap-4">
+                  <div className="flex items-center gap-2">
+                     <span className="text-sm text-muted-foreground whitespace-nowrap">Rows per page</span>
+                     <Select 
+                        value={pageSize.toString()} 
+                        onValueChange={(val) => setPageSize(parseInt(val))}
+                     >
+                       <SelectTrigger className="h-8 w-[70px]">
+                         <SelectValue placeholder="10" />
+                       </SelectTrigger>
+                       <SelectContent>
+                         <SelectItem value="10">10</SelectItem>
+                         <SelectItem value="20">20</SelectItem>
+                         <SelectItem value="50">50</SelectItem>
+                         <SelectItem value="100">100</SelectItem>
+                       </SelectContent>
+                     </Select>
                   </div>
-                  <div className="flex gap-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                      disabled={currentPage === 1}
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                      disabled={currentPage === totalPages}
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
+
+                  <div className="flex items-center gap-4">
+                      <div className="text-sm text-muted-foreground">
+                        Page {currentPage} of {totalPages}
+                      </div>
+                      <div className="flex gap-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                          disabled={currentPage === 1}
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                          disabled={currentPage === totalPages}
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
                   </div>
-                </div>
-              )}
+              </div>
            </div>
 
            {/* Floating Footer */}

@@ -55,13 +55,17 @@ export async function generateTournamentBracket(tournamentId: string): Promise<G
       return { success: false, error: 'No divisions are enabled for this tournament. Please enable at least one division in Division Management.', errorType: 'general' }
     }
 
-    // 3. Fetch participants
-    const { data: participants } = await getTournamentParticipants(tournamentId, { limit: 1000 })
+    // 3. Fetch participants (fetch ALL, not just 1000)
+    const { data: participants, count: totalCount } = await getTournamentParticipants(tournamentId, { limit: 10000 })
 
-    const confirmedParticipants = participants.filter((p: any) => (p.status === 'verified' || p.status === 'paid') && !p.disqualified)
+    console.log(`[BRACKET] Total participants in tournament: ${totalCount}, Fetched: ${participants.length}`)
+
+    const confirmedParticipants = participants.filter((p: any) => p.status === 'verified' && !p.disqualified)
+
+    console.log(`[BRACKET] Verified non-DQ participants: ${confirmedParticipants.length}`)
 
     if (confirmedParticipants.length < 2) {
-      return { success: false, error: 'Need at least 2 verified/paid participants to generate brackets', errorType: 'general' }
+      return { success: false, error: 'Need at least 2 verified participants to generate brackets', errorType: 'general' }
     }
 
     // 3.5. Validate all confirmed participants have completed weigh-in
@@ -81,6 +85,16 @@ export async function generateTournamentBracket(tournamentId: string): Promise<G
     })
 
     if (participantsWithoutWeighIn.length > 0) {
+      console.log('[BRACKET] Participants without weigh-in:', participantsWithoutWeighIn.map((p: any) => ({
+        id: p.id,
+        name: `${p.player?.first_name} ${p.player?.last_name}`,
+        status: p.status,
+        weighed_in_at: p.weighed_in_at,
+        actual_weight: p.actual_weight,
+        actual_height: p.actual_height,
+        dob: p.player?.dob
+      })))
+
       return {
         success: false,
         error: 'Some participants have not completed weigh-in',
@@ -88,7 +102,7 @@ export async function generateTournamentBracket(tournamentId: string): Promise<G
         participants: participantsWithoutWeighIn.map((p: any) => ({
           id: p.id,
           name: `${p.player?.first_name} ${p.player?.last_name}`,
-          reason: 'Missing weigh-in data'
+          reason: !p.weighed_in_at ? 'No weigh-in timestamp' : 'Missing actual measurements'
         }))
       }
     }
@@ -135,6 +149,7 @@ export async function generateTournamentBracket(tournamentId: string): Promise<G
 
     // 4. Assign participants to divisions and categories
     const assignmentErrors: { id: string; name: string; reason: string; currentWeight?: number; currentHeight?: number; age?: number }[] = []
+    const assignmentsToMake: Array<{ registrationId: string; divisionId: string; categoryId: string }> = []
 
     for (const participant of confirmedParticipants) {
       if (!participant.player?.dob || !participant.player?.gender) {
@@ -217,8 +232,12 @@ export async function generateTournamentBracket(tournamentId: string): Promise<G
         continue
       }
 
-      // Assign to database
-      await assignParticipantDivision(participant.id, dbDivision.id, dbCategory.id)
+      // Collect assignment for batch processing
+      assignmentsToMake.push({
+        registrationId: participant.id,
+        divisionId: dbDivision.id,
+        categoryId: dbCategory.id
+      })
     }
 
     // If there were any assignment errors, STOP and return them
@@ -231,12 +250,18 @@ export async function generateTournamentBracket(tournamentId: string): Promise<G
       }
     }
 
+    // Batch assign all participants at once (avoids JWT expiration on large tournaments)
+    if (assignmentsToMake.length > 0) {
+      const { batchAssignParticipantDivisions } = await import('@/lib/db/queries/divisions')
+      await batchAssignParticipantDivisions(assignmentsToMake)
+    }
+
     // 5. Refresh participants with division assignments
     const { data: assignedParticipants } = await getTournamentParticipants(tournamentId, { limit: 1000 })
 
     // Double check that everyone we expect to be assigned is actually assigned
     const participantsWithDivisions = assignedParticipants.filter(
-      (p: any) => (p.status === 'verified' || p.status === 'paid') && p.division_id && p.category_id && !p.disqualified
+      (p: any) => p.status === 'verified' && p.division_id && p.category_id && !p.disqualified
     )
 
     // 6. Group participants by division, category, and optionally belt skill category
@@ -292,7 +317,18 @@ export async function generateTournamentBracket(tournamentId: string): Promise<G
           source_match_id: null,
           court_number: null,
           division_id: divisionId,
-          category_id: categoryId
+          category_id: categoryId,
+          skill_level: !isOpenBelt && groupParticipants[0]?.player?.belt_level
+            ? getBeltSkillCategory(groupParticipants[0].player.belt_level)
+            : null,
+          // Missing Timestamps
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          // Missing Metadata (Consistent with Generator)
+          round_name: 'Finals',
+          round_order: 6,
+          bracket_position: 'F-1',
+          structural_match_number: 101
         }
 
         allMatches.push(singlePlayerMatch)
@@ -308,11 +344,20 @@ export async function generateTournamentBracket(tournamentId: string): Promise<G
       const divisionId = groupParticipants[0].division_id
       const categoryId = groupParticipants[0].category_id
 
+      // Determine skill level for this bracket group
+      // For Standard tournaments: extract from participant belt level
+      // For Open Belt tournaments: null (all skill levels compete together)
+      let skillLevel: string | null = null
+      if (!isOpenBelt && groupParticipants[0]?.player?.belt_level) {
+        skillLevel = getBeltSkillCategory(groupParticipants[0].player.belt_level)
+      }
+
       // Add metadata to each match
       const matchesWithMeta = matches.map(m => ({
         ...m,
         division_id: divisionId,
-        category_id: categoryId
+        category_id: categoryId,
+        skill_level: skillLevel
       }))
 
       allMatches.push(...matchesWithMeta)

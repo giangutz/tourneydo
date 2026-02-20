@@ -27,7 +27,7 @@ export default async function BracketPage({ params }: BracketPageProps) {
   
   const [tournament, { data: participants }, matches] = await Promise.all([
     getTournamentById(id),
-    getTournamentParticipants(id, { limit: 1000 }),
+    getTournamentParticipants(id, { limit: 10000 }),
     getMatchesWithReadiness(id)
   ])
 

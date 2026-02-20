@@ -65,7 +65,7 @@ const aj = arcjet({
   ],
 })
 
-const isPublicRoute = createRouteMatcher(['/sign-in(.*)', '/sign-up(.*)', '/tournaments(.*)', '/tournament(.*)', '/api/import-test', '/api/verify-import', '/api/check-stats', '/api/debug-participants'])
+const isPublicRoute = createRouteMatcher(['/sign-in(.*)', '/sign-up(.*)', '/tournaments(.*)', '/tournament(.*)', '/api/verify-import'])
 
 const isOnboardingRoute = createRouteMatcher(['/onboarding'])
 

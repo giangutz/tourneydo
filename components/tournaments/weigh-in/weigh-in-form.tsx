@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Loader2, AlertTriangle, Scale, Info, ArrowLeft, Ruler } from 'lucide-react'
-import { weighInParticipant, getPredictedDivision, allowAtStatedWeight } from '@/lib/actions/participants'
+import { weighInParticipant, getPredictedDivision, allowAtStatedWeight, disqualifyParticipant } from '@/lib/actions/participants'
 import { toast } from 'sonner'
 import { DivisionMoveDialog } from '@/components/tournaments/division-move-dialog'
 import { DisqualificationDialog } from '@/components/tournaments/disqualification-dialog'
@@ -213,6 +213,15 @@ export function WeighInForm({
       return
     }
 
+    console.log('[CLIENT] Starting weigh-in:', {
+      participantId: participant.id,
+      tournamentId,
+      actualWeight,
+      actualHeight,
+      hasDivision: !!participant.division_id,
+      hasCategory: !!participant.category_id
+    })
+
     setIsSubmitting(true)
     try {
       const result = await weighInParticipant(
@@ -222,19 +231,29 @@ export function WeighInForm({
         actualHeight ? parseFloat(actualHeight) : null
       )
 
+      console.log('[CLIENT] Weigh-in result:', result)
+
       if (!result.success) {
         toast.error(result.error || 'Failed to record weigh-in')
         return
       }
 
       if (result.data?.needsAction) {
-        setValidationResult(result.data)
+        console.log('[CLIENT] Needs action - showing dialog')
+        // Store the actual measurements with the validation result
+        setValidationResult({
+          ...result.data,
+          actualWeight: actualWeight ? parseFloat(actualWeight) : null,
+          actualHeight: actualHeight ? parseFloat(actualHeight) : null
+        })
         // Dialog will be triggered by validationResult state being set
       } else {
+        console.log('[CLIENT] Success - redirecting')
         toast.success('Weigh-in recorded successfully')
         router.push(routes.organizer.tournamentParticipants(tournamentId))
       }
     } catch (error: any) {
+      console.error('[CLIENT] Error:', error)
       toast.error(error.message || 'Failed to record weigh-in')
     } finally {
       setIsSubmitting(false)
@@ -486,14 +505,16 @@ export function WeighInForm({
                <AlertTriangle className="h-5 w-5" />
                Measurements Out of Range
             </AlertDialogTitle>
-            <AlertDialogDescription className="space-y-3">
-              <p>
-                 Measured <strong>{validationResult?.exceededLimit === 'height' ? actualHeight + 'cm' : actualWeight + 'kg'}</strong> is <strong>{validationResult?.outOfRange}</strong> the limit for {effectiveDivisionName} - {effectiveCategoryName}.
-              </p>
-              <div className="p-3 bg-muted rounded-md text-sm">
-                 <strong>Policy:</strong> {validationResult?.divisionMovePolicy === 'disqualify_only' 
-                   ? 'Strict - Participants must be disqualified.'
-                   : 'Flexible - You can move the participant to a suggested division.'}
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <span className="block">
+                   Measured <strong>{validationResult?.exceededLimit === 'height' ? validationResult?.actualHeight + 'cm' : validationResult?.actualWeight + 'kg'}</strong> is <strong>{validationResult?.outOfRange}</strong> the limit for {effectiveDivisionName} - {effectiveCategoryName}.
+                </span>
+                <div className="p-3 bg-muted rounded-md text-sm">
+                   <strong>Policy:</strong> {validationResult?.divisionMovePolicy === 'disqualify_only' 
+                     ? 'Strict - Participants must be disqualified.'
+                     : 'Flexible - You can move the participant to a suggested division.'}
+                </div>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -532,10 +553,10 @@ export function WeighInForm({
            setShowDivisionMove(open)
            if (!open) setValidationResult(null) 
          }}
-         onSuccess={() => {
-            router.push(routes.organizer.weighIn(tournamentId))
-            setValidationResult(null)
-         }}
+          onSuccess={() => {
+             router.push(routes.organizer.tournamentParticipants(tournamentId))
+             setValidationResult(null)
+          }}
         />
       )}
       
@@ -550,9 +571,9 @@ export function WeighInForm({
           tournamentId={tournamentId}
           open={showDisqualify}
           onOpenChange={setShowDisqualify}
-          onSuccess={() => {
-             router.push(routes.organizer.weighIn(tournamentId))
-          }}
+           onSuccess={() => {
+              router.push(routes.organizer.tournamentParticipants(tournamentId))
+           }}
           />
       )}
     </>

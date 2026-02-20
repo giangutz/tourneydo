@@ -304,6 +304,11 @@ export interface Match {
   id: string
   tournament_id: string
   round: number
+  // NEW: Round Metadata (Populated by Generator)
+  round_name?: string         // e.g. "Quarter-finals"
+  round_order?: number        // e.g. 3 (Standard Hierarchy)
+  bracket_position?: string   // e.g. "QF-1"
+  structural_match_number?: number // e.g. 301 (Round 3, Match 1)
   match_number: number
   match_number_formatted: string | null // WT format: CourtSequence (e.g., 101, 312)
   match_number_legacy: string | null // Old match number if migrated

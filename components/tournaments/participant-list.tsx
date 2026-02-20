@@ -34,7 +34,7 @@ import { AddParticipantDialog } from './add-participant-dialog'
 import { EditParticipantDialog } from './edit-participant-dialog'
 import { Team } from '@/types/models'
 import { Pencil, MoreHorizontal, Search, Check, X, DollarSign, Loader2, Scale, CheckCircle2, AlertTriangle, ArrowUpDown, Filter, ChevronLeft, ChevronRight, Trash2, Download } from 'lucide-react'
-import { updateParticipantStatus, bulkWeighIn, deleteParticipant, bulkDeleteParticipants } from '@/lib/actions/participants'
+import { updateParticipantStatus, bulkWeighIn, deleteParticipant, bulkDeleteParticipants, weighInParticipant } from '@/lib/actions/participants'
 import { DeleteConfirmDialog } from './delete-confirm-dialog'
 import { toast } from 'sonner'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -99,6 +99,7 @@ interface ParticipantListProps {
 
 import { useAdminChannel } from '@/lib/realtime/admin-channel'
 
+
 export function ParticipantList({ 
   participants, 
   count, 
@@ -119,6 +120,7 @@ export function ParticipantList({
   const [editingParticipant, setEditingParticipant] = useState<Participant | null>(null)
   const [deletingParticipant, setDeletingParticipant] = useState<Participant | null>(null)
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false)
+
   
   const selectedVerifiedCount = useMemo(() => {
     return selectedIds.filter(id => {
@@ -585,7 +587,9 @@ export function ParticipantList({
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <div className="flex items-center gap-1">
-                            {participant.weighed_in_at ? (
+                            {participant.disqualified ? (
+                              <X className="h-4 w-4 text-destructive" />
+                            ) : participant.weighed_in_at ? (
                               <CheckCircle2 className="h-4 w-4 text-green-600" />
                             ) : participant.status === 'verified' || participant.status === 'paid' ? (
                               <AlertTriangle className="h-4 w-4 text-amber-600" />
@@ -595,11 +599,46 @@ export function ParticipantList({
                           </div>
                         </TooltipTrigger>
                         <TooltipContent>
-                          {participant.weighed_in_at ? (
-                            <div className="text-xs">
-                              <div>Weighed in</div>
-                              {participant.actual_weight && <div>Weight: {participant.actual_weight}kg</div>}
-                              {participant.actual_height && <div>Height: {participant.actual_height}cm</div>}
+                          {participant.disqualified ? (
+                            <div className="text-xs space-y-1">
+                              <div className="font-semibold text-destructive">Disqualified</div>
+                              {participant.disqualification_reason && (
+                                <div className="text-muted-foreground">{participant.disqualification_reason}</div>
+                              )}
+                              {(() => {
+                                const age = participant.player?.dob ? new Date().getFullYear() - new Date(participant.player.dob).getFullYear() : null
+                                const isHeightBased = age !== null && age < 12
+                                return (
+                                  <>
+                                    {isHeightBased && participant.actual_height && <div>Height: {participant.actual_height}cm</div>}
+                                    {!isHeightBased && participant.actual_weight && <div>Weight: {participant.actual_weight}kg</div>}
+                                  </>
+                                )
+                              })()}
+                              {participant.weighed_in_by_user && (
+                                <div className="mt-1 pt-1 border-t border-border/50 text-muted-foreground">
+                                  by {participant.weighed_in_by_user.first_name || ''} {participant.weighed_in_by_user.last_name || ''}
+                                </div>
+                              )}
+                            </div>
+                          ) : participant.weighed_in_at ? (
+                            <div className="text-xs space-y-1">
+                              <div className="font-semibold">Weighed In</div>
+                              {(() => {
+                                const age = participant.player?.dob ? new Date().getFullYear() - new Date(participant.player.dob).getFullYear() : null
+                                const isHeightBased = age !== null && age < 12
+                                return (
+                                  <>
+                                    {isHeightBased && participant.actual_height && <div>Height: {participant.actual_height}cm</div>}
+                                    {!isHeightBased && participant.actual_weight && <div>Weight: {participant.actual_weight}kg</div>}
+                                  </>
+                                )
+                              })()}
+                              {participant.tournament_divisions && participant.tournament_categories && (
+                                <div className="text-muted-foreground">
+                                  {participant.tournament_divisions.name} - {participant.tournament_categories.name}
+                                </div>
+                              )}
                               {participant.weighed_in_by_user && (
                                 <div className="mt-1 pt-1 border-t border-border/50 text-muted-foreground">
                                   by {participant.weighed_in_by_user.first_name || ''} {participant.weighed_in_by_user.last_name || ''}

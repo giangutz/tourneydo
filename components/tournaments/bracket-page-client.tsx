@@ -62,8 +62,8 @@ import { DivisionBreakdown } from './shared/division-breakdown'
 import { ScheduleInfeasibilityDialog } from './schedule-infeasibility-dialog'
 import { ScheduleSuccessSummaryDialog } from './schedule-success-summary-dialog'
 import { getBeltSkillCategory, getCategoryDisplayName } from '@/lib/utils'
-
-const SKILL_ORDER = ['Beginner', 'Novice I', 'Novice II', 'Advanced', 'Unknown']
+import { BELT_GROUPS } from '@/lib/constants/belts'
+const SKILL_ORDER = [...Object.keys(BELT_GROUPS), 'Unknown']
 
 export function BracketPageClient({ tournament, participants, matches, userRole }: BracketPageClientProps) {
   useAdminChannel(tournament.id)
@@ -224,6 +224,12 @@ export function BracketPageClient({ tournament, participants, matches, userRole 
     setEditDialogOpen(true)
   }
 
+  // Filter matches to only include relevant lifecycle states
+  const relevantMatches = matches.filter((m: any) => {
+    const state = m.lifecycle_state
+    return state === 'WAITING' || state === 'CONTEST' || state === 'IN_PROGRESS' || state === 'COMPLETED' || state === 'AUTO_ADVANCE' || state === null || state === undefined
+  })
+
   // Calculate Stats
   const uniquePlayers = new Set<string>()
   const divisionStats: Record<string, { 
@@ -231,12 +237,6 @@ export function BracketPageClient({ tournament, participants, matches, userRole 
     matches: number,
     rows: Map<string, { category: string, skill: string, playerCount: Set<string>, matchCount: number, completedCount: number }>
   }> = {}
-
-  // Filter matches to only include relevant lifecycle states
-  const relevantMatches = matches.filter((m: any) => {
-    const state = m.lifecycle_state
-    return state === 'WAITING' || state === 'CONTEST' || state === 'IN_PROGRESS' || state === 'COMPLETED'
-  })
 
   if (relevantMatches.length > 0) {
     relevantMatches.forEach((match: any) => {
@@ -249,43 +249,10 @@ export function BracketPageClient({ tournament, participants, matches, userRole 
       // Skip matches without division/category data
       if (!divName || !catName) return
       
-      // Determine skill level from either player's belt
-      // For single-player matches (BYE), we only have one player
-      let skill = ''
-      
-      // Helper to get belt from participants array (fallback)
-      const getBeltFromParticipants = (playerId: string | null): string | null => {
-        if (!playerId) return null
-        const participant = participants.find((p: any) => p.player_id === playerId)
-        return participant?.player?.belt_level || null
-      }
-      
-      // Try to get skill from player1
-      if (match.player1_id) {
-        let p1Belt = match.player1?.belt_level
-        if (!p1Belt) {
-          p1Belt = getBeltFromParticipants(match.player1_id)
-        }
-        if (p1Belt) {
-          skill = getBeltSkillCategory(p1Belt)
-        }
-      }
-      
-      // If still empty, try player2
-      if (!skill && match.player2_id) {
-        let p2Belt = match.player2?.belt_level
-        if (!p2Belt) {
-          p2Belt = getBeltFromParticipants(match.player2_id)
-        }
-        if (p2Belt) {
-          skill = getBeltSkillCategory(p2Belt)
-        }
-      }
-      
-      // If still empty, mark as Unknown for display
-      if (!skill) {
-        skill = 'Unknown'
-      }
+      // Get skill level directly from match (set during bracket generation)
+      let skill = (match as any).skill_level || 'Unknown'
+      // Skip matches with Unknown/null skill (Open Belt tournaments or old data)
+      if (!skill || skill === 'Unknown') return
       
       // Include all matches - organizers need to see everything
       
@@ -319,9 +286,12 @@ export function BracketPageClient({ tournament, participants, matches, userRole 
 
   const sortedDivisionNames = Object.keys(divisionStats).sort()
   const totalDivisions = sortedDivisionNames.length
-  const totalMatches = relevantMatches.length
-  const completedMatches = relevantMatches.filter((m: any) => m.lifecycle_state === 'COMPLETED').length
-  const progressVal = totalMatches > 0 ? Math.round((completedMatches / totalMatches) * 100) : 0
+  const matchesOnly = relevantMatches.filter((m: any) => m.lifecycle_state !== 'AUTO_ADVANCE')
+  const totalMatches = matchesOnly.length
+  const completedMatches = matchesOnly.filter((m: any) => m.lifecycle_state === 'COMPLETED').length
+  const progressVal = totalMatches > 0 
+    ? Math.round((completedMatches / totalMatches) * 100) 
+    : (relevantMatches.length > 0 ? 100 : 0)
 
   // Set default selection if empty
   const activeDivision = selectedDivision || (sortedDivisionNames.length > 0 ? sortedDivisionNames[0] : '')
@@ -394,9 +364,9 @@ export function BracketPageClient({ tournament, participants, matches, userRole 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
           <StatCard
             title="Total Players"
-            value={uniquePlayers.size}
+            value={participants.filter((p: any) => p.status === 'verified' && !p.disqualified).length}
             icon={Users}
-            description="Players in bracket"
+            description={`${uniquePlayers.size} in bracket`}
           />
           <StatCard
             title="Active Divisions"

@@ -30,6 +30,28 @@ export async function createPayment(data: PaymentInsert): Promise<Payment> {
 /**
  * Create a new payment with linked players
  */
+/**
+ * Bulk create payments with players
+ */
+export async function createBulkPayments(
+  items: { data: PaymentInsert; playerIds: string[] }[]
+): Promise<Payment[]> {
+  // Execute all payment creations in parallel
+  // Note: If one fails, Promise.all will reject. This is acceptable for now to ensure data integrity
+  // or we could use allSettled to allow partial success, but atomic all-or-nothing is often safer for "submit all".
+  // However, Supabase calls are individual HTTP requests. 
+  // Let's stick to Promise.all for speed.
+
+  const results = await Promise.all(
+    items.map(item => createPaymentWithPlayers(item.data, item.playerIds))
+  )
+
+  return results
+}
+
+/**
+ * Create a new payment with linked players
+ */
 export async function createPaymentWithPlayers(
   data: PaymentInsert,
   playerIds: string[]

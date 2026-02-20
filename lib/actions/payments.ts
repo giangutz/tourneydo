@@ -1,7 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { createPayment, createPaymentWithPlayers, updatePaymentStatus } from "@/lib/db/queries/payments"
+import { createPayment, createPaymentWithPlayers, updatePaymentStatus, createBulkPayments } from "@/lib/db/queries/payments"
 import { PaymentInsert } from "@/types/models"
 import { auth } from '@clerk/nextjs/server'
 import { safeAction } from '@/lib/utils/errors'
@@ -38,6 +38,40 @@ export async function submitPaymentWithPlayers(
     }
 
     await createPaymentWithPlayers(data, playerIds)
+    revalidatePath(path)
+  })
+}
+
+/**
+ * Bulk submit payments for multiple teams
+ */
+export async function submitBulkPayments(
+  submissions: { team_id: string; amount: number; playerIds: string[] }[],
+  sharedData: { tournament_id: string; coach_id: string; reference_number: string },
+  path: string
+): Promise<ActionResult<void>> {
+  return safeAction(async () => {
+    const { userId } = await auth()
+    if (!userId) throw new Error('Unauthorized')
+
+    if (submissions.length === 0) {
+      throw new Error('No payments to submit')
+    }
+
+    // Transform to DB expected format
+    const bulkData = submissions.map(sub => ({
+      data: {
+        tournament_id: sharedData.tournament_id,
+        team_id: sub.team_id,
+        coach_id: sharedData.coach_id,
+        amount: sub.amount,
+        reference_number: sharedData.reference_number,
+        status: 'pending' as const
+      },
+      playerIds: sub.playerIds
+    }))
+
+    await createBulkPayments(bulkData)
     revalidatePath(path)
   })
 }

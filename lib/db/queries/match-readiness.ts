@@ -140,6 +140,12 @@ export async function getMatchesWithReadiness(
     .order('round', { ascending: true })
 
   if (matchesError) {
+    // Check if this is a Supabase/Cloudflare infrastructure error
+    const errorMsg = matchesError.message || ''
+    if (errorMsg.includes('<!DOCTYPE html>') || errorMsg.includes('Internal server error')) {
+      console.error('Supabase infrastructure error, returning empty matches array')
+      return []
+    }
     throw new Error(`Failed to get matches: ${matchesError.message}`)
   }
 
@@ -148,14 +154,23 @@ export async function getMatchesWithReadiness(
   }
 
   // Get all readiness records for these matches
+  // Process in chunks to avoid URL length limits with large tournaments
   const matchIds = matches.map(m => m.id)
-  const { data: readinessRecords, error: readinessError } = await supabase
-    .from('match_athlete_readiness')
-    .select('*')
-    .in('match_id', matchIds)
+  const CHUNK_SIZE = 100
+  const readinessRecords: any[] = []
 
-  if (readinessError) {
-    console.error('Failed to get readiness records:', readinessError)
+  for (let i = 0; i < matchIds.length; i += CHUNK_SIZE) {
+    const chunk = matchIds.slice(i, i + CHUNK_SIZE)
+    const { data, error } = await supabase
+      .from('match_athlete_readiness')
+      .select('*')
+      .in('match_id', chunk)
+
+    if (error) {
+      console.error(`Failed to get readiness records for chunk ${i / CHUNK_SIZE + 1}:`, error)
+    } else if (data) {
+      readinessRecords.push(...data)
+    }
   }
 
   // Build readiness map

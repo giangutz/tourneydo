@@ -1,0 +1,108 @@
+{
+  "tournamentConfig": {
+    "id": "dbbe53a7-98b4-41a9-8940-36fd883acfdd",
+    "daily_start_time": "08:00",
+    "daily_end_time": "20:00",
+    "courts": 4,
+    "default_sparring_duration": 10,
+    "gradeschool_round_time": 60,
+    "gradeschool_rest_between_rounds": 30,
+    "gradeschool_kyeshi_time": 60,
+    "cadet_round_time": 90,
+    "cadet_rest_between_rounds": 30,
+    "cadet_kyeshi_time": 60,
+    "junior_round_time": 90,
+    "junior_rest_between_rounds": 30,
+    "junior_kyeshi_time": 60,
+    "senior_round_time": 120,
+    "senior_rest_between_rounds": 30,
+    "senior_kyeshi_time": 60
+  },
+  "divisionConfigs": [
+    {
+      "division_id": "4ed87bca-6d13-473a-b7ae-ab1b62d4709f",
+      "category_id": "3ef9a6d6-023d-4e34-a266-a2522a1f6c37",
+      "avg_match_duration": null
+    },
+    {
+      "division_id": "4ed87bca-6d13-473a-b7ae-ab1b62d4709f",
+      "category_id": "b2ba8606-247c-418d-a3fd-a9920de44c1c",
+      "avg_match_duration": null
+    },
+    {
+      "division_id": "4ed87bca-6d13-473a-b7ae-ab1b62d4709f",
+      "category_id": "df1849b8-5e6b-4e61-af0a-e77e13edf5ba",
+      "avg_match_duration": null
+    },
+    {
+      "division_id": "4ed87bca-6d13-473a-b7ae-ab1b62d4709f",
+      "category_id": "f90db4b4-787e-4693-b203-a8f7dfbdfb7f",
+      "avg_match_duration": null
+    },
+    {
+      "division_id": "7ed077eb-9cc0-4cc4-bff8-04bdcf85fd30",
+      "category_id": "1df830fb-72db-4b57-9acd-9b5820802aef",
+      "avg_match_duration": null
+    },
+    {
+      "division_id": "7ed077eb-9cc0-4cc4-bff8-04bdcf85fd30",
+      "category_id": "291dc158-fb14-46e1-876a-36ca76de7634",
+      "avg_match_duration": null
+    },
+    {
+      "division_id": "7ed077eb-9cc0-4cc4-bff8-04bdcf85fd30",
+      "category_id": "965f33fc-9548-41ff-874c-bb82562a78b2",
+      "avg_match_duration": null
+    },
+    {
+      "division_id": "7ed077eb-9cc0-4cc4-bff8-04bdcf85fd30",
+      "category_id": "dc185871-790c-4184-a5fe-5b81195b273f",
+      "avg_match_duration": null
+    },
+    {
+      "division_id": "7ed077eb-9cc0-4cc4-bff8-04bdcf85fd30",
+      "category_id": "ea2ac721-9e66-4a65-8524-932643ac6e53",
+      "avg_match_duration": null
+    },
+    {
+      "division_id": "7ed077eb-9cc0-4cc4-bff8-04bdcf85fd30",
+      "category_id": "f79da636-a702-43d0-bf35-1819a86b8cc9",
+      "avg_match_duration": null
+    },
+    {
+      "division_id": "a518795d-9524-41ff-90b7-7e417c83bb98",
+      "category_id": "0a962738-9e20-4322-b559-499410d1b3f3",
+      "avg_match_duration": null
+    },
+    {
+      "division_id": "a518795d-9524-41ff-90b7-7e417c83bb98",
+      "category_id": "67cfc7f4-7352-4e9e-a278-c351dcb2259d",
+      "avg_match_duration": null
+    },
+    {
+      "division_id": "a518795d-9524-41ff-90b7-7e417c83bb98",
+      "category_id": "77a709ae-9c62-4d7c-a64f-57cdac5a6a0b",
+      "avg_match_duration": null
+    },
+    {
+      "division_id": "eacb5fdb-4952-4d03-9313-9dae58cb9755",
+      "category_id": "2b8c7993-6bf3-44ea-bd9f-e62d9af2ae24",
+      "avg_match_duration": null
+    },
+    {
+      "division_id": "eacb5fdb-4952-4d03-9313-9dae58cb9755",
+      "category_id": "75064adc-b337-486f-aca5-c48dae84d2fc",
+      "avg_match_duration": null
+    },
+    {
+      "division_id": "eacb5fdb-4952-4d03-9313-9dae58cb9755",
+      "category_id": "754c83d5-e72b-4e08-b727-178ecb47995c",
+      "avg_match_duration": null
+    },
+    {
+      "division_id": "eacb5fdb-4952-4d03-9313-9dae58cb9755",
+      "category_id": "ed383956-9c67-4f56-8afc-68cd3a9fa8ea",
+      "avg_match_duration": null
+    }
+  ]
+}

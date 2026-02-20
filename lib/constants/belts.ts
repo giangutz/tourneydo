@@ -1,12 +1,10 @@
-export type BeltGroup = 'Beginner' | 'Novice I' | 'Novice II' | 'Advanced'
+export type BeltGroup = 'Beginner' | 'Novice' | 'Advanced I' | 'Advanced II'
 
 export const BELT_GROUPS: Record<BeltGroup, string[]> = {
   Beginner: ['White'],
-  'Novice I': ['Yellow', 'Blue'],
-  'Novice II': ['Red', 'Brown'],
-  Advanced: ['Black']
+  Novice: ['Yellow', 'Blue'],
+  'Advanced I': ['Red', 'Brown'],
+  'Advanced II': ['Black']
 }
-
-export const ALL_BELT_GROUPS: BeltGroup[] = ['Beginner', 'Novice I', 'Novice II', 'Advanced']
 
 export const BELT_ORDER = ['White', 'Yellow', 'Blue', 'Red', 'Brown', 'Black'] as const

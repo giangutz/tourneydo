@@ -21,7 +21,7 @@ const SKILL_ORDER = ['Beginner', 'Novice I', 'Novice II', 'Advanced', 'Unknown']
 const ITEMS_PER_PAGE = 5
 
 export function DivisionBreakdown({ matches, participants = [] }: DivisionBreakdownProps) {
-  const [skillFilter, setSkillFilter] = useState<string>('all')
+  const [searchFilter, setSearchFilter] = useState<string>('')
   const [selectedDivision, setSelectedDivision] = useState<string>('')
   const [currentPage, setCurrentPage] = useState(1)
 
@@ -32,92 +32,41 @@ export function DivisionBreakdown({ matches, participants = [] }: DivisionBreakd
     rows: Map<string, { category: string, skill: string, playerCount: Set<string>, matchCount: number, completedCount: number }>
   }> = {}
 
-  // Pre-pass: Find representative belt for each Division+Category group
-  const repBeltMap = new Map<string, string>()
-  
-  if (matches.length > 0) {
-    matches.forEach((m: any) => {
-      const divName = m.tournament_divisions?.name
-      const catName = m.tournament_categories?.name
-      if (!divName || !catName) return
-      
-      const key = `${divName}::${catName}`
-      if (!repBeltMap.has(key)) {
-         // Try to find belt from players
-         let belt = m.player1?.belt_level || m.player2?.belt_level
-         if (!belt && participants.length > 0) {
-            const p1 = participants.find((p: any) => p.player_id === m.player1_id)
-            const p2 = participants.find((p: any) => p.player_id === m.player2_id)
-            belt = p1?.player?.belt_level || p2?.player?.belt_level
-         }
-         
-         if (belt) repBeltMap.set(key, belt)
-      }
-    })
-  }
-
   // Filter matches to only include relevant lifecycle states
   const relevantMatches = matches.filter((m: any) => {
     const state = m.lifecycle_state
-    return state === 'WAITING' || state === 'CONTEST' || state === 'IN_PROGRESS' || state === 'COMPLETED'
+    return state === 'WAITING' || state === 'CONTEST' || state === 'IN_PROGRESS' || state === 'COMPLETED' || state === 'AUTO_ADVANCE' || state === null || state === undefined
   })
 
   if (relevantMatches.length > 0) {
     relevantMatches.forEach((match: any) => {
       const divName = match.tournament_divisions?.name
       const catName = match.tournament_categories?.name
+      const catGender = match.tournament_categories?.gender
       
       // Skip matches without division/category data
       if (!divName || !catName) return
       
-      // Determine skill level from either player's belt
-      // For single-player matches (BYE), we only have one player
-      let skill = ''
+      // Get skill level directly from match (set during bracket generation)
+      // For Standard tournaments: Beginner, Novice, Advanced I, Advanced II
+      // For Open Belt tournaments: null
+      let skill = (match as any).skill_level || 'Unknown'
       
-      // Helper to get belt from participants array (fallback)
-      const getBeltFromParticipants = (playerId: string | null): string | null => {
-        if (!playerId || participants.length === 0) return null
-        const participant = participants.find((p: any) => p.player_id === playerId)
-        return participant?.player?.belt_level || null
-      }
+      // Skip matches with Unknown/null skill (Open Belt tournaments or old data)
+      if (!skill || skill === 'Unknown') return
       
-      // Try to get skill from player1
-      if (match.player1_id) {
-        let p1Belt = match.player1?.belt_level
-        // Fallback to participants if belt not in match data
-        if (!p1Belt) {
-          p1Belt = getBeltFromParticipants(match.player1_id)
-        }
-        if (p1Belt) {
-          skill = getBeltSkillCategory(p1Belt)
-        }
-      }
+      // Get gender label (Boys/Girls for youth, Men/Women for senior)
+      const genderLabel = catGender === 'both' ? 'Mixed' : 
+        (divName.toLowerCase().includes('senior') 
+          ? (catGender === 'male' ? 'Men' : 'Women')
+          : (catGender === 'male' ? 'Boys' : 'Girls'))
       
-      // If still empty, try player2
-      if (!skill && match.player2_id) {
-        let p2Belt = match.player2?.belt_level
-        // Fallback to participants if belt not in match data
-        if (!p2Belt) {
-          p2Belt = getBeltFromParticipants(match.player2_id)
-        }
-        if (p2Belt) {
-          skill = getBeltSkillCategory(p2Belt)
-        }
-      }
+      // Normalize category name for weight/height group
+      const normalizedCatName = getCategoryDisplayName(catName)
       
-      // If still empty, try Representative Belt for the entire group (Division + Category)
-      if (!skill) {
-         const key = `${divName}::${catName}`
-         const repBelt = repBeltMap.get(key)
-         if (repBelt) {
-            skill = getBeltSkillCategory(repBelt)
-         }
-      }
-      
-      // If still empty, mark as Unknown for display
-      if (!skill) {
-        skill = 'Unknown'
-      }
+      // Build full category name: "Division Gender Skill WeightGroup"
+      // Example: "Gradeschool Boys Novice Group 0"
+      const fullCategoryName = `${divName} ${genderLabel} ${skill} ${normalizedCatName}`.trim()
       
       // Include all matches - organizers need to see everything
       
@@ -127,15 +76,13 @@ export function DivisionBreakdown({ matches, participants = [] }: DivisionBreakd
       
       if (match.player1_id) divisionStats[divName].players.add(match.player1_id)
       if (match.player2_id) divisionStats[divName].players.add(match.player2_id)
-      divisionStats[divName].matches++
+      if (match.lifecycle_state !== 'AUTO_ADVANCE') divisionStats[divName].matches++
       
-      // Normalize category name for display
-      const normalizedCatName = getCategoryDisplayName(catName)
-      
-      const rowKey = `${normalizedCatName}-${skill}`
+      // Use full category name as the row key
+      const rowKey = fullCategoryName
       if (!divisionStats[divName].rows.has(rowKey)) {
         divisionStats[divName].rows.set(rowKey, {
-          category: normalizedCatName,
+          category: fullCategoryName,
           skill: skill,
           playerCount: new Set(),
           matchCount: 0,
@@ -146,12 +93,29 @@ export function DivisionBreakdown({ matches, participants = [] }: DivisionBreakd
       const row = divisionStats[divName].rows.get(rowKey)!
       if (match.player1_id) row.playerCount.add(match.player1_id)
       if (match.player2_id) row.playerCount.add(match.player2_id)
-      row.matchCount++
+      if (match.lifecycle_state !== 'AUTO_ADVANCE') row.matchCount++
       if (match.lifecycle_state === 'COMPLETED') row.completedCount++
     })
   }
 
-  const sortedDivisionNames = Object.keys(divisionStats).sort()
+  const sortedDivisionNames = Object.keys(divisionStats).sort((a, b) => {
+    // Define strict division order
+    const divisionOrder = ['Gradeschool', 'Cadet', 'Junior', 'Senior']
+    const indexA = divisionOrder.indexOf(a)
+    const indexB = divisionOrder.indexOf(b)
+    
+    // If both divisions are in the order list, sort by their position
+    if (indexA !== -1 && indexB !== -1) {
+      return indexA - indexB
+    }
+    
+    // If only one is in the list, prioritize it
+    if (indexA !== -1) return -1
+    if (indexB !== -1) return 1
+    
+    // Otherwise, sort alphabetically
+    return a.localeCompare(b)
+  })
   const activeDivision = selectedDivision || (sortedDivisionNames.length > 0 ? sortedDivisionNames[0] : '')
 
   if (matches.length === 0) return null
@@ -178,11 +142,53 @@ export function DivisionBreakdown({ matches, participants = [] }: DivisionBreakd
             {sortedDivisionNames.map(divName => {
               const stats = divisionStats[divName]
               const rows = Array.from(stats.rows.values())
-                .filter(r => skillFilter === 'all' || r.skill.toLowerCase() === skillFilter.toLowerCase())
-                // Sort by Skill Order first, then Category
+                .filter(r => {
+                  if (!searchFilter.trim()) return true
+                  return r.category.toLowerCase().includes(searchFilter.toLowerCase())
+                })
+                // Sort by Skill Order first, then by weight/height group
                 .sort((a, b) => {
-                    const skillDiff = SKILL_ORDER.indexOf(a.skill) - SKILL_ORDER.indexOf(b.skill)
+                    // Extract skill from category name for sorting
+                    const getSkillPriority = (cat: string) => {
+                      if (cat.includes('Beginner')) return 0
+                      if (cat.includes('Novice')) return 1
+                      if (cat.includes('Advanced I')) return 2
+                      if (cat.includes('Advanced II')) return 3
+                      return 4 // Unknown
+                    }
+                    
+                    // Extract weight/height group for secondary sorting
+                    const getGroupPriority = (cat: string) => {
+                      // Height groups (Gradeschool): Group 0, Group 1, ... Group 6
+                      const heightMatch = cat.match(/Group (\d+)/)
+                      if (heightMatch) {
+                        return parseInt(heightMatch[1])
+                      }
+                      
+                      // Weight groups (other divisions): Fin, Fly, Bantam, Feather, Lt. Feather, Light, Lt. Middle, Middle, Lt. Heavy, Heavy
+                      const weightOrder = [
+                        'Fin', 'Fly', 'Bantam', 'Feather', 'Lt. Feather', 
+                        'Light', 'Lt. Middle', 'Middle', 'Lt. Heavy', 'Heavy'
+                      ]
+                      
+                      for (let i = 0; i < weightOrder.length; i++) {
+                        if (cat.includes(weightOrder[i])) {
+                          return i
+                        }
+                      }
+                      
+                      return 999 // Unknown group
+                    }
+                    
+                    // First sort by skill level
+                    const skillDiff = getSkillPriority(a.category) - getSkillPriority(b.category)
                     if (skillDiff !== 0) return skillDiff
+                    
+                    // Then sort by weight/height group
+                    const groupDiff = getGroupPriority(a.category) - getGroupPriority(b.category)
+                    if (groupDiff !== 0) return groupDiff
+                    
+                    // Finally, alphabetically as fallback
                     return a.category.localeCompare(b.category)
                 })
 
@@ -196,37 +202,34 @@ export function DivisionBreakdown({ matches, participants = [] }: DivisionBreakd
                     <div className="text-sm text-muted-foreground">
                       <span className="font-medium text-foreground">{stats.players.size}</span> Players • <span className="font-medium text-foreground">{stats.matches}</span> Matches
                     </div>
-                    <Select value={skillFilter} onValueChange={(val) => {
-                        setSkillFilter(val)
+                    <input
+                      type="text"
+                      placeholder="Search categories..."
+                      value={searchFilter}
+                      onChange={(e) => {
+                        setSearchFilter(e.target.value)
                         setCurrentPage(1)
-                    }}>
-                      <SelectTrigger className="w-[180px]">
-                        <SelectValue placeholder="Filter by Skill" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Skills</SelectItem>
-                        <SelectItem value="Beginner">Beginner</SelectItem>
-                        <SelectItem value="Novice I">Novice I</SelectItem>
-                        <SelectItem value="Novice II">Novice II</SelectItem>
-                        <SelectItem value="Advanced">Advanced</SelectItem>
-                      </SelectContent>
-                    </Select>
+                      }}
+                      className="px-3 py-2 text-sm border rounded-md w-full sm:w-[250px] focus:outline-none focus:ring-2 focus:ring-primary"
+                    />
                   </div>
                   
-                  <div className="rounded-md border">
+                  <div className="rounded-md border overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-[200px]">Category</TableHead>
-                        <TableHead>Skill Level</TableHead>
-                        <TableHead className="text-right">Players</TableHead>
-                        <TableHead className="w-[180px]">Progress</TableHead>
+                        <TableHead className="w-full lg:w-[300px]">Full Category</TableHead>
+                        <TableHead className="hidden lg:table-cell text-right">Players</TableHead>
+                        <TableHead className="hidden lg:table-cell text-right">Total Matches</TableHead>
+                        <TableHead className="hidden lg:table-cell text-right">Completed</TableHead>
+                        <TableHead className="hidden lg:table-cell text-right">Remaining</TableHead>
+                        <TableHead className="w-[180px] lg:w-[220px]">Progress</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {paginatedRows.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={4} className="h-24 text-center">
+                          <TableCell colSpan={6} className="h-24 text-center">
                             No data matching filter.
                           </TableCell>
                         </TableRow>
@@ -237,19 +240,11 @@ export function DivisionBreakdown({ matches, participants = [] }: DivisionBreakd
                           
                           return (
                           <TableRow key={idx}>
-                            <TableCell className="font-medium">{row.category}</TableCell>
-                            <TableCell>
-                              <span className={cn(
-                                  "inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ring-1 ring-inset",
-                                  row.skill === 'Advanced' ? 'bg-purple-50 text-purple-700 ring-purple-600/20' :
-                                  row.skill === 'Beginner' ? 'bg-green-50 text-green-700 ring-green-600/20' :
-                                  row.skill.startsWith('Novice') ? 'bg-blue-50 text-blue-700 ring-blue-600/20' :
-                                  'bg-gray-50 text-gray-600 ring-gray-500/10'
-                              )}>
-                                {row.skill}
-                              </span>
-                            </TableCell>
-                            <TableCell className="text-right">{row.playerCount.size}</TableCell>
+                            <TableCell className="font-medium text-sm lg:text-base">{row.category}</TableCell>
+                            <TableCell className="hidden lg:table-cell text-right">{row.playerCount.size}</TableCell>
+                            <TableCell className="hidden lg:table-cell text-right">{row.matchCount}</TableCell>
+                            <TableCell className="hidden lg:table-cell text-right">{row.completedCount}</TableCell>
+                            <TableCell className="hidden lg:table-cell text-right font-medium text-muted-foreground">{matchesLeft}</TableCell>
                             <TableCell>
                               <TooltipProvider>
                                   <Tooltip delayDuration={0}>

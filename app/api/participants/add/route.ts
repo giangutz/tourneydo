@@ -1,119 +1,190 @@
-import { NextRequest, NextResponse } from 'next/server'
+/**
+ * API Route: POST /api/participants/add
+ * 
+ * Add a player to a tournament
+ * 
+ * Security:
+ * - Requires authentication (Clerk JWT)
+ * - Requires authorization (user must be team owner/coach)
+ * - All inputs validated with Zod
+ * - No sensitive data exposed in errors
+ */
+
+import { NextRequest } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { getTeamById } from '@/lib/db/queries/teams'
-import { createPlayer } from '@/lib/db/queries/players'
+import { createPlayer, updatePlayer } from '@/lib/db/queries/players'
 import { addPlayerToTeam } from '@/lib/db/queries/teams'
 import { createRegistration } from '@/lib/db/queries/registrations'
 import { revalidatePath } from 'next/cache'
 import { routes } from '@/config/routes'
+import { successResponse, errorResponse, ERROR_CODE, HTTP_STATUS } from '@/lib/utils/api-response'
+import { addParticipantSchema } from '@/lib/validations/participants'
+import * as Sentry from '@sentry/nextjs'
 
 export async function POST(request: NextRequest) {
   try {
+    // 1. AUTHENTICATE
     const { userId } = await auth()
     if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponse(
+        ERROR_CODE.UNAUTHORIZED,
+        'Must be logged in to add participants',
+        HTTP_STATUS.UNAUTHORIZED
+      )
     }
 
-    const body = await request.json()
+    // 2. VALIDATE INPUT
+    let body: unknown
+    try {
+      body = await request.json()
+    } catch {
+      return errorResponse(
+        ERROR_CODE.INVALID_INPUT,
+        'Invalid JSON in request body',
+        HTTP_STATUS.BAD_REQUEST
+      )
+    }
+
+    const validationResult = addParticipantSchema.safeParse(body)
+    if (!validationResult.success) {
+      const details: Record<string, string> = {}
+      for (const error of validationResult.error.issues) {
+        const path = error.path.join('.')
+        details[path] = error.message
+      }
+      return errorResponse(
+        ERROR_CODE.VALIDATION_ERROR,
+        'Validation failed',
+        HTTP_STATUS.BAD_REQUEST,
+        details
+      )
+    }
+
     const {
       tournamentId,
-      player_id,
-      first_name,
-      last_name,
+      teamId,
+      playerId,
+      firstName,
+      lastName,
       email,
       dob,
       gender,
       weight,
       height,
-      belt_level,
-      team_id,
-    } = body
+      beltLevel,
+    } = validationResult.data
 
-    // Validate required fields
-    if (!tournamentId || !team_id) {
-      return NextResponse.json({ error: 'Missing required tournament or team ID' }, { status: 400 })
-    }
-
-    if (!player_id && (!first_name || !last_name || !email || !dob || !gender || !belt_level)) {
-      return NextResponse.json({ error: 'Missing required player fields' }, { status: 400 })
-    }
-
-    // Get team to verify it exists and get coach_id
-    const team = await getTeamById(team_id)
+    // 3. AUTHORIZE (verify team ownership)
+    const team = await getTeamById(teamId)
     if (!team) {
-      return NextResponse.json({ error: 'Team not found' }, { status: 404 })
+      return errorResponse(
+        ERROR_CODE.NOT_FOUND,
+        'Team not found',
+        HTTP_STATUS.NOT_FOUND
+      )
     }
 
-    let finalPlayerId = player_id
-
-    if (player_id) {
-      // Update existing player with provided details
-      // We update the player record to keep it current
-      await import('@/lib/db/queries/players').then(mod => mod.updatePlayer(player_id, {
-        first_name,
-        last_name,
-        email: email || null,
-        dob: dob || null,
-        gender: gender || null,
-        weight: weight || null,
-        height: height || null,
-        belt_level: belt_level || null,
-      }))
-    } else {
-      // Create new player
-      const player = await createPlayer({
-        first_name,
-        last_name,
-        email,
-        dob,
-        gender,
-        weight,
-        height,
-        belt_level,
-        coach_id: team.user_id,
-      })
-      finalPlayerId = player.id
+    if (team.user_id !== userId) {
+      return errorResponse(
+        ERROR_CODE.FORBIDDEN,
+        'Not authorized to manage this team',
+        HTTP_STATUS.FORBIDDEN
+      )
     }
 
-    // Add player to team (ignore if already added)
+    // 4. EXECUTE BUSINESS LOGIC
+    let finalPlayerId: string = playerId || ''
+
     try {
-      await addPlayerToTeam(team.id, finalPlayerId)
-    } catch (error: any) {
-      // Ignore unique violation (player already on team)
-      if (!error.message?.includes('duplicate key value') && !error.message?.includes('unique constraint')) {
-        console.warn('Error adding player to team (might be already added):', error)
+      if (playerId) {
+        await updatePlayer(playerId, {
+          first_name: firstName,
+          last_name: lastName,
+          email: email || null,
+          dob: dob ? (dob instanceof Date ? dob.toISOString().split('T')[0] : dob) : null,
+          gender: gender || null,
+          weight: weight || null,
+          height: height || null,
+          belt_level: beltLevel,
+        })
+      } else {
+        const player = await createPlayer({
+          first_name: firstName!,
+          last_name: lastName!,
+          email: email || null,
+          dob: dob ? (dob instanceof Date ? dob.toISOString().split('T')[0] : dob) : null,
+          gender: gender || null,
+          weight: weight || null,
+          height: height || null,
+          belt_level: beltLevel!,
+          coach_id: team.user_id,
+        })
+        finalPlayerId = player.id
       }
+
+      try {
+        await addPlayerToTeam(team.id, finalPlayerId)
+      } catch (error: unknown) {
+        const err = error as { message?: string }
+        if (
+          !err.message?.includes('duplicate key value') &&
+          !err.message?.includes('unique constraint')
+        ) {
+          throw error
+        }
+      }
+
+      await createRegistration({
+        tournament_id: tournamentId,
+        team_id: team.id,
+        player_id: finalPlayerId,
+        coach_id: team.user_id,
+        status: 'verified',
+        actual_weight: weight || null,
+        actual_height: height || null,
+        disqualified: false,
+        disqualification_reason: null,
+        weighed_in_at: null,
+        weighed_in_by: null,
+        weigh_in_selected: false,
+      })
+    } catch (error: unknown) {
+      const err = error as { message?: string }
+      if (err.message?.includes('duplicate') || err.message?.includes('unique')) {
+        return errorResponse(
+          ERROR_CODE.CONFLICT,
+          'Player already registered for this tournament',
+          HTTP_STATUS.CONFLICT
+        )
+      }
+      throw error
     }
 
-    // Create tournament registration
-    // Check if checks are required here (duplicate registration?)
-    // createRegistration will likely throw if unique constraint on (tournament_id, player_id) exists
-
-    // We add actual_weight/height to registration from the form data as well, 
-    // assuming the form reflects current status
-    await createRegistration({
-      tournament_id: tournamentId,
-      team_id: team.id,
-      player_id: finalPlayerId,
-      coach_id: team.user_id,
-      status: 'verified', // Auto-verified since organizer added them
-      actual_weight: weight || null,
-      actual_height: height || null,
-      disqualified: false,
-      disqualification_reason: null,
-      weighed_in_at: null,
-      weighed_in_by: null,
-      weigh_in_selected: false,
+    // 5. LOG SUCCESS
+    console.log('Participant added', {
+      userId,
+      teamId,
+      playerId: finalPlayerId,
+      tournamentId,
     })
 
     revalidatePath(routes.organizer.tournamentParticipants(tournamentId))
 
-    return NextResponse.json({ success: true, playerId: finalPlayerId })
-  } catch (error: any) {
-    console.error('Error adding participant:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to add participant' },
-      { status: 500 }
+    return successResponse(
+      { playerId: finalPlayerId, status: 'verified' },
+      HTTP_STATUS.CREATED
+    )
+  } catch (error) {
+    console.error('Failed to add participant:', error)
+    Sentry.captureException(error, {
+      tags: { action: 'add_participant' },
+    })
+
+    return errorResponse(
+      ERROR_CODE.INTERNAL_ERROR,
+      'Failed to add participant',
+      HTTP_STATUS.INTERNAL_SERVER_ERROR
     )
   }
 }

@@ -286,12 +286,56 @@ export async function weighInParticipant(
       throw new Error('Player must have date of birth and gender')
     }
 
-    // If participant is not yet assigned to a division, just save the measurements
-    // Division assignment will happen later based on these measurements
+    // If participant is not yet assigned to a division, auto-assign based on registered measurements
     if (!registration.division_id || !registration.category_id) {
-      await updateWeighIn(registrationId, actualWeight, actualHeight, userId)
-      revalidatePath(routes.organizer.tournamentParticipants(tournamentId))
-      return { needsAction: false, divisionMovePolicy }
+      console.log('[AUTO-ASSIGN] Participant not assigned, predicting division...')
+
+      const prediction = await getPredictedDivision(tournamentId, {
+        weight: registration.player.weight,
+        height: registration.player.height,
+        dob: registration.player.dob,
+        gender: registration.player.gender as 'male' | 'female',
+        beltLevel: registration.player.belt_level
+      })
+
+      console.log('[AUTO-ASSIGN] Prediction:', prediction)
+
+      if (!prediction || !prediction.match) {
+        throw new Error('Cannot determine appropriate division for this participant. Please assign manually.')
+      }
+
+      // Get tournament divisions to find the predicted division/category IDs
+      const divisions = await getTournamentDivisions(tournamentId)
+      const division = divisions.find(d => d.name === prediction.divisionName)
+
+      if (!division) {
+        throw new Error(`Predicted division "${prediction.divisionName}" not found in tournament`)
+      }
+
+      const category = (division.tournament_categories as any[])?.find(
+        (c: any) => c.name === prediction.categoryName && c.gender === registration.player.gender
+      )
+
+      if (!category) {
+        throw new Error(`Predicted category "${prediction.categoryName}" not found in division "${prediction.divisionName}"`)
+      }
+
+      console.log('[AUTO-ASSIGN] Assigning to:', {
+        divisionId: division.id,
+        divisionName: division.name,
+        categoryId: category.id,
+        categoryName: category.name
+      })
+
+      // Assign the participant to the predicted division
+      const { assignParticipantDivision } = await import('@/lib/db/queries/divisions')
+      await assignParticipantDivision(registrationId, division.id, category.id)
+
+      // Update the registration object for validation below
+      registration.division_id = division.id
+      registration.category_id = category.id
+
+      console.log('[AUTO-ASSIGN] Assignment complete, proceeding with validation')
     }
 
     // Get tournament divisions to find the registered category
@@ -357,11 +401,18 @@ export async function weighInParticipant(
 
     // If within limits, save and return success
     if (validation.valid) {
+      console.log('[DEBUG] Validation Passed - Marking as completed')
+
+      // Clear any existing disqualification status (measurements are now valid)
+      const { updateDisqualification } = await import('@/lib/db/queries/registrations')
+      await updateDisqualification(registrationId, false, null)
+
       await updateWeighIn(registrationId, actualWeight, actualHeight, userId)
       revalidatePath(routes.organizer.tournamentParticipants(tournamentId))
       return { needsAction: false, divisionMovePolicy }
     }
 
+    console.log('[DEBUG] Validation Failed - needsAction: true')
     // If out of range, find alternative divisions using dynamic configuration
     // Only if tournament policy allows division moves
     const suggestedDivisions = divisionMovePolicy === 'allow_move'
@@ -377,8 +428,11 @@ export async function weighInParticipant(
       : []
 
     // Save the actual measurements even though they're out of range
-    // This allows organizer to make a decision
-    await updateWeighIn(registrationId, actualWeight, actualHeight, userId)
+    // BUT DO NOT finalize the weigh-in (don't set weighed_in_at timestamp)
+    // This allows organizer to make a decision without marking them as "Weighed In"
+    const { updateWeighInMeasurements } = await import('@/lib/db/queries/registrations')
+    await updateWeighInMeasurements(registrationId, actualWeight, actualHeight, userId)
+
     revalidatePath(routes.organizer.tournamentParticipants(tournamentId))
 
     return {
@@ -426,9 +480,22 @@ export async function moveParticipantDivision(
       throw new Error('This tournament does not allow division moves. Participants must be disqualified if out of range.')
     }
 
-    const { updateDivisionAssignment } = await import('@/lib/db/queries/registrations')
+    const { updateDivisionAssignment, getRegistrationById, updateWeighIn, updateDisqualification } = await import('@/lib/db/queries/registrations')
 
+    // Clear any existing disqualification status (they're being moved to a valid division)
+    await updateDisqualification(registrationId, false, null)
+
+    // Update division assignment
     await updateDivisionAssignment(registrationId, newDivisionId, newCategoryId)
+
+    // Finalize the weigh-in with the already-saved measurements
+    const registration = await getRegistrationById(registrationId)
+    await updateWeighIn(
+      registrationId,
+      registration.actual_weight,
+      registration.actual_height,
+      userId
+    )
 
     revalidatePath(routes.organizer.tournamentParticipants(tournamentId))
   })
@@ -449,15 +516,23 @@ export async function disqualifyParticipant(
       throw new Error('Unauthorized')
     }
 
-    const { updateDisqualification, getRegistrationById } = await import('@/lib/db/queries/registrations')
+    const { updateDisqualification, getRegistrationById, updateWeighIn } = await import('@/lib/db/queries/registrations')
     const { findActiveMatchForParticipant, forfeitMatch } = await import('@/lib/db/queries/matches')
 
     // 1. Update DQ status in registration
     await updateDisqualification(registrationId, true, reason)
 
-    // 2. Auto-forfeit active match
+    // 2. Finalize the weigh-in with the already-saved measurements
+    const reg = await getRegistrationById(registrationId)
+    await updateWeighIn(
+      registrationId,
+      reg.actual_weight,
+      reg.actual_height,
+      userId
+    )
+
+    // 3. Auto-forfeit active match
     try {
-      const reg = await getRegistrationById(registrationId)
       if (reg.player_id) {
         // Find if they are in an active match
         const activeMatch = await findActiveMatchForParticipant(reg.player_id, tournamentId)
@@ -492,9 +567,22 @@ export async function allowAtStatedWeight(
       throw new Error('Unauthorized')
     }
 
-    // Actual measurements are already saved by weighInParticipant
-    // This action just confirms the organizer's decision to keep them in the division
-    // No additional database updates needed
+    // Measurements were saved by weighInParticipant using updateWeighInMeasurements
+    // Now we need to finalize the weigh-in by setting the timestamp
+    const { getRegistrationById, updateWeighIn, updateDisqualification } = await import('@/lib/db/queries/registrations')
+
+    // Clear any existing disqualification status (organizer is allowing them to compete)
+    await updateDisqualification(registrationId, false, null)
+
+    const registration = await getRegistrationById(registrationId)
+
+    // Finalize with the already-saved measurements
+    await updateWeighIn(
+      registrationId,
+      registration.actual_weight,
+      registration.actual_height,
+      userId
+    )
 
     revalidatePath(routes.organizer.tournamentParticipants(tournamentId))
   })

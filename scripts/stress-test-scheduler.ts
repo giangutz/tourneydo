@@ -1,8 +1,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import { calculateSchedule, assignMatchNumbers, ScheduleInput } from '../lib/utils/match-scheduler';
-import { TournamentScheduleConfig, DivisionScheduleConfig } from '../types/models';
+import { calculateSchedule, assignMatchNumbers } from '../lib/utils/match-scheduler';
 
 // --- MOCK DATA GENERATORS ---
 
@@ -18,7 +17,7 @@ const GENDERS = ['Male', 'Female'];
 const WEIGHT_CLASSES = ['Fin', 'Fly', 'Bantam', 'Feather', 'Light', 'Welter', 'Middle', 'Heavy'];
 
 function generateMockData(matchCount: number) {
-  const tournamentConfig: TournamentScheduleConfig = {
+  const tournamentConfig: any = {
     id: 'stress-test-config',
     tournament_id: 'stress-test-tournament',
     daily_start_time: '09:00',
@@ -44,7 +43,7 @@ function generateMockData(matchCount: number) {
     updated_at: new Date().toISOString()
   };
 
-  const divisionConfigs: DivisionScheduleConfig[] = [];
+  const divisionConfigs: any[] = [];
   const matches: any[] = [];
 
   // We want to distribute 500 matches across these groups.
@@ -127,7 +126,7 @@ async function runStressTest() {
   const startDate = new Date('2024-06-01T00:00:00Z');
   const endDate = new Date('2024-06-05T00:00:00Z'); // 5 Days available
 
-  const input: ScheduleInput = {
+  const input: any = {
     tournamentConfig,
     divisionConfigs,
     matches,

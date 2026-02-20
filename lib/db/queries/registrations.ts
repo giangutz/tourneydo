@@ -106,16 +106,39 @@ export async function registerTeamForTournament(
 export async function getCoachRegistrations(coachId: string) {
   const supabase = createServerSupabaseClient()
 
-  const { data, error } = await supabase
-    .from('tournament_registrations')
-    .select('*')
-    .eq('coach_id', coachId)
+  let allRegistrations: TournamentRegistration[] = []
+  let page = 0
+  const pageSize = 1000
+  let hasMore = true
 
-  if (error) {
-    throw new Error(`Failed to fetch coach registrations: ${error.message}`)
+  while (hasMore) {
+    const from = page * pageSize
+    const to = from + pageSize - 1
+
+    const { data, error } = await supabase
+      .from('tournament_registrations')
+      .select('*')
+      .eq('coach_id', coachId)
+      .range(from, to)
+
+    if (error) {
+      throw new Error(`Failed to fetch coach registrations: ${error.message}`)
+    }
+
+    if (data && data.length > 0) {
+      allRegistrations = allRegistrations.concat(data as unknown as TournamentRegistration[])
+
+      if (data.length < pageSize) {
+        hasMore = false
+      } else {
+        page++
+      }
+    } else {
+      hasMore = false
+    }
   }
 
-  return (data as unknown as TournamentRegistration[]) || []
+  return allRegistrations
 }
 
 /**
@@ -234,19 +257,7 @@ export async function getTournamentParticipants(
   // Handle search query with a different approach to avoid PostgREST or() parsing issues
   // We'll fetch matching registrations in two separate queries and merge them
   if (query) {
-    // First, get registrations matching player names
-    const playerNameQuery = supabase
-      .from('tournament_registrations')
-      .select('id')
-      .eq('tournament_id', tournamentId)
-
-    // Search for matching teams to get their IDs
-    const { data: matchingTeams } = await supabase
-      .from('teams')
-      .select('id')
-      .ilike('name', `%${query}%`)
-
-    const matchingTeamIds = matchingTeams?.map((t: any) => t.id) || []
+    const searchTerm = query.trim().toLowerCase()
 
     // Build a list of registration IDs that match our search criteria
     const matchingRegistrationIds = new Set<string>()
@@ -256,7 +267,7 @@ export async function getTournamentParticipants(
       .from('tournament_registrations')
       .select('id, players!inner(first_name)')
       .eq('tournament_id', tournamentId)
-      .ilike('players.first_name', `%${query}%`)
+      .ilike('players.first_name', `%${searchTerm}%`)
 
     firstNameMatches?.forEach((r: any) => matchingRegistrationIds.add(r.id))
 
@@ -265,9 +276,32 @@ export async function getTournamentParticipants(
       .from('tournament_registrations')
       .select('id, players!inner(last_name)')
       .eq('tournament_id', tournamentId)
-      .ilike('players.last_name', `%${query}%`)
+      .ilike('players.last_name', `%${searchTerm}%`)
 
     lastNameMatches?.forEach((r: any) => matchingRegistrationIds.add(r.id))
+
+    // Get registrations by full name (first + last)
+    // Limit to 5000 to avoid overwhelming the query on very large tournaments
+    const { data: allRegistrations } = await supabase
+      .from('tournament_registrations')
+      .select('id, players!inner(first_name, last_name)')
+      .eq('tournament_id', tournamentId)
+      .limit(5000)
+
+    allRegistrations?.forEach((r: any) => {
+      const fullName = `${r.players.first_name} ${r.players.last_name}`.toLowerCase()
+      if (fullName.includes(searchTerm)) {
+        matchingRegistrationIds.add(r.id)
+      }
+    })
+
+    // Search for matching teams to get their IDs
+    const { data: matchingTeams } = await supabase
+      .from('teams')
+      .select('id')
+      .ilike('name', `%${searchTerm}%`)
+
+    const matchingTeamIds = matchingTeams?.map((t: any) => t.id) || []
 
     // Get registrations by team ID
     if (matchingTeamIds.length > 0) {
@@ -460,6 +494,32 @@ export async function updateWeighIn(
 
   if (error) {
     throw new Error(`Failed to update weigh-in: ${error.message}`)
+  }
+}
+
+/**
+ * Update weigh-in measurements ONLY (does not mark as completed)
+ */
+export async function updateWeighInMeasurements(
+  registrationId: string,
+  actualWeight: number | null,
+  actualHeight: number | null,
+  weighedInBy: string
+): Promise<void> {
+  const supabase = createServerSupabaseClient()
+
+  const { error } = await supabase
+    .from('tournament_registrations')
+    .update({
+      actual_weight: actualWeight,
+      actual_height: actualHeight,
+      weighed_in_by: weighedInBy,
+      // pending status implied by null weighed_in_at
+    })
+    .eq('id', registrationId)
+
+  if (error) {
+    throw new Error(`Failed to update measurements: ${error.message}`)
   }
 }
 

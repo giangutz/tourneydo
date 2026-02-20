@@ -77,29 +77,73 @@ export async function NotificationsNav() {
        data: p
      }))
 
-     // Map coach registrations (Coach View) - "You registered"
-     const coachRegActivities = (coachRegistrations || []).map((r: any) => ({
-       id: `coach-reg-${r.id}`,
-       type: 'coach-registration',
-       created_at: r.created_at,
-       status: r.status,
-       player_name: `${r.players?.first_name} ${r.players?.last_name}`,
-       tournament_name: r.tournaments?.name,
-       tournament_id: r.tournaments?.id,
-       data: r
-     }))
+     // Map coach registrations (Coach View) - Consolidated by Tournament
+     const groupedCoachRegs: Record<string, any> = {}
+     ;(coachRegistrations || []).forEach(r => {
+        const key = r.tournaments?.id
+        if (!key) return
 
-     // Map coach payments (Coach View) - "Your payment status update"
-     const coachPayActivities = (coachPayments || []).map((p: any) => ({
-       id: `coach-pay-${p.id}`,
-       type: 'coach-payment',
-       created_at: p.updated_at || p.created_at, // Use updated_at if available for status changes
-       status: p.status,
-       player_name: p.teams?.name || 'Your Team',
-       tournament_name: p.tournaments?.name,
-       tournament_id: p.tournaments?.id,
-       data: p
-     }))
+        if (!groupedCoachRegs[key]) {
+           groupedCoachRegs[key] = {
+              ...r,
+              count: 0,
+              latest_created_at: r.created_at
+           }
+        }
+        groupedCoachRegs[key].count++
+     })
+
+     const coachRegActivities = Object.values(groupedCoachRegs).map(r => {
+       const isBulk = r.count > 1
+       const displayName = isBulk 
+           ? `${r.count} Athletes`
+           : `${r.players?.first_name} ${r.players?.last_name}`
+
+       return {
+         id: `coach-reg-${r.id}`, // Use representative ID
+         type: 'coach-registration',
+         created_at: r.latest_created_at || r.created_at,
+         status: r.status,
+         player_name: displayName,
+         tournament_name: r.tournaments?.name,
+         tournament_id: r.tournaments?.id,
+         data: r
+       }
+     })
+
+     // Map coach payments (Coach View) - Consolidated by Tournament & Status
+     const groupedCoachPays: Record<string, any> = {}
+     ;(coachPayments || []).forEach((p: any) => {
+        const key = `${p.tournaments?.id}-${p.status}`
+        if (!p.tournaments?.id) return
+
+        if (!groupedCoachPays[key]) {
+           groupedCoachPays[key] = {
+              ...p,
+              count: 0,
+              latest_created_at: p.updated_at || p.created_at
+           }
+        }
+        groupedCoachPays[key].count++
+     })
+
+     const coachPayActivities = Object.values(groupedCoachPays).map(p => {
+       const isBulk = p.count > 1
+       const displayName = isBulk 
+           ? `${p.count} Teams` // Payments are usually per team, or we could say "Payments"
+           : p.teams?.name || 'Your Team'
+
+       return {
+         id: `coach-pay-${p.id}`,
+         type: 'coach-payment',
+         created_at: p.latest_created_at || p.created_at, 
+         status: p.status,
+         player_name: displayName,
+         tournament_name: p.tournaments?.name,
+         tournament_id: p.tournaments?.id,
+         data: p
+       }
+     })
 
      // Merge and sort
      activities = [

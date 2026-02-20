@@ -14,19 +14,89 @@ interface Participant {
 // MAIN GENERATOR
 // ============================================================================
 
+// ============================================================================
+// ROUND HIERARCHY HELPERS
+// ============================================================================
+
+interface RoundInfo {
+  localRound: number
+  globalOrder: number
+  name: string
+  abbrev: string
+  participants: number
+  matchCount: number
+}
+
+function getGlobalRoundOrder(bracketSize: number): number {
+  switch (bracketSize) {
+    case 64: return 1
+    case 32: return 2
+    case 16: return 3
+    case 8: return 4
+    case 4: return 5
+    case 2: return 6
+    default: return 1
+  }
+}
+
+function getRoundName(participants: number): string {
+  switch (participants) {
+    case 64: return 'Round of 64'
+    case 32: return 'Round of 32'
+    case 16: return 'Round of 16'
+    case 8: return 'Quarter-finals'
+    case 4: return 'Semi-finals'
+    case 2: return 'Finals'
+    default: return `Round of ${participants}`
+  }
+}
+
+function getRoundAbbreviation(participants: number): string {
+  switch (participants) {
+    case 64: return 'R64'
+    case 32: return 'R32'
+    case 16: return 'R16'
+    case 8: return 'QF'
+    case 4: return 'SF'
+    case 2: return 'F'
+    default: return `R${participants}`
+  }
+}
+
+// Keep legacy for backward compatibility if needed, but implementation updated
 export function getBracketRoundLabel(
   currentRound: number,
   totalRounds: number
 ): string {
   const roundsFromEnd = totalRounds - currentRound + 1
+  const participants = Math.pow(2, roundsFromEnd)
+  return getRoundName(participants)
+}
 
-  if (roundsFromEnd === 1) return 'Finals'
-  if (roundsFromEnd === 2) return 'Semi-Finals'
-  if (roundsFromEnd === 3) return 'Quarter-Finals'
+function calculateRoundStructure(bracketSize: number): RoundInfo[] {
+  const rounds: RoundInfo[] = []
+  let currentParticipants = bracketSize
+  let roundOrder = 1
 
-  // Calculate participants in this round (power of 2)
-  const participantsInRound = Math.pow(2, roundsFromEnd)
-  return `Round of ${participantsInRound}`
+  // Calculate specific global start order based on bracket size
+  // e.g. Size 16 (Ro16) -> Global 3
+  const startGlobal = getGlobalRoundOrder(bracketSize)
+
+  const totalRounds = Math.log2(bracketSize)
+
+  for (let r = 1; r <= totalRounds; r++) {
+    rounds.push({
+      localRound: r,
+      globalOrder: startGlobal + r - 1,
+      name: getRoundName(currentParticipants),
+      abbrev: getRoundAbbreviation(currentParticipants),
+      participants: currentParticipants,
+      matchCount: currentParticipants / 2
+    })
+    currentParticipants /= 2
+  }
+
+  return rounds
 }
 
 /**
@@ -240,6 +310,10 @@ export function generateBracket(
       id: crypto.randomUUID(),
       tournament_id: tournamentId,
       round: 1,
+      round_name: 'Finals',
+      round_order: 6,
+      bracket_position: 'F-1',
+      structural_match_number: 101, // Round 1 Matches 1
       match_number: 0,
       player1_id: participants[0].player_id,
       player2_id: null,
@@ -247,7 +321,6 @@ export function generateBracket(
       status: 'completed',
       lifecycle_state: 'AUTO_ADVANCE',
       division_id: undefined, category_id: undefined,
-      // ...boilerplate
       score_player1: 0, score_player2: 0,
       score_round1_player1: 0, score_round1_player2: 0,
       score_round2_player1: 0, score_round2_player2: 0,
@@ -266,9 +339,10 @@ export function generateBracket(
     }]
   }
 
-  // 2. Sizing
+  // 2. Sizing & Structure
   const bracketSize = Math.pow(2, Math.ceil(Math.log2(participants.length)))
   const totalRounds = Math.log2(bracketSize)
+  const roundStructure = calculateRoundStructure(bracketSize)
 
   // 3. Placement (WT Seeding + Scored Optimization)
   const slots = assignParticipantsToSeeds(participants, bracketSize)
@@ -286,26 +360,38 @@ export function generateBracket(
   const round2Inputs = new Map<number, { type: 'player' | 'match', id: string }>()
 
   // == PHASE A: Round 1 (Promoted Placement) ==
+  // Matches created here are the "Opening Round" matches
+  const r1Info = roundStructure[0] // First round in structure
   const r1MatchCount = bracketSize / 2
+
   for (let i = 0; i < r1MatchCount; i++) {
     const slotA = slots[i * 2]
     const slotB = slots[i * 2 + 1]
-    const structuralMatchNum = i + 1
+    const structuralMatchNum = i + 1 // 1..N
 
     if (slotA && slotB) {
       // Create Match
       const matchId = getMatchId(1, structuralMatchNum)
+      const structuralNumFull = 100 + structuralMatchNum
+
       matches.push({
         id: matchId,
         tournament_id: tournamentId,
         round: 1,
         match_number: 0,
+
+        // NEW METADATA
+        round_name: r1Info.name,
+        round_order: r1Info.globalOrder,
+        bracket_position: `${r1Info.abbrev}-${structuralMatchNum}`,
+        structural_match_number: structuralNumFull,
+
         player1_id: slotA.player_id,
         player2_id: slotB.player_id,
         winner_id: null,
-        status: 'scheduled',
-        lifecycle_state: 'CONTEST',
-        // ...boilerplate
+        status: 'scheduled', // Use scheduled/pending based on readiness? Actually contest logic handles this
+        lifecycle_state: 'CONTEST', // Both players known
+
         score_player1: 0, score_player2: 0,
         score_round1_player1: 0, score_round1_player2: 0,
         score_round2_player1: 0, score_round2_player2: 0,
@@ -319,7 +405,9 @@ export function generateBracket(
         match_number_formatted: null, match_number_legacy: null,
         day_number: null, match_sequence: null,
         division_id: undefined, category_id: undefined,
-        athlete1_available_at: null, athlete2_available_at: null
+        athlete1_available_at: null, athlete2_available_at: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       })
       round2Inputs.set(structuralMatchNum, { type: 'match', id: matchId })
     } else {
@@ -331,7 +419,9 @@ export function generateBracket(
 
   // == PHASE B: Upper Rounds ==
   for (let r = 2; r <= totalRounds; r++) {
+    const roundInfo = roundStructure[r - 1]
     const matchCount = Math.pow(2, totalRounds - r)
+
     for (let m = 1; m <= matchCount; m++) {
       const matchId = getMatchId(r, m)
       const sourceIndexA = m * 2 - 1
@@ -353,18 +443,39 @@ export function generateBracket(
         sourceMatches.push(getMatchId(r - 1, sourceIndexB))
       }
 
+      // Determine Lifecycle
+      const isReady = p1Id && p2Id
+      const lifecycle = isReady ? 'CONTEST' : 'WAITING'
+      const status = isReady ? 'scheduled' : 'scheduled' // 'pending' might be better but DB constraint?
+      // Actually DB status is 'scheduled' | 'in_progress' | 'completed'.
+      // 'pending' is NOT in the DB enum (MatchStatus).
+      // Wait, 'MatchStatus' in models.ts is 'scheduled' | 'in_progress' | 'completed'.
+      // User requested "status: (p1Id && p2Id) ? 'contest' : 'pending'".
+      // This implies User wants to CHANGE the MatchStatus type?
+      // OR User considers 'scheduled' == 'pending'?
+      // I should stick to DB enum 'scheduled' but rely on lifecycle_state 'WAITING'.
+
+      const structuralNumFull = r * 100 + m
+
       matches.push({
         id: matchId,
         tournament_id: tournamentId,
         round: r,
         match_number: 0,
+
+        // NEW METADATA
+        round_name: roundInfo.name,
+        round_order: roundInfo.globalOrder,
+        bracket_position: `${roundInfo.abbrev}-${m}`,
+        structural_match_number: structuralNumFull,
+
         player1_id: p1Id,
         player2_id: p2Id,
         winner_id: null,
         status: 'scheduled',
-        lifecycle_state: 'WAITING',
+        lifecycle_state: lifecycle,
         source_match_ids: sourceMatches,
-        // ...boilerplate
+
         score_player1: 0, score_player2: 0,
         score_round1_player1: 0, score_round1_player2: 0,
         score_round2_player1: 0, score_round2_player2: 0,
@@ -377,7 +488,9 @@ export function generateBracket(
         match_number_formatted: null, match_number_legacy: null,
         day_number: null, match_sequence: null,
         division_id: undefined, category_id: undefined,
-        athlete1_available_at: null, athlete2_available_at: null
+        athlete1_available_at: null, athlete2_available_at: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       })
     }
   }
@@ -398,5 +511,144 @@ export function generateBracket(
     }
   }
 
+  // == PHASE D: Assign Visual Structural Numbers (DFS Level-by-Level) ==
+  /**
+   * Assigns structural_match_number based on visual bracket order.
+   * Uses DFS to traverse from Finals to Round 1, then numbers matches
+   * sequentially at each level (round) from top to bottom.
+   */
+  function assignVisualStructuralNumbers(matches: any[]): void {
+    const matchMap = new Map(matches.map(m => [m.id, m]))
+
+    // Group matches by round
+    const matchesByRound = new Map<number, any[]>()
+    matches.forEach(m => {
+      if (!matchesByRound.has(m.round)) {
+        matchesByRound.set(m.round, [])
+      }
+      matchesByRound.get(m.round)!.push(m)
+    })
+
+    // Find Finals (matches with no next_match_id)
+    const finals = matches.filter(m => !m.next_match_id)
+
+    // Track vertical order within each round
+    const verticalOrderByRound = new Map<number, Map<string, number>>()
+
+    // Initialize order maps for each round
+    for (let r = 1; r <= totalRounds; r++) {
+      verticalOrderByRound.set(r, new Map<string, number>())
+    }
+
+    /**
+     * DFS traversal to assign vertical order indices.
+     * Visits children before parent (post-order) to ensure
+     * top-to-bottom ordering at each level.
+     */
+    function visit(match: any, verticalIndex: number): number {
+      const orderMap = verticalOrderByRound.get(match.round)!
+
+      // Get children from source_match_ids
+      const children = (match.source_match_ids || [])
+        .map((id: string) => matchMap.get(id))
+        .filter(Boolean)
+
+      if (children.length === 0) {
+        // Leaf node - assign index
+        if (!orderMap.has(match.id)) {
+          orderMap.set(match.id, verticalIndex)
+        }
+        return verticalIndex + 1
+      }
+
+      // Visit children first (left to right = top to bottom)
+      let currentIndex = verticalIndex
+      for (const child of children) {
+        currentIndex = visit(child, currentIndex)
+      }
+
+      // Assign index to this match after children
+      if (!orderMap.has(match.id)) {
+        orderMap.set(match.id, currentIndex)
+      }
+
+      return currentIndex + 1
+    }
+
+    // Start DFS from each final (should typically be just one)
+    finals.forEach(final => visit(final, 0))
+
+    // Now assign structural_match_number based on vertical order within each round
+    for (let r = 1; r <= totalRounds; r++) {
+      const roundMatches = matchesByRound.get(r) || []
+      const orderMap = verticalOrderByRound.get(r)!
+
+      // Sort matches by their vertical order
+      const sortedMatches = roundMatches
+        .filter(m => orderMap.has(m.id))
+        .sort((a, b) => {
+          const orderA = orderMap.get(a.id)!
+          const orderB = orderMap.get(b.id)!
+          return orderA - orderB
+        })
+
+      // Assign structural numbers sequentially (1, 2, 3, 4...)
+      sortedMatches.forEach((match, idx) => {
+        match.structural_match_number = (r * 100) + (idx + 1)
+      })
+    }
+  }
+
+  assignVisualStructuralNumbers(matches)
+
+  // == FINAL VALIDATION ==
+  validateSingleEliminationBracket(matches, participants.length)
+
   return matches as Match[]
+}
+
+/**
+ * Validates that the generated bracket meets strictly Single Elimination invariants.
+ * Rule 1: Total Matches = N - 1 (for N > 1).
+ * Rule 2: No duplicate Match IDs.
+ * Rule 3: No duplicate Structural Numbers within a round.
+ */
+function validateSingleEliminationBracket(matches: any[], participantCount: number) {
+  // 1. Count Check
+  // N=1 -> 1 Match (Auto Advance)
+  // N>1 -> N-1 Matches (e.g. 8 players = 7 matches: 4 QF, 2 SF, 1 F)
+  const expectedMatches = participantCount > 1 ? participantCount - 1 : 1
+
+  if (matches.length !== expectedMatches) {
+    const errorMsg = `[BracketValidation] Match Count Mismatch! Expected ${expectedMatches} matches for ${participantCount} participants, but generated ${matches.length}.`
+    console.error(errorMsg)
+    // We throw to prevent bad data from being saved
+    throw new Error(errorMsg)
+  }
+
+  // 2. Duplicate ID Check
+  const ids = new Set<string>()
+  matches.forEach(m => {
+    if (ids.has(m.id)) {
+      throw new Error(`[BracketValidation] Duplicate Match ID detected: ${m.id}`)
+    }
+    ids.add(m.id)
+  })
+
+  // 3. Structural Number Check
+  const structuralNums = new Set<number>()
+  matches.forEach(m => {
+    if (structuralNums.has(m.structural_match_number)) {
+      throw new Error(`[BracketValidation] Duplicate Structural Match Number: ${m.structural_match_number}`)
+    }
+    structuralNums.add(m.structural_match_number)
+  })
+
+  // 4. Bye Verification (Log only as Byes are implicit)
+  // Formula: Byes = (Next Power of 2) - N
+  const nextPow2 = Math.pow(2, Math.ceil(Math.log2(participantCount)))
+  const expectedByes = nextPow2 - participantCount
+
+  console.log(`[BracketValidation] Passed. ${matches.length} matches valid for ${participantCount} participants.`)
+  console.log(`[BracketValidation] Verification: Size=${nextPow2}, Byes calculated=${expectedByes} (Standard Formula match)`)
 }

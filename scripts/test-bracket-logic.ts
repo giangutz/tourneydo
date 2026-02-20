@@ -2,7 +2,7 @@
 import { generateBracket } from '../lib/utils/bracket-generator'
 import { BracketValidator } from '../lib/utils/scheduling/validator'
 // import { PhysicsScheduler } from '../lib/utils/scheduling/physics-scheduler'
-import { TournamentScheduleConfig } from '../types/models'
+// import removed - debug script
 
 // Mock Data
 const MOCK_PARTICIPANTS = [
@@ -19,7 +19,7 @@ const MOCK_PARTICIPANTS = [
   // Winter, Aaron, Yisoo, Phil, Mark, Hendrix. 6 Players.
 ]
 
-const MOCK_CONFIG: TournamentScheduleConfig = {
+const MOCK_CONFIG: any = {
   id: 'conf_1',
   tournament_id: 't_1',
   daily_start_time: '09:00',

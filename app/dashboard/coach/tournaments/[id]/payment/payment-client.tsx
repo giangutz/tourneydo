@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label"
 import { CreditCard, Users, AlertCircle, CheckCircle2, Clock, User, Calendar, Weight, Ruler } from "lucide-react"
 import { toast } from "sonner"
-import { submitPaymentWithPlayers } from "@/lib/actions/payments"
+import { submitBulkPayments } from "@/lib/actions/payments"
 import { useRouter } from "next/navigation"
 import { success } from "zod"
 
@@ -208,39 +208,34 @@ export function PaymentClient({ tournament, teams, registrations, coachId, divis
       })
 
       const teamIds = Object.keys(playersByTeam)
-      const results = []
+      const submissions = teamIds.map(teamId => ({
+        team_id: teamId,
+        amount: playersByTeam[teamId].length * entryFee,
+        playerIds: playersByTeam[teamId]
+      }))
 
-      for (const teamId of teamIds) {
-        // Calculate amount for this chunk
-        const chunkAmount = playersByTeam[teamId].length * entryFee
+      // Single Bulk Request
+      const result = await submitBulkPayments(
+        submissions,
+        {
+          tournament_id: tournament.id,
+          coach_id: coachId,
+          reference_number: referenceNumber.trim()
+        },
+        `/dashboard/coach/tournaments/${tournament.id}/payment`
+      )
 
-        const result = await submitPaymentWithPlayers(
-          {
-            tournament_id: tournament.id,
-            team_id: teamId,
-            coach_id: coachId,
-            amount: chunkAmount,
-            reference_number: referenceNumber.trim()
-          },
-          playersByTeam[teamId],
-          `/dashboard/coach/tournaments/${tournament.id}/payment`
-        )
-        results.push(result)
-      }
-
-      const allSuccess = results.every(r => r.success)
-
-      if (allSuccess) {
+      if (result.success) {
         toast.success("Payments Submitted", {
           description: `Successfully submitted payments for ${selectedPlayers.length} players across ${teamIds.length} teams.`
         })
         setSelectedPlayers([])
         setReferenceNumber("")
+        // No need for explicit refresh if revalidatePath works, but router.refresh() is good for client state
         router.refresh()
       } else {
-        const errorMsg = results.find(r => !r.success)?.error || "Unknown error"
         toast.error("Submission Failed", {
-          description: errorMsg
+          description: result.error || "Unknown error"
         })
       }
     } catch (error) {

@@ -1,8 +1,8 @@
 
 import { validateSchedule } from '../lib/utils/match-scheduler'
-import { TournamentScheduleConfig, DivisionScheduleConfig } from '../types/models'
+// import removed - debug script
 
-const MOCK_CONFIG: TournamentScheduleConfig = {
+const MOCK_CONFIG: any = {
   id: 'conf_1',
   tournament_id: 't_1',
   daily_start_time: '09:00',

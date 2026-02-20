@@ -277,6 +277,63 @@ export async function assignParticipantDivision(
     throw new Error(`Failed to assign division: ${error.message}`)
   }
 }
+
+/**
+ * Batch assign multiple participants to divisions (for bracket generation)
+ * Uses service role to avoid JWT expiration on large batches
+ * Processes in chunks to avoid overwhelming the database
+ */
+export async function batchAssignParticipantDivisions(
+  assignments: Array<{ registrationId: string; divisionId: string; categoryId: string }>
+) {
+  const { createServiceSupabaseClient } = await import('@/lib/supabase/service')
+  const supabase = createServiceSupabaseClient()
+
+  const CHUNK_SIZE = 25 // Process 25 updates at a time (reduced from 50)
+  const DELAY_MS = 200 // Delay between chunks to avoid overwhelming Supabase
+  const chunks: typeof assignments[] = []
+
+  // Split assignments into chunks
+  for (let i = 0; i < assignments.length; i += CHUNK_SIZE) {
+    chunks.push(assignments.slice(i, i + CHUNK_SIZE))
+  }
+
+  console.log(`[BATCH_ASSIGN] Processing ${assignments.length} assignments in ${chunks.length} chunks of ${CHUNK_SIZE}`)
+
+  // Process each chunk sequentially with delay
+  for (let i = 0; i < chunks.length; i++) {
+    const chunk = chunks[i]
+    console.log(`[BATCH_ASSIGN] Processing chunk ${i + 1}/${chunks.length} (${chunk.length} assignments)`)
+
+    // Execute all updates in this chunk in parallel
+    const updatePromises = chunk.map(({ registrationId, divisionId, categoryId }) =>
+      supabase
+        .from('tournament_registrations')
+        .update({
+          division_id: divisionId,
+          category_id: categoryId,
+        })
+        .eq('id', registrationId)
+    )
+
+    const results = await Promise.all(updatePromises)
+
+    // Check for any errors in this chunk
+    const errors = results.filter(r => r.error)
+    if (errors.length > 0) {
+      console.error(`[BATCH_ASSIGN] Errors in chunk ${i + 1}:`, errors.map(e => e.error?.message))
+      throw new Error(`Failed to batch assign divisions (chunk ${i + 1}): ${errors[0].error?.message}`)
+    }
+
+    // Add delay between chunks (except after the last chunk)
+    if (i < chunks.length - 1) {
+      await new Promise(resolve => setTimeout(resolve, DELAY_MS))
+    }
+  }
+
+  console.log(`[BATCH_ASSIGN] Successfully assigned ${assignments.length} participants`)
+}
+
 /**
  * Get all divisions for a tournament (including disabled ones)
  * Used for division management UI

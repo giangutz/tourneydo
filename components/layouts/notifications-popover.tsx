@@ -86,13 +86,11 @@ export function NotificationsPopover({ initialActivities }: NotificationsPopover
     } else if (activity.type === 'payment') {
       router.push(`/dashboard/tournament-organizer/tournaments/${activity.tournament_id}/payments`)
     } else if (activity.type === 'coach-registration') {
-      // Coach: Go to the public tournament page
-      router.push(`/tournaments/${activity.tournament_id}`)
+      // Coach: Go to the registration management page
+      router.push(`/dashboard/coach/tournaments/${activity.tournament_id}/register`)
     } else if (activity.type === 'coach-payment') {
-      // Coach: Go to the public tournament page or dashboard
-      // Assuming they want to see the result, the dashboard is best if they have one, 
-      // otherwise public page. Let's send to dashboard/tournaments if possible, or public.
-      router.push(`/dashboard/coach`) 
+      // Coach: Go to the payments page
+      router.push(`/dashboard/coach/tournaments/${activity.tournament_id}/payment`) 
     }
   }
 
@@ -210,7 +208,7 @@ export function NotificationsPopover({ initialActivities }: NotificationsPopover
                                )}
                                {activity.type === 'coach-payment' && (
                                  <>
-                                   Your payment for <span className="font-medium text-foreground/80">{activity.tournament_name}</span> was <span className={`font-semibold ${activity.status === 'verified' ? 'text-green-600' : activity.status === 'rejected' ? 'text-red-600' : 'text-yellow-600'}`}>{activity.status}</span>
+                                   Payment for <span className="font-semibold text-foreground">{activity.player_name}</span> in <span className="font-medium text-foreground/80">{activity.tournament_name}</span> is <span className={`font-semibold ${activity.status === 'verified' ? 'text-green-600' : activity.status === 'rejected' ? 'text-red-600' : 'text-yellow-600'}`}>{activity.status}</span>
                                  </>
                                )}
                             </p>

@@ -24,7 +24,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 
-import { saveTournamentScheduleConfig } from '@/lib/actions/schedule'
+import { saveTournamentScheduleConfig, generateSchedule } from '@/lib/actions/schedule'
 import { TournamentScheduleConfig } from '@/types/models'
 
 const scheduleFormSchema = z.object({
@@ -63,6 +63,24 @@ export function ScheduleConfigForm({ tournamentId, initialConfig, tournamentCour
   const [isPending, setIsPending] = useState(false)
   const [validationResult, setValidationResult] = useState<any>(null)
   const [isFeasible, setIsFeasible] = useState<boolean | null>(null)
+  const [isPublishing, setIsPublishing] = useState(false)
+
+  async function onPublish() {
+    setIsPublishing(true)
+    try {
+      const result = await generateSchedule(tournamentId)
+      if (result.success) {
+        toast.success('Schedule published successfully!')
+        router.refresh()
+      } else {
+         toast.error(result.error || 'Failed to publish schedule')
+      }
+    } catch {
+       toast.error('Failed to publish schedule')
+    } finally {
+       setIsPublishing(false)
+    }
+  }
 
   const form = useForm<ScheduleFormValues>({
     resolver: zodResolver(scheduleFormSchema) as any,
@@ -238,8 +256,24 @@ export function ScheduleConfigForm({ tournamentId, initialConfig, tournamentCour
         <Alert className="bg-green-50 dark:bg-green-950/20 text-green-800 dark:text-green-200 border-green-200 dark:border-green-800">
           <CheckCircle2 className="h-4 w-4" />
           <AlertTitle>Schedule Feasible</AlertTitle>
-          <AlertDescription>
-            All matches fit within the configured time constraints.
+          <AlertDescription className="mt-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <p>All matches fit within the configured time constraints.</p>
+            <Button 
+              size="sm" 
+              onClick={(e) => {
+                e.preventDefault();
+                onPublish();
+              }}
+              disabled={isPublishing}
+              className="bg-green-600 hover:bg-green-700 text-white border-transparent shadow-sm"
+            >
+              {isPublishing ? (
+                 <>
+                   <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                   Publishing...
+                 </>
+              ) : 'Publish Schedule'}
+            </Button>
           </AlertDescription>
         </Alert>
       )}

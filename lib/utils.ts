@@ -134,15 +134,29 @@ export function formatCurrencyNoSymbol(amount: number, currency = 'PHP'): string
  * Red, Brown -> Novice II
  * Black -> Advanced
  */
+import { BELT_GROUPS } from '@/lib/constants/belts'
+
+/**
+ * Map belt level to skill category using BELT_GROUPS constant
+ */
 export function getBeltSkillCategory(beltLevel: string | null | undefined): string {
-  if (!beltLevel) return ''
+  if (!beltLevel) return 'Unknown' // Default to Unknown if missing
 
   const belt = beltLevel.toLowerCase()
 
-  if (belt.includes('white')) return 'Beginner'
-  if (belt.includes('yellow') || belt.includes('blue')) return 'Novice I'
-  if (belt.includes('red') || belt.includes('brown')) return 'Novice II'
-  if (belt.includes('black')) return 'Advanced'
+  // Iterate through defined groups
+  for (const [groupName, colors] of Object.entries(BELT_GROUPS)) {
+    // Check if the belt matches any color in this group
+    if (colors.some(color => belt.includes(color.toLowerCase()))) {
+      return groupName
+    }
+  }
 
-  return ''
+  // Fallback checks if exact match failed (e.g. "Low Yellow")
+  if (belt.includes('white')) return 'Beginner'
+  if (belt.includes('yellow') || belt.includes('blue')) return 'Novice'
+  if (belt.includes('red') || belt.includes('brown')) return 'Advanced I'
+  if (belt.includes('black')) return 'Advanced II'
+
+  return 'Unknown'
 }

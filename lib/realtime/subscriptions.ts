@@ -2,8 +2,9 @@
 
 import { createClient } from '@/lib/supabase/client';
 
-
-const INACTIVITY_TIMEOUT = 1 * 30 * 1000; // 30 seconds
+// OPTIMIZATION: Aggressive timeouts for MVP
+const INACTIVITY_TIMEOUT = 10 * 1000; // 10 seconds - disconnect when idle
+const PAGE_HIDDEN_TIMEOUT = 5 * 1000; // 5 seconds - aggressively disconnect hidden tabs
 
 export type ConnectionStatus = 'CONNECTED' | 'DISCONNECTED_IDLE' | 'DISCONNECTED_HIDDEN' | 'DISCONNECTED_ERROR';
 
@@ -80,10 +81,15 @@ export class SubscriptionManager {
   private setupVisibilityListener() {
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
+        // OPTIMIZATION: Disconnect hidden tabs faster (5s timeout)
         this.setStatus('DISCONNECTED_HIDDEN');
-        this.disconnect();
+        setTimeout(() => {
+          if (document.hidden) {
+            this.disconnect();
+          }
+        }, PAGE_HIDDEN_TIMEOUT);
       } else {
-        // Coming back to visible
+        // Coming back to visible - reconnect immediately
         this.setStatus('CONNECTED');
         this.reconnect();
       }
