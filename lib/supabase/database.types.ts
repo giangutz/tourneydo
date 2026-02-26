@@ -628,6 +628,10 @@ export type Database = {
           updated_at: string
           weigh_in_selected: boolean
           weighed_in_at: string | null
+          random_weigh_in_weight: number | null
+          random_weigh_in_at: string | null
+          random_weigh_in_passed: boolean | null
+          random_weigh_in_by: string | null
         }
         Insert: {
           actual_height?: number | null
@@ -646,6 +650,10 @@ export type Database = {
           updated_at?: string
           weigh_in_selected?: boolean
           weighed_in_at?: string | null
+          random_weigh_in_weight?: number | null
+          random_weigh_in_at?: string | null
+          random_weigh_in_passed?: boolean | null
+          random_weigh_in_by?: string | null
         }
         Update: {
           actual_height?: number | null
@@ -664,6 +672,10 @@ export type Database = {
           updated_at?: string
           weigh_in_selected?: boolean
           weighed_in_at?: string | null
+          random_weigh_in_weight?: number | null
+          random_weigh_in_at?: string | null
+          random_weigh_in_passed?: boolean | null
+          random_weigh_in_by?: string | null
         }
         Relationships: [
           {
@@ -802,7 +814,7 @@ export type Database = {
           email: string
           id: string
           last_invited_at: string | null
-          role: string
+          roles: string[]
           status: string
           tournament_id: string
           updated_at: string | null
@@ -813,7 +825,7 @@ export type Database = {
           email: string
           id?: string
           last_invited_at?: string | null
-          role: string
+          roles: string[]
           status?: string
           tournament_id: string
           updated_at?: string | null
@@ -824,7 +836,7 @@ export type Database = {
           email?: string
           id?: string
           last_invited_at?: string | null
-          role?: string
+          roles?: string[]
           status?: string
           tournament_id?: string
           updated_at?: string | null
@@ -953,8 +965,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      advance_match_winner: {
+        Args: {
+          p_match_id: string
+          p_winner_id: string
+          p_player1_wins: number
+          p_player2_wins: number
+        }
+        Returns: Json
+      }
       archive_match_numbers: {
         Args: { p_tournament_id: string }
+        Returns: undefined
+      }
+      batch_update_match_schedule: {
+        Args: { p_assignments: Json }
         Returns: undefined
       }
       get_match_readiness_status: {

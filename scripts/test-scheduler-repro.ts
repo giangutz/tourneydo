@@ -58,8 +58,7 @@ const result = validateSchedule({
   divisionConfigs: [], // Empty configs to force use of smart logic
   matches: matches as any[],
   startDate: new Date('2024-01-01'),
-  endDate: new Date('2024-01-01'),
-  forceLunchBreak: false
+  endDate: new Date('2024-01-01')
 })
 
 console.log('\n--- Result ---')

@@ -55,16 +55,17 @@ export default async function TournamentDashboardPage({ params }: TournamentDash
     notFound()
   }
 
-  const role = access.userRole as TournamentRole || (access.isOrganizer ? 'admin' : null)
+  const userRoles = (access.userRoles ?? []) as TournamentRole[]
   const isOrganizer = access.isOrganizer
+  const hasRole = (...r: TournamentRole[]) => r.some(role => userRoles.includes(role))
 
   // Define permissions
-  const canManageParticipants = isOrganizer || role === 'admin' || role === 'staff' || role === 'registration_manager'
-  const canManageBracket = isOrganizer || role === 'admin' || role === 'staff' || role === 'bracket_manager'
-  const canManageMatches = isOrganizer || role === 'admin' || role === 'staff' || role === 'bracket_manager' || role === 'official'
-  const canManageSettings = isOrganizer || role === 'admin'
-  const canManageStaff = isOrganizer || role === 'admin'
-  const canWeighIn = isOrganizer || role === 'admin' || role === 'staff' || role === 'official' || role === 'weigh_in_staff'
+  const canManageParticipants = isOrganizer || hasRole('admin', 'staff', 'registration_manager')
+  const canManageBracket = isOrganizer || hasRole('admin', 'staff', 'bracket_manager')
+  const canManageMatches = isOrganizer || hasRole('admin', 'staff', 'bracket_manager', 'official')
+  const canManageSettings = isOrganizer || hasRole('admin')
+  const canManageStaff = isOrganizer || hasRole('admin')
+  const canWeighIn = isOrganizer || hasRole('admin', 'staff', 'official', 'weigh_in_staff')
 
   const { userId } = await auth()
   if (!userId) {
@@ -76,7 +77,7 @@ export default async function TournamentDashboardPage({ params }: TournamentDash
       {/* ... header */}
       <PageHeader
         title={tournament.name}
-        description={`Tournament Dashboard ${role ? `• ${role.charAt(0).toUpperCase() + role.slice(1)} View` : ''}`}
+        description={`Tournament Dashboard ${isOrganizer ? '• Organizer View' : userRoles.length > 0 ? `• ${userRoles.map(r => r.charAt(0).toUpperCase() + r.slice(1)).join(', ')} View` : ''}`}
         action={
           <div className="flex gap-2">
             <Button variant="outline" asChild>
@@ -175,7 +176,7 @@ export default async function TournamentDashboardPage({ params }: TournamentDash
           )}
 
           {canWeighIn && (
-            <Link href={routes.organizer.weighIn(tournament.id)} className="block">
+            <Link href={routes.organizer.randomweighIn(tournament.id)} className="block">
               <Card className="hover:bg-muted/50 transition-colors cursor-pointer h-full">
                 <CardHeader>
                   <CardTitle className="flex items-center text-base">

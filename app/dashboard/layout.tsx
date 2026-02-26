@@ -3,6 +3,7 @@ import { AppSidebar } from "@/components/app-sidebar"
 import { UserButton } from "@clerk/nextjs"
 import { ModeToggle } from "@/components/layouts/mode-toggle"
 import { ConnectionMonitor } from '@/components/ConnectionMonitor'
+import { ConnectionStatus } from '@/components/ui/connection-status'
 import { NotificationsNav } from "@/components/layouts/notifications-nav"
 
 export default function DashboardLayout({
@@ -20,6 +21,7 @@ export default function DashboardLayout({
                <SidebarTrigger className="-ml-1" />
             </div>
             <div className="flex items-center gap-3">
+              <ConnectionStatus />
               <ModeToggle />
               <NotificationsNav />
               <UserButton 

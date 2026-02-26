@@ -594,7 +594,7 @@ export function BracketView({
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
-                <div className="text-sm font-medium whitespace-nowrap min-w-[80px] text-center">
+                <div className="text-sm font-medium whitespace-nowrap min-w-20 text-center">
                   Page {currentPage} of {totalPages}
                 </div>
                 <Button

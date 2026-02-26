@@ -2,13 +2,14 @@ import { DashboardShell } from '@/components/layouts/dashboard-shell'
 import { PageHeader } from '@/components/ui/page-header'
 import { getTournamentById } from '@/lib/db/queries/tournaments'
 import { getTournamentStaff } from '@/lib/actions/staff'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { StaffList } from '@/components/tournaments/dashboard/staff/staff-list'
 import { InviteStaffDialog } from '@/components/tournaments/dashboard/staff/invite-staff-dialog'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { routes } from '@/config/routes'
+import { checkTournamentAccess } from '@/lib/auth/tournament-access'
 
 interface StaffPageProps {
   params: Promise<{
@@ -29,8 +30,15 @@ export default async function StaffPage({ params, searchParams }: StaffPageProps
   const query = search || ''
   const roleFilter = role || 'all'
 
+  // Only organizers and admin staff can manage the staff list
+  const access = await checkTournamentAccess(id)
+  const userRoles = access.userRoles ?? []
+  if (!access.hasAccess || (!access.isOrganizer && !userRoles.includes('admin'))) {
+    redirect(routes.organizer.tournamentDetail(id))
+  }
+
   const tournament = await getTournamentById(id)
-  
+
   if (!tournament) {
     notFound()
   }

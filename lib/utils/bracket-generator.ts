@@ -29,18 +29,22 @@ interface RoundInfo {
 
 function getGlobalRoundOrder(bracketSize: number): number {
   switch (bracketSize) {
-    case 64: return 1
-    case 32: return 2
-    case 16: return 3
-    case 8: return 4
-    case 4: return 5
-    case 2: return 6
+    case 256: return 1
+    case 128: return 2
+    case 64: return 3
+    case 32: return 4
+    case 16: return 5
+    case 8: return 6
+    case 4: return 7
+    case 2: return 8
     default: return 1
   }
 }
 
 function getRoundName(participants: number): string {
   switch (participants) {
+    case 256: return 'Round of 256'
+    case 128: return 'Round of 128'
     case 64: return 'Round of 64'
     case 32: return 'Round of 32'
     case 16: return 'Round of 16'
@@ -53,6 +57,8 @@ function getRoundName(participants: number): string {
 
 function getRoundAbbreviation(participants: number): string {
   switch (participants) {
+    case 256: return 'R256'
+    case 128: return 'R128'
     case 64: return 'R64'
     case 32: return 'R32'
     case 16: return 'R16'
@@ -286,6 +292,23 @@ function assignParticipantsToSeeds(
     if (!resolvedAny) break
   }
 
+  // Count any remaining team conflicts for logging
+  let remaining = 0
+  for (let i = 0; i < bracketSize; i++) {
+    if (!slots[i]) continue
+    for (let j = i + 1; j < bracketSize; j++) {
+      if (!slots[j]) continue
+      if (slots[i]!.team_id === slots[j]!.team_id) {
+        let a = i, b = j, depth = 1
+        while (Math.floor(a / 2) !== Math.floor(b / 2)) { a = Math.floor(a / 2); b = Math.floor(b / 2); depth++ }
+        if (depth <= 2) remaining++
+      }
+    }
+  }
+  if (remaining > 0) {
+    console.warn(`[BracketGenerator] ${remaining} same-team conflict(s) could not be resolved after 3 passes`)
+  }
+
   return slots
 }
 
@@ -298,8 +321,6 @@ export function generateBracket(
   participants: Participant[],
   startMatchNumber: number = 1
 ): Match[] {
-  console.log('generateBracket (WT-Engine) called with', participants.length, 'participants')
-
   if (participants.length < 1) {
     throw new Error('At least 1 participant is required to generate a bracket')
   }
@@ -334,6 +355,8 @@ export function generateBracket(
       match_number_formatted: null, match_number_legacy: null,
       day_number: null, match_sequence: null,
       athlete1_available_at: null, athlete2_available_at: null,
+      win_method: null,
+      winning_round: null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     }]
@@ -348,7 +371,7 @@ export function generateBracket(
   const slots = assignParticipantsToSeeds(participants, bracketSize)
 
   // 4. Build Matches
-  const matches: any[] = []
+  const matches: Partial<Match>[] = []
   const matchIdMap = new Map<string, string>()
   const getMatchId = (r: number, m: number) => {
     const key = `${r}-${m}`
@@ -406,6 +429,8 @@ export function generateBracket(
         day_number: null, match_sequence: null,
         division_id: undefined, category_id: undefined,
         athlete1_available_at: null, athlete2_available_at: null,
+        win_method: null,
+        winning_round: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
@@ -489,6 +514,8 @@ export function generateBracket(
         day_number: null, match_sequence: null,
         division_id: undefined, category_id: undefined,
         athlete1_available_at: null, athlete2_available_at: null,
+        win_method: null,
+        winning_round: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
@@ -517,16 +544,17 @@ export function generateBracket(
    * Uses DFS to traverse from Finals to Round 1, then numbers matches
    * sequentially at each level (round) from top to bottom.
    */
-  function assignVisualStructuralNumbers(matches: any[]): void {
+  function assignVisualStructuralNumbers(matches: Partial<Match>[]): void {
     const matchMap = new Map(matches.map(m => [m.id, m]))
 
     // Group matches by round
-    const matchesByRound = new Map<number, any[]>()
+    const matchesByRound = new Map<number, Partial<Match>[]>()
     matches.forEach(m => {
-      if (!matchesByRound.has(m.round)) {
-        matchesByRound.set(m.round, [])
+      const r = m.round!
+      if (!matchesByRound.has(r)) {
+        matchesByRound.set(r, [])
       }
-      matchesByRound.get(m.round)!.push(m)
+      matchesByRound.get(r)!.push(m)
     })
 
     // Find Finals (matches with no next_match_id)
@@ -545,18 +573,18 @@ export function generateBracket(
      * Visits children before parent (post-order) to ensure
      * top-to-bottom ordering at each level.
      */
-    function visit(match: any, verticalIndex: number): number {
-      const orderMap = verticalOrderByRound.get(match.round)!
+    function visit(match: Partial<Match>, verticalIndex: number): number {
+      const orderMap = verticalOrderByRound.get(match.round!)!
 
       // Get children from source_match_ids
       const children = (match.source_match_ids || [])
         .map((id: string) => matchMap.get(id))
-        .filter(Boolean)
+        .filter((c): c is Partial<Match> => c !== undefined)
 
       if (children.length === 0) {
         // Leaf node - assign index
-        if (!orderMap.has(match.id)) {
-          orderMap.set(match.id, verticalIndex)
+        if (!orderMap.has(match.id!)) {
+          orderMap.set(match.id!, verticalIndex)
         }
         return verticalIndex + 1
       }
@@ -568,8 +596,8 @@ export function generateBracket(
       }
 
       // Assign index to this match after children
-      if (!orderMap.has(match.id)) {
-        orderMap.set(match.id, currentIndex)
+      if (!orderMap.has(match.id!)) {
+        orderMap.set(match.id!, currentIndex)
       }
 
       return currentIndex + 1
@@ -585,10 +613,10 @@ export function generateBracket(
 
       // Sort matches by their vertical order
       const sortedMatches = roundMatches
-        .filter(m => orderMap.has(m.id))
+        .filter(m => orderMap.has(m.id!))
         .sort((a, b) => {
-          const orderA = orderMap.get(a.id)!
-          const orderB = orderMap.get(b.id)!
+          const orderA = orderMap.get(a.id!)!
+          const orderB = orderMap.get(b.id!)!
           return orderA - orderB
         })
 
@@ -613,7 +641,7 @@ export function generateBracket(
  * Rule 2: No duplicate Match IDs.
  * Rule 3: No duplicate Structural Numbers within a round.
  */
-function validateSingleEliminationBracket(matches: any[], participantCount: number) {
+function validateSingleEliminationBracket(matches: Partial<Match>[], participantCount: number) {
   // 1. Count Check
   // N=1 -> 1 Match (Auto Advance)
   // N>1 -> N-1 Matches (e.g. 8 players = 7 matches: 4 QF, 2 SF, 1 F)
@@ -629,19 +657,19 @@ function validateSingleEliminationBracket(matches: any[], participantCount: numb
   // 2. Duplicate ID Check
   const ids = new Set<string>()
   matches.forEach(m => {
-    if (ids.has(m.id)) {
+    if (ids.has(m.id!)) {
       throw new Error(`[BracketValidation] Duplicate Match ID detected: ${m.id}`)
     }
-    ids.add(m.id)
+    ids.add(m.id!)
   })
 
   // 3. Structural Number Check
   const structuralNums = new Set<number>()
   matches.forEach(m => {
-    if (structuralNums.has(m.structural_match_number)) {
+    if (structuralNums.has(m.structural_match_number!)) {
       throw new Error(`[BracketValidation] Duplicate Structural Match Number: ${m.structural_match_number}`)
     }
-    structuralNums.add(m.structural_match_number)
+    structuralNums.add(m.structural_match_number!)
   })
 
   // 4. Bye Verification (Log only as Byes are implicit)
@@ -649,6 +677,4 @@ function validateSingleEliminationBracket(matches: any[], participantCount: numb
   const nextPow2 = Math.pow(2, Math.ceil(Math.log2(participantCount)))
   const expectedByes = nextPow2 - participantCount
 
-  console.log(`[BracketValidation] Passed. ${matches.length} matches valid for ${participantCount} participants.`)
-  console.log(`[BracketValidation] Verification: Size=${nextPow2}, Byes calculated=${expectedByes} (Standard Formula match)`)
 }

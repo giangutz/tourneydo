@@ -19,9 +19,16 @@ import { revalidatePath } from 'next/cache'
 import { routes } from '@/config/routes'
 import { successResponse, errorResponse, ERROR_CODE, HTTP_STATUS } from '@/lib/utils/api-response'
 import { updateParticipantSchema } from '@/lib/validations/participants'
+import { ajStrict } from '@/lib/arcjet'
 import * as Sentry from '@sentry/nextjs'
 
 export async function PUT(request: NextRequest) {
+  // Rate limit: 60 requests / 60 s per IP
+  const rl = await ajStrict.protect(request)
+  if (rl.isDenied()) {
+    return errorResponse(ERROR_CODE.TOO_MANY_REQUESTS, 'Too many requests. Please try again later.', HTTP_STATUS.TOO_MANY_REQUESTS)
+  }
+
   try {
     // 1. AUTHENTICATE
     const { userId } = await auth()

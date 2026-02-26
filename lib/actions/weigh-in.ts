@@ -2,7 +2,7 @@
 
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
-import { getTournamentDivisions } from '@/lib/db/queries/divisions'
+import { invalidateMatchesCache } from '@/lib/cache/result-cache'
 
 export interface WeighInGenerationResult {
   success: boolean
@@ -31,10 +31,18 @@ export async function generateWeighInList(tournamentId: string): Promise<WeighIn
     return { success: false, message: 'Brackets must be generated before selecting participants for weigh-in.' }
   }
 
-  // 2. Reset any previous weigh-in selections to ensure consistent 20% selection
+  // 2. Reset any previous random weigh-in selections and clear ONLY random-specific columns.
+  // Official weigh-in data (actual_weight, weighed_in_at, disqualified, etc.) is intentionally
+  // left untouched so that deleting/regenerating the random list never overwrites official records.
   const { error: resetError } = await supabase
     .from('tournament_registrations')
-    .update({ weigh_in_selected: false })
+    .update({
+      weigh_in_selected: false,
+      random_weigh_in_weight: null,
+      random_weigh_in_at: null,
+      random_weigh_in_passed: null,
+      random_weigh_in_by: null,
+    })
     .eq('tournament_id', tournamentId)
     .eq('weigh_in_selected', true)
 
@@ -43,15 +51,18 @@ export async function generateWeighInList(tournamentId: string): Promise<WeighIn
     // Don't fail the whole operation, just log it
   }
 
-  // 3. Fetch verified registrations with division info
+  // 3. Fetch verified registrations with division and category info
   const { data: rawRegistrations, error: regError } = await supabase
     .from('tournament_registrations')
     .select(`
-      id, 
-      division_id, 
+      id,
+      division_id,
       category_id,
       tournament_divisions (
         name
+      ),
+      tournament_categories (
+        max_weight
       )
     `)
     .eq('tournament_id', tournamentId)
@@ -65,15 +76,17 @@ export async function generateWeighInList(tournamentId: string): Promise<WeighIn
     return { success: false, message: 'No verified participants found.' }
   }
 
-  // Filter out "Gradeschool" divisions
+  // Random weigh-in applies to weight divisions only:
+  // - Exclude "Gradeschool" divisions (height-based for under-12)
+  // - Exclude any category without a max_weight (height-only categories)
   const registrations = rawRegistrations.filter(reg => {
-    // Type assertion or check safe navigation
     const divisionName = (reg.tournament_divisions as any)?.name || ''
-    return !divisionName.toLowerCase().includes('gradeschool')
+    const maxWeight = (reg.tournament_categories as any)?.max_weight
+    return !divisionName.toLowerCase().includes('gradeschool') && maxWeight != null
   })
 
   if (registrations.length === 0) {
-    return { success: false, message: 'No eligible participants found (Gradeschool excluded).' }
+    return { success: false, message: 'No eligible participants found. Random weigh-in applies to weight divisions only.' }
   }
 
   // 4. Group by category
@@ -98,11 +111,18 @@ export async function generateWeighInList(tournamentId: string): Promise<WeighIn
     selected.forEach(s => idsToSelect.push(s.id))
   })
 
-  // 6. Update database
+  // 6. Update database — mark as selected and reset ONLY random columns so they
+  // start as "Pending" on the random list. Official weigh-in data is left untouched.
   if (idsToSelect.length > 0) {
     const { error: updateError } = await supabase
       .from('tournament_registrations')
-      .update({ weigh_in_selected: true })
+      .update({
+        weigh_in_selected: true,
+        random_weigh_in_weight: null,
+        random_weigh_in_at: null,
+        random_weigh_in_passed: null,
+        random_weigh_in_by: null,
+      })
       .in('id', idsToSelect)
 
     if (updateError) {
@@ -201,15 +221,14 @@ export async function submitWeighInResult(
     }
   }
 
-  // 2. Update registration
+  // 2. Always write to random-specific columns (never overwrites official weigh-in data)
   const { error: updateError } = await supabase
     .from('tournament_registrations')
     .update({
-      actual_weight: weight,
-      actual_height: height || null,
-      weighed_in_at: new Date().toISOString(),
-      disqualified: disqualified,
-      disqualification_reason: reason
+      random_weigh_in_weight: weight,
+      random_weigh_in_at: new Date().toISOString(),
+      random_weigh_in_passed: !disqualified,
+      random_weigh_in_by: null,
     })
     .eq('id', registrationId)
 
@@ -217,12 +236,23 @@ export async function submitWeighInResult(
     return { success: false, message: `Failed to update weigh-in: ${updateError.message}` }
   }
 
+  // On DQ — propagate to official record so the athlete is marked disqualified everywhere
+  if (disqualified) {
+    await supabase
+      .from('tournament_registrations')
+      .update({
+        disqualified: true,
+        disqualification_reason: reason,
+      })
+      .eq('id', registrationId)
+  }
+
   // 3. Auto-forfeit match if disqualified
+  // Removes them from the court queue, advances the opponent, and frees the court slot.
   if (disqualified) {
     try {
       const { findActiveMatchForParticipant, forfeitMatch } = await import('@/lib/db/queries/matches')
 
-      // We need the player_id, which we can get from the registration object we fetched earlier
       if (registration.player_id) {
         const activeMatch = await findActiveMatchForParticipant(registration.player_id, tournamentId)
 
@@ -233,11 +263,15 @@ export async function submitWeighInResult(
       }
     } catch (err) {
       console.error('[WEIGH-IN FAILURE] Failed to auto-forfeit match:', err)
-      // Don't fail the whole action, just log it. The participant is already DQ'd in registration.
+      // Non-fatal — participant is already DQ'd in registration.
     }
+
+    // Invalidate match cache so court queue reflects the forfeit immediately
+    invalidateMatchesCache(tournamentId)
   }
 
   revalidatePath(`/dashboard/tournament-organizer/tournaments/${tournamentId}/weigh-in`)
   revalidatePath(`/dashboard/tournament-organizer/tournaments/${tournamentId}/bracket`)
+  revalidatePath(`/dashboard/tournament-organizer/tournaments/${tournamentId}/matches`)
   return { success: true, message: disqualified ? 'Participant disqualified and match forfeited.' : 'Weigh-in verified successfully.' }
 }

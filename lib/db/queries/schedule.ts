@@ -280,30 +280,26 @@ export async function updateMatchSchedule(
 ): Promise<void> {
   const supabase = createServerSupabaseClient()
 
-  // Batch update matches
-  // Supabase/PostgREST doesn't support massive bulk update of different values easily in one call without upsert complexity
-  // But we can loop reasonably for a few hundred matches, or use a custom function/jsonb approach.
-  // For now, loop is simple and reliable for < 1000 matches.
+  if (assignments.length === 0) return
 
-  for (const assignment of assignments) {
-    const { error } = await supabase
-      .from('matches')
-      .update({
-        tournament_id: tournamentId,
-        match_number_formatted: assignment.matchNumber,
-        match_number: parseInt(assignment.matchNumber),
-        day_number: assignment.day,
-        court_number: assignment.court,
-        match_sequence: assignment.sequence,
-        scheduled_start_time: assignment.scheduledStartTime,
-        scheduled_end_time: assignment.scheduledEndTime,
-        // We also sync legacy number/etc if needed, but not here
-      })
-      .eq('id', assignment.matchId)
+  // Single atomic call via RPC — replaces N sequential UPDATE queries.
+  // Partial failures are impossible: all assignments succeed or none do.
+  const payload = assignments.map(a => ({
+    matchId: a.matchId,
+    matchNumber: a.matchNumber,
+    day: a.day,
+    court: a.court,
+    sequence: a.sequence,
+    scheduledStartTime: a.scheduledStartTime,
+    scheduledEndTime: a.scheduledEndTime,
+  }))
 
-    if (error) {
-      console.error(`Failed to update match ${assignment.matchId}:`, error)
-    }
+  const { error } = await supabase.rpc('batch_update_match_schedule', {
+    p_assignments: payload
+  })
+
+  if (error) {
+    throw new Error(`Failed to update match schedule: ${error.message}`)
   }
 }
 

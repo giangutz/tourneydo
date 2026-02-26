@@ -20,7 +20,9 @@ describe('Error Handling Utilities', () => {
     it('should handle null data', () => {
       const result = createActionSuccess(null)
       expect(result.success).toBe(true)
-      expect(result.data).toBeNull()
+      if (result.success) {
+        expect(result.data).toBeNull()
+      }
     })
   })
 

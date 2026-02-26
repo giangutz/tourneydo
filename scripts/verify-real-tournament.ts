@@ -123,12 +123,11 @@ async function run() {
     divisionConfigs: dConfigs as any[],
     matches: schedulerMatches,
     startDate: new Date('2026-01-18T00:00:00Z'), // Hardcoded from data_config
-    endDate: new Date('2026-01-18T00:00:00Z'),
-    forceLunchBreak: true
+    endDate: new Date('2026-01-18T00:00:00Z')
   }
 
   console.log('Running Scheduler...')
-  const result = await calculateSchedule(input, null as any)
+  const result = await calculateSchedule(input)
 
   console.log('--- Results ---')
   console.log('Total Assignments:', result.assignments.length)

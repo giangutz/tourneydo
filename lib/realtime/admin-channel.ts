@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useTransition, useCallback } from 'react';
 import { useSession } from '@clerk/nextjs';
 import { createClerkSupabaseClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
@@ -9,18 +9,33 @@ export function useAdminChannel(tournamentId: string) {
   const { session } = useSession();
   const router = useRouter();
   const [isConnected, setIsConnected] = useState(false);
+  const [isPending, startTransition] = useTransition();
   const refreshTimeout = useRef<NodeJS.Timeout | null>(null);
+  const lastManualRefresh = useRef<number>(0);
 
-  const debouncedRefresh = () => {
+  /**
+   * Called by components BEFORE their own `router.refresh()` so
+   * the realtime listener skips the redundant follow-up refresh.
+   */
+  const markManualRefresh = useCallback(() => {
+    lastManualRefresh.current = Date.now();
+  }, []);
+
+  const debouncedRefresh = useCallback(() => {
+    // Skip if a manual refresh happened recently (within 2s)
+    if (Date.now() - lastManualRefresh.current < 2000) return;
+
     if (refreshTimeout.current) {
       clearTimeout(refreshTimeout.current);
     }
     refreshTimeout.current = setTimeout(() => {
       console.log('[AdminChannel] Debounced refresh triggering...');
-      router.refresh();
+      startTransition(() => {
+        router.refresh();
+      });
       refreshTimeout.current = null;
-    }, 1000);
-  };
+    }, 200);
+  }, [router, startTransition]);
 
   useEffect(() => {
     if (!tournamentId || !session) return;
@@ -42,7 +57,7 @@ export function useAdminChannel(tournamentId: string) {
             table: 'matches',
             filter: `tournament_id=eq.${tournamentId}`
           },
-          (payload) => {
+          () => {
             console.log('[AdminChannel] Match update received, scheduling refresh...');
             debouncedRefresh();
           }
@@ -87,11 +102,13 @@ export function useAdminChannel(tournamentId: string) {
         client.realtime.disconnect();
       } else {
         console.log('[AdminChannel] Tab visible, reconnecting...');
-        // Client.realtime.connect() is automatic when subscribing, 
+        // Client.realtime.connect() is automatic when subscribing,
         // but since we might have disconnected the socket:
         client.realtime.connect();
         setupConnection();
-        router.refresh(); // Catch up
+        startTransition(() => {
+          router.refresh(); // Catch up
+        });
       }
     };
 
@@ -103,7 +120,7 @@ export function useAdminChannel(tournamentId: string) {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       client.realtime.disconnect(); // Ensure socket is closed on unmount
     };
-  }, [tournamentId, session, router]);
+  }, [tournamentId, session, router, debouncedRefresh, startTransition]);
 
-  return { isConnected };
+  return { isConnected, isPending, markManualRefresh };
 }

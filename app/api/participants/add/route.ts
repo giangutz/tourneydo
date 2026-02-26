@@ -22,9 +22,16 @@ import { routes } from '@/config/routes'
 import { successResponse, errorResponse, ERROR_CODE, HTTP_STATUS } from '@/lib/utils/api-response'
 import { addParticipantSchema } from '@/lib/validations/participants'
 import { invalidateTournamentCache } from '@/lib/cache/result-cache'
+import { ajStrict } from '@/lib/arcjet'
 import * as Sentry from '@sentry/nextjs'
 
 export async function POST(request: NextRequest) {
+  // Rate limit: 60 requests / 60 s per IP
+  const rl = await ajStrict.protect(request)
+  if (rl.isDenied()) {
+    return errorResponse(ERROR_CODE.TOO_MANY_REQUESTS, 'Too many requests. Please try again later.', HTTP_STATUS.TOO_MANY_REQUESTS)
+  }
+
   try {
     // 1. AUTHENTICATE
     const { userId } = await auth()
@@ -108,6 +115,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // 3b. ENFORCE REGISTRATION DEADLINE
+    if (tournament.registration_deadline) {
+      const deadline = new Date(tournament.registration_deadline)
+      if (new Date() > deadline) {
+        return errorResponse(
+          ERROR_CODE.VALIDATION_ERROR,
+          `Registration deadline has passed (${deadline.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })})`,
+          HTTP_STATUS.BAD_REQUEST
+        )
+      }
+    }
+
     // 4. EXECUTE BUSINESS LOGIC
     let finalPlayerId: string = playerId || ''
 
@@ -163,6 +182,10 @@ export async function POST(request: NextRequest) {
         weighed_in_at: null,
         weighed_in_by: null,
         weigh_in_selected: false,
+        random_weigh_in_weight: null,
+        random_weigh_in_at: null,
+        random_weigh_in_passed: null,
+        random_weigh_in_by: null,
       })
     } catch (error: unknown) {
       const err = error as { message?: string }

@@ -199,6 +199,15 @@ export async function updateTournament(id: string, prevState: any, formData: For
   try {
     await updateTournamentQuery(id, tournamentData)
 
+    // Sync courts to schedule config if one exists (no-op if not yet configured)
+    if (tournamentData.courts !== null && tournamentData.courts !== undefined) {
+      const supabase = createServerSupabaseClient()
+      await supabase
+        .from('tournament_schedule_config')
+        .update({ courts: tournamentData.courts })
+        .eq('tournament_id', id)
+    }
+
     // HANDLE SUB-RESOURCE UPDATES (Divisions & Gender)
     // Same logic as create logic to ensure consistency when settings change
 

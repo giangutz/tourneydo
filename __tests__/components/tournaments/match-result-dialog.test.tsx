@@ -11,10 +11,9 @@ describe('MatchResultDialog', () => {
     
     renderWithProviders(
       <MatchResultDialog 
-        match={match} 
+        match={match as any} 
         open={true} 
-        onClose={mockOnClose}
-        onUpdate={mockOnUpdate}
+        onOpenChange={mockOnClose}
         participants={[]}
       />
     )
@@ -28,16 +27,15 @@ describe('MatchResultDialog', () => {
     
     renderWithProviders(
       <MatchResultDialog 
-        match={match} 
+        match={match as any} 
         open={true} 
-        onClose={mockOnClose}
-        onUpdate={mockOnUpdate}
+        onOpenChange={mockOnClose}
         participants={[]}
       />
     )
     
     const inputs = await screen.findAllByRole('spinbutton')
-    expect(inputs).toHaveLength(6) // 3 rounds * 2 players
+    expect(inputs).toHaveLength(2) // 1 round * 2 players displayed a time
     
     fireEvent.change(inputs[0], { target: { value: '5' } })
     expect(inputs[0]).toHaveValue(5)

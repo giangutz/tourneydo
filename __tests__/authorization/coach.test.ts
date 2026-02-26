@@ -177,10 +177,11 @@ describe('Coach Authorization', () => {
   describe('Payment Submission', () => {
     it('✓ CAN submit payment for tournament', async () => {
       // Simulating payment submission action
-      const registration = mockRegistration({ payment_status: 'paid', status: 'paid' })
+      const registration = mockRegistration({ status: 'paid' } as any)
+        ; (registration as any).payment_status = 'paid'
       mockSuccessQuery(registration)
 
-      expect(registration.payment_status).toBe('paid')
+      expect((registration as any).payment_status).toBe('paid')
     })
 
     it('✓ Payment updates registration status', async () => {

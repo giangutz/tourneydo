@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from "react"
+import { useState, useTransition } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -10,117 +10,108 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
 import { TournamentRole } from "@/types/models"
-import { updateStaffRole } from "@/lib/actions/staff"
-import { useTransition } from "react"
+import { updateStaffRoles } from "@/lib/actions/staff"
 import { toast } from "sonner"
+
+const ROLE_OPTIONS: { value: TournamentRole; label: string; description: string }[] = [
+  { value: 'admin', label: 'Admin', description: 'Full access to this tournament' },
+  { value: 'staff', label: 'General Staff', description: 'Participants, brackets, matches & weigh-in' },
+  { value: 'bracket_manager', label: 'Bracket Manager', description: 'Brackets & matches only' },
+  { value: 'registration_manager', label: 'Registration Manager', description: 'Participants only' },
+  { value: 'weigh_in_staff', label: 'Weigh-In Staff', description: 'Weigh-in only' },
+  { value: 'official', label: 'Table Official', description: 'Score matches & weigh-ins only' },
+]
 
 interface EditRoleDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   tournamentId: string
   staffId: string
-  currentRole: TournamentRole
+  currentRoles: TournamentRole[]
   email: string
 }
 
-export function EditRoleDialog({ 
-  open, 
-  onOpenChange, 
-  tournamentId, 
-  staffId, 
-  currentRole,
+export function EditRoleDialog({
+  open,
+  onOpenChange,
+  tournamentId,
+  staffId,
+  currentRoles,
   email
 }: EditRoleDialogProps) {
-  const [role, setRole] = useState<TournamentRole>(currentRole)
+  const [selectedRoles, setSelectedRoles] = useState<TournamentRole[]>(currentRoles)
   const [isPending, startTransition] = useTransition()
 
+  const toggleRole = (role: TournamentRole) => {
+    setSelectedRoles(prev =>
+      prev.includes(role) ? prev.filter(r => r !== role) : [...prev, role]
+    )
+  }
+
+  const hasChanged = (
+    selectedRoles.length !== currentRoles.length ||
+    !selectedRoles.every(r => currentRoles.includes(r))
+  )
+
   const handleSave = () => {
+    if (selectedRoles.length === 0) {
+      toast.error("Select at least one role.")
+      return
+    }
     startTransition(async () => {
-      const result = await updateStaffRole(staffId, role, tournamentId)
+      const result = await updateStaffRoles(staffId, selectedRoles, tournamentId)
       if (result.success) {
-        toast.success(`Updated role for ${email}`)
+        toast.success(`Updated roles for ${email}`)
         onOpenChange(false)
       } else {
-        toast.error(result.error || "Failed to update role")
+        toast.error(result.error || "Failed to update roles")
       }
     })
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[480px]">
         <DialogHeader>
-          <DialogTitle>Edit Staff Role</DialogTitle>
+          <DialogTitle>Edit Staff Roles</DialogTitle>
           <DialogDescription>
-            Change the access level for {email}.
+            Change the access levels for {email}.
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="role" className="text-right">
-              Role
-            </Label>
-            <Select 
-                value={role} 
-                onValueChange={(val) => setRole(val as TournamentRole)}
-                disabled={isPending}
-            >
-              <SelectTrigger className="col-span-3">
-                <SelectValue placeholder="Select a role" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="admin">
-                    <div className="flex flex-col">
-                        <span>Admin</span>
-                        <span className="text-xs text-muted-foreground">Full access only to this tournament</span>
-                    </div>
-                </SelectItem>
-                <SelectItem value="staff">
-                    <div className="flex flex-col">
-                        <span>General Staff</span>
-                        <span className="text-xs text-muted-foreground">Manage participants & brackets</span>
-                    </div>
-                </SelectItem>
-                 <SelectItem value="bracket_manager">
-                    <div className="flex flex-col">
-                        <span>Bracket Manager</span>
-                        <span className="text-xs text-muted-foreground">Manage brackets & matches only</span>
-                    </div>
-                </SelectItem>
-                 <SelectItem value="registration_manager">
-                    <div className="flex flex-col">
-                        <span>Registration Manager</span>
-                        <span className="text-xs text-muted-foreground">Manage participants only</span>
-                    </div>
-                </SelectItem>
-                 <SelectItem value="weigh_in_staff">
-                    <div className="flex flex-col">
-                        <span>Weigh-In Staff</span>
-                        <span className="text-xs text-muted-foreground">Weigh-ion only</span>
-                    </div>
-                </SelectItem>
-                <SelectItem value="official">
-                    <div className="flex flex-col">
-                        <span>Official</span>
-                        <span className="text-xs text-muted-foreground">Score matches & weigh-ins only</span>
-                    </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
+        <div className="py-4">
+          <Label className="mb-3 block">Roles</Label>
+          <div className="space-y-3">
+            {ROLE_OPTIONS.map(({ value, label, description }) => (
+              <div key={value} className="flex items-start gap-3">
+                <Checkbox
+                  id={`edit-role-${value}`}
+                  checked={selectedRoles.includes(value)}
+                  onCheckedChange={() => toggleRole(value)}
+                  disabled={isPending}
+                  className="mt-0.5"
+                />
+                <label
+                  htmlFor={`edit-role-${value}`}
+                  className="cursor-pointer leading-none"
+                >
+                  <div className="font-medium text-sm">{label}</div>
+                  <div className="text-xs text-muted-foreground">{description}</div>
+                </label>
+              </div>
+            ))}
           </div>
+          {selectedRoles.length === 0 && (
+            <p className="text-xs text-destructive mt-2">Select at least one role.</p>
+          )}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>Cancel</Button>
-          <Button onClick={handleSave} disabled={isPending || role === currentRole}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave} disabled={isPending || !hasChanged || selectedRoles.length === 0}>
             {isPending ? "Saving..." : "Save changes"}
           </Button>
         </DialogFooter>

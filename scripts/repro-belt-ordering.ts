@@ -36,7 +36,7 @@ const input: any = {
 
 async function run() {
   console.log('--- Testing Belt Scheduling Order ---')
-  const result = await calculateSchedule(input, null as any)
+  const result = await calculateSchedule(input)
 
   // Result assignments should have White first.
   // m2 is White. m1 is Black.

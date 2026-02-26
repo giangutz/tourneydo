@@ -36,7 +36,7 @@ export default async function BracketPage({ params }: BracketPageProps) {
   }
 
   // Determine effective role
-  const role = access.isOrganizer ? 'admin' : (access.userRole || null)
+  const role = access.isOrganizer ? 'admin' : (access.userRoles?.[0] || null)
 
 
   return (

@@ -73,6 +73,7 @@ export async function submitBulkPayments(
 
     await createBulkPayments(bulkData)
     revalidatePath(path)
+    revalidatePath(routes.coach.payments)
   })
 }
 

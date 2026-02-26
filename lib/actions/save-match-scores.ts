@@ -3,21 +3,39 @@
 import { revalidatePath } from 'next/cache'
 import { auth } from '@clerk/nextjs/server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { updateRoundScore, checkAndUpdateMatchWinner } from '@/lib/db/queries/match-rounds'
+import { checkAndUpdateMatchWinner } from '@/lib/db/queries/match-rounds'
+import { getTournamentById } from '@/lib/db/queries/tournaments'
 import { routes } from '@/config/routes'
+import { invalidateMatchesCache } from '@/lib/cache/result-cache'
+import { matchScoresSchema, type MatchScoresInput } from '@/lib/validations/match-scores'
+import { createAuditEntry } from '@/lib/db/queries/audit-trail'
+import { logger } from '@/lib/logger'
+import type { WinMethod } from '@/types/models'
 
-interface RoundScores {
-  round1: { player1: number; player2: number; winnerId?: string | null }
-  round2: { player1: number; player2: number; winnerId?: string | null }
-  round3: { player1: number; player2: number; winnerId?: string | null }
-}
+// Re-export the type so callers can use it without a direct dep on validations
+type RoundScores = MatchScoresInput
 
 /**
- * Save all round scores at once and determine match winner
+ * Save all round scores at once and determine match winner.
+ *
+ * @param matchId      - The match being scored
+ * @param scores       - Per-round point totals and optional manual winner override
+ * @param winMethod    - How the match was decided (default: 'SCORE')
+ * @param winningRound - Which round ended the match early (KO/TKO/DQ/etc.)
+ *                       Omit for normal SCORE decisions.
+ * @param winnerId        - Explicit winner for non-score decisions (KO/TKO/DQ/etc.)
+ *                         Required when winMethod is not 'SCORE'.
+ * @param expectedVersion - The `updated_at` ISO string read when the dialog opened.
+ *                         If provided and the DB row has since changed, the save is
+ *                         rejected with a CONFLICT error (optimistic locking).
  */
 export async function saveMatchScores(
   matchId: string,
-  scores: RoundScores
+  scores: RoundScores,
+  winMethod: WinMethod = 'SCORE',
+  winningRound?: number,
+  winnerId?: string,
+  expectedVersion?: string
 ) {
   const { userId } = await auth()
 
@@ -25,13 +43,26 @@ export async function saveMatchScores(
     throw new Error('Unauthorized')
   }
 
+  // Validate scores before touching the database
+  const parsedScores = matchScoresSchema.safeParse(scores)
+  if (!parsedScores.success) {
+    const firstIssue = parsedScores.error.issues[0]
+    return {
+      success: false,
+      error: firstIssue
+        ? `${firstIssue.path.join('.')}: ${firstIssue.message}`
+        : 'Invalid score data'
+    }
+  }
+  const validScores = parsedScores.data
+
   try {
     const supabase = createServerSupabaseClient()
 
-    // Get the match to find player IDs and tournament
+    // Get the match to find player IDs, tournament, and current version
     const { data: match, error: matchError } = await supabase
       .from('matches')
-      .select('player1_id, player2_id, tournament_id')
+      .select('player1_id, player2_id, tournament_id, updated_at')
       .eq('id', matchId)
       .single()
 
@@ -39,91 +70,93 @@ export async function saveMatchScores(
       throw new Error('Match not found')
     }
 
-    // Get all rounds for this match
-    const { data: rounds, error: roundsError } = await supabase
-      .from('match_rounds')
-      .select('id, round_number')
-      .eq('match_id', matchId)
-      .order('round_number', { ascending: true })
-
-    if (roundsError || !rounds || rounds.length !== 3) {
-      throw new Error('Match rounds not found')
-    }
-
-    // Update each round
-    const roundUpdates = [
-      { roundNumber: 1, scores: scores.round1 },
-      { roundNumber: 2, scores: scores.round2 },
-      { roundNumber: 3, scores: scores.round3 }
-    ]
-
-    let round1WinnerId: string | null = null
-    let round2WinnerId: string | null = null
-    let round3WinnerId: string | null = null
-
-    for (const update of roundUpdates) {
-      const round = rounds.find(r => r.round_number === update.roundNumber)
-      if (!round) continue
-
-      const { player1, player2, winnerId: manualWinnerId } = update.scores
-
-      // Determine round winner
-      let winnerId: string | null = null
-
-      // Use manual winner if provided (for tie-breaks)
-      // Check for truthy value, not just undefined, because null means "no manual winner"
-      if (manualWinnerId) {
-        winnerId = manualWinnerId
-        console.log(`[SAVE SCORES] Round ${update.roundNumber}: Using manual winner ${winnerId}`)
-      } else if (player1 > player2) {
-        winnerId = match.player1_id
-        console.log(`[SAVE SCORES] Round ${update.roundNumber}: Player 1 wins by score (${player1} > ${player2})`)
-      } else if (player2 > player1) {
-        winnerId = match.player2_id
-        console.log(`[SAVE SCORES] Round ${update.roundNumber}: Player 2 wins by score (${player2} > ${player1})`)
-      } else {
-        console.log(`[SAVE SCORES] Round ${update.roundNumber}: Tied (${player1} = ${player2}), no winner`)
+    // Optimistic locking: reject if the match was modified after the dialog opened
+    if (expectedVersion && match.updated_at !== expectedVersion) {
+      return {
+        success: false,
+        error: 'This match was modified by another user. Please reload and try again.',
+        conflict: true,
       }
-
-      console.log(`[SAVE SCORES] Round ${update.roundNumber}: Updating with winner_id=${winnerId}, scores=${player1}-${player2}`)
-
-      // Update the round
-      await updateRoundScore(round.id, {
-        score_player1: player1,
-        score_player2: player2,
-        winner_id: winnerId,
-        status: player1 === 0 && player2 === 0 ? 'pending' : 'completed'
-      })
-      // Capture winner ID for syncing to matches table
-      if (update.roundNumber === 1) round1WinnerId = winnerId
-      else if (update.roundNumber === 2) round2WinnerId = winnerId
-      else if (update.roundNumber === 3) round3WinnerId = winnerId
     }
 
-    console.log(`[SAVE SCORES] All rounds updated for match ${matchId}`)
+    // Verify the calling user is the tournament organizer
+    const tournament = await getTournamentById(match.tournament_id)
+    if (!tournament || tournament.organizer_id !== userId) {
+      throw new Error('Not authorized to modify this match')
+    }
+
+    // Derive round winners from scores or manual override
+    function deriveWinnerId(
+      player1Score: number,
+      player2Score: number,
+      manualWinnerId: string | null | undefined
+    ): string | null {
+      if (manualWinnerId) return manualWinnerId
+      const m = match!
+      if (player1Score > player2Score) return m.player1_id ?? null
+      if (player2Score > player1Score) return m.player2_id ?? null
+      return null
+    }
+
+    const round1WinnerId = deriveWinnerId(validScores.round1.player1, validScores.round1.player2, validScores.round1.winnerId)
+    const round2WinnerId = deriveWinnerId(validScores.round2.player1, validScores.round2.player2, validScores.round2.winnerId)
+    const round3WinnerId = deriveWinnerId(validScores.round3.player1, validScores.round3.player2, validScores.round3.winnerId)
+
+    // Atomically update all round rows + sync denormalized scores to matches table
+    const { error: rpcError } = await supabase.rpc('save_match_scores_atomic', {
+      p_match_id: matchId,
+      p_rounds: [
+        { round_number: 1, score_player1: validScores.round1.player1, score_player2: validScores.round1.player2, winner_id: round1WinnerId },
+        { round_number: 2, score_player1: validScores.round2.player1, score_player2: validScores.round2.player2, winner_id: round2WinnerId },
+        { round_number: 3, score_player1: validScores.round3.player1, score_player2: validScores.round3.player2, winner_id: round3WinnerId },
+      ]
+    })
+
+    if (rpcError) {
+      throw new Error(`Failed to save scores: ${rpcError.message}`)
+    }
 
     // Check if match has a winner and advance them
-    console.log(`[SAVE SCORES] Checking for match winner...`)
-    const result = await checkAndUpdateMatchWinner(matchId)
-    console.log(`[SAVE SCORES] Winner check result:`, result)
+    // For non-SCORE methods the winner is explicit; pass it directly to skip round counting
+    const result = await checkAndUpdateMatchWinner(
+      matchId,
+      winMethod !== 'SCORE' ? winnerId ?? null : undefined,
+      winMethod,
+      winningRound
+    )
 
-    // Sync per-round scores to matches table for efficient querying in SVG bracket
-    await (supabase as any).from('matches').update({
-      score_round1_player1: scores.round1.player1,
-      score_round1_player2: scores.round1.player2,
-      score_round2_player1: scores.round2.player1,
-      score_round2_player2: scores.round2.player2,
-      score_round3_player1: scores.round3.player1,
-      score_round3_player2: scores.round3.player2,
-      winner_round1: round1WinnerId,
-      winner_round2: round2WinnerId,
-      winner_round3: round3WinnerId,
-    }).eq('id', matchId)
+    // Record actual_end_time when the match has a winner (lifecycle: COMPLETED)
+    if (result.hasWinner) {
+      await supabase
+        .from('matches')
+        .update({ actual_end_time: new Date().toISOString() })
+        .eq('id', matchId)
+    }
 
-    // Revalidate both bracket and tournament detail pages to show updates
+    // Write audit entry (non-blocking — failure must not break the save)
+    await createAuditEntry({
+      tournamentId: match.tournament_id,
+      entityType: 'match',
+      entityId: matchId,
+      action: 'SCORE_SAVED',
+      actorId: userId,
+      newState: {
+        round1: { player1: validScores.round1.player1, player2: validScores.round1.player2, winner: round1WinnerId },
+        round2: { player1: validScores.round2.player1, player2: validScores.round2.player2, winner: round2WinnerId },
+        round3: { player1: validScores.round3.player1, player2: validScores.round3.player2, winner: round3WinnerId },
+      },
+      metadata: {
+        winMethod,
+        winningRound: winningRound ?? null,
+        hasWinner: result.hasWinner,
+        winnerId: result.winnerId,
+      },
+    })
+
+    // Invalidate in-memory match cache and revalidate Next.js Data Cache paths
+    invalidateMatchesCache(match.tournament_id)
     revalidatePath(routes.organizer.tournamentBracket(match.tournament_id))
     revalidatePath(routes.organizer.tournamentDetail(match.tournament_id))
-    console.log(`[SAVE SCORES] Revalidated paths for tournament ${match.tournament_id}`)
 
     return {
       success: true,
@@ -133,7 +166,7 @@ export async function saveMatchScores(
       player2Wins: result.player2Wins
     }
   } catch (error) {
-    console.error('Error saving match scores:', error)
+    logger.error({ error, matchId }, 'Failed to save match scores')
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to save match scores'

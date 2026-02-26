@@ -136,6 +136,11 @@ export interface TournamentRegistration {
   weighed_in_at: string | null
   weighed_in_by: string | null
   weigh_in_selected: boolean
+  // Random (surprise) weigh-in — separate from official columns
+  random_weigh_in_weight: number | null
+  random_weigh_in_at: string | null
+  random_weigh_in_passed: boolean | null  // null = pending, true = passed, false = failed
+  random_weigh_in_by: string | null
   created_at: string
   updated_at: string
 }
@@ -179,6 +184,11 @@ export interface TournamentScheduleConfig {
   default_sparring_duration: number | null
   default_poomsae_duration: number | null
   default_breaking_duration: number | null
+
+  // Lunch break configuration
+  lunch_enabled: boolean
+  lunch_start_time: string  // HH:MM format, e.g. "12:00"
+  lunch_end_time: string    // HH:MM format, e.g. "13:00"
 
   // Scheduling constraints
   max_divisions_per_day: number | null
@@ -300,6 +310,23 @@ export type MatchLifecycleState =
   | 'IN_PROGRESS'
   | 'COMPLETED'
 
+/**
+ * How the match was decided.
+ * SCORE:      Normal best-of-3 rounds by point total (default)
+ * KO:         Knock-out — opponent cannot continue
+ * TKO:        Technical knock-out — referee stops the contest
+ * DQ:         Disqualification
+ * WITHDRAWAL: Athlete withdraws before/during the match
+ * FORFEIT:    Coach/team forfeits on behalf of the athlete
+ */
+export type WinMethod =
+  | 'SCORE'
+  | 'KO'
+  | 'TKO'
+  | 'DQ'
+  | 'WITHDRAWAL'
+  | 'FORFEIT'
+
 export interface Match {
   id: string
   tournament_id: string
@@ -335,6 +362,10 @@ export interface Match {
 
   // WT Lifecycle State (determines visibility and callability)
   lifecycle_state: MatchLifecycleState
+
+  // Win method and which round ended the match (null = went full distance)
+  win_method: WinMethod | null
+  winning_round: number | null
 
   // DAG Dependency Tracking (0-2 source matches that feed into this one)
   source_match_ids: string[]
@@ -503,8 +534,9 @@ export interface TournamentStaff {
   tournament_id: string
   user_id: string | null
   email: string
-  role: TournamentRole
+  roles: TournamentRole[]
   status: 'pending' | 'active'
+  last_invited_at: string | null
   created_at: string
   updated_at: string
 }

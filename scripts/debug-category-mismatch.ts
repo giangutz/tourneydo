@@ -1,6 +1,6 @@
 
 import 'dotenv/config'
-import { createServiceSupabaseClient } from '@/lib/supabase/service'
+import { createServiceSupabaseClient } from '../lib/supabase/service'
 
 async function debugCategory() {
   const supabase = createServiceSupabaseClient()
@@ -38,7 +38,7 @@ async function debugCategory() {
 
   console.log(`Found ${matches?.length} total matches in Gradeschool Group 0`)
 
-  const targetMatches = matches?.filter(m => {
+  const targetMatches = matches?.filter((m: any) => {
     // We want the specific row from the breakdown
     // Breakdown logic: Division + Gender + Skill + Category
     return true // Just dump them all for now to see
@@ -47,7 +47,7 @@ async function debugCategory() {
   // Group by exact category name logic
   // "Gradeschool Girls Advanced II Group 0"
 
-  targetMatches?.forEach(m => {
+  targetMatches?.forEach((m: any) => {
     console.log('--- Match ---')
     console.log(`ID: ${m.id}`)
     console.log(`Round: ${m.round}`)

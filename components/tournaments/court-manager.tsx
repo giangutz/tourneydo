@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Match, Tournament, MatchWithReadiness } from '@/types/models'
 import { MatchResultDialog } from '@/components/tournaments/match-result-dialog'
 import { Badge } from '@/components/ui/badge'
-import { AthleteReadinessToggle, ReadinessStatusBadge } from '@/components/tournaments/athlete-readiness-toggle'
+import { ReadinessStatusBadge } from '@/components/tournaments/athlete-readiness-toggle'
 import { isMatchReady } from '@/lib/utils/match-lifecycle'
 import { broadcastManager } from '@/lib/realtime/broadcast'
 import {
@@ -34,18 +34,25 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { assignMatchToCourt, unassignMatch, updateMatchStatus } from '@/lib/actions/matches'
+import { assignMatchToCourt, unassignMatch, updateMatchStatus, returnMatchToQueue } from '@/lib/actions/matches'
 import { disqualifyParticipant } from '@/lib/actions/participants'
 import { toast } from 'sonner'
-import { ArrowRightLeft, Trash2, XCircle, Monitor, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ArrowRightLeft, Trash2, XCircle, Monitor, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { LiveDisplayMode } from '@/components/tournaments/live-display-mode'
 
+interface CourtParticipant {
+  id: string
+  player_id: string
+  player: { first_name: string; last_name: string }
+  team?: { name: string }
+}
+
 interface CourtManagerProps {
   tournament: Tournament
   matches: MatchWithReadiness[] | Match[]
-  participants: any[]
+  participants: CourtParticipant[]
 }
 
 export function CourtManager({ tournament, matches, participants }: CourtManagerProps) {
@@ -64,6 +71,10 @@ export function CourtManager({ tournament, matches, participants }: CourtManager
   const [playerToDQ, setPlayerToDQ] = useState<{ playerId: string; name: string; team: string; matchId: string } | null>(null)
   const [dqReason, setDQReason] = useState('')
   const [isDQing, setIsDQing] = useState(false)
+
+  // Return to queue state
+  const [matchToReturnToQueue, setMatchToReturnToQueue] = useState<Match | null>(null)
+  const [isReturningToQueue, setIsReturningToQueue] = useState(false)
   
   // Live display mode state
   const [liveDisplayMode, setLiveDisplayMode] = useState(false)
@@ -120,7 +131,7 @@ export function CourtManager({ tournament, matches, participants }: CourtManager
         broadcastManager.publish(match.tournament_id, 'bracket_update', { matchId: match.id, status: 'in_progress' })
       }
     } catch (error) {
-      toast.error('Failed to start match')
+      toast.error('Failed to start match', { description: (error as Error).message })
     }
   }
 
@@ -146,7 +157,7 @@ export function CourtManager({ tournament, matches, participants }: CourtManager
         toast.error(result.error)
       }
     } catch (error) {
-      toast.error('Failed to move match')
+      toast.error('Failed to move match', { description: (error as Error).message })
     } finally {
       setIsMoving(false)
     }
@@ -167,7 +178,7 @@ export function CourtManager({ tournament, matches, participants }: CourtManager
         toast.error(result.error)
       }
     } catch (error) {
-      toast.error('Failed to remove match')
+      toast.error('Failed to remove match', { description: (error as Error).message })
     } finally {
       setIsRemoving(false)
     }
@@ -198,9 +209,29 @@ export function CourtManager({ tournament, matches, participants }: CourtManager
         toast.error(result.error || 'Failed to disqualify player')
       }
     } catch (error) {
-      toast.error('An error occurred during disqualification')
+      toast.error('An error occurred during disqualification', { description: (error as Error).message })
     } finally {
       setIsDQing(false)
+    }
+  }
+
+  const handleConfirmReturnToQueue = async () => {
+    if (!matchToReturnToQueue) return
+
+    setIsReturningToQueue(true)
+    try {
+      const result = await returnMatchToQueue(matchToReturnToQueue.id, matchToReturnToQueue.tournament_id)
+      if (result.success) {
+        toast.success("Match returned to queue")
+        broadcastManager.publish(matchToReturnToQueue.tournament_id, 'bracket_update', { matchId: matchToReturnToQueue.id, status: 'scheduled' })
+        setMatchToReturnToQueue(null)
+      } else {
+        toast.error(result.error)
+      }
+    } catch {
+      toast.error('Failed to return match to queue')
+    } finally {
+      setIsReturningToQueue(false)
     }
   }
 
@@ -367,7 +398,7 @@ export function CourtManager({ tournament, matches, participants }: CourtManager
                     </div>
                     
                     <div className="flex gap-2">
-                      <Button 
+                      <Button
                         className="flex-1"
                         onClick={() => handleScoreMatch(currentMatch)}
                       >
@@ -380,6 +411,15 @@ export function CourtManager({ tournament, matches, participants }: CourtManager
                         onClick={() => setMatchToMove(currentMatch)}
                       >
                         <ArrowRightLeft className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        title="Return to queue"
+                        className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                        onClick={() => setMatchToReturnToQueue(currentMatch)}
+                      >
+                        <RotateCcw className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="destructive"
@@ -588,6 +628,27 @@ export function CourtManager({ tournament, matches, participants }: CourtManager
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Return to Queue Confirmation Dialog */}
+      <AlertDialog open={!!matchToReturnToQueue} onOpenChange={(open) => !open && setMatchToReturnToQueue(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Return Match to Queue?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Match #{matchToReturnToQueue?.match_number} will be moved back to the queue on Court {matchToReturnToQueue?.court_number}. The match status will revert to scheduled and can be restarted when ready.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmReturnToQueue}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              {isReturningToQueue ? 'Returning...' : 'Return to Queue'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* DQ Confirmation Dialog */}
       <AlertDialog open={!!playerToDQ} onOpenChange={(open) => {
         if (!open) {
@@ -613,7 +674,7 @@ export function CourtManager({ tournament, matches, participants }: CourtManager
               placeholder="e.g., Weight violation, Unsportsmanlike conduct, No-show..."
               value={dqReason}
               onChange={(e) => setDQReason(e.target.value)}
-              className="mt-2 min-h-[80px]"
+              className="mt-2 min-h-20"
               disabled={isDQing}
             />
           </div>

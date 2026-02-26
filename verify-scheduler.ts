@@ -25,6 +25,9 @@ const tournamentConfig: TournamentScheduleConfig = {
   default_poomsae_duration: null,
   default_breaking_duration: null,
   max_divisions_per_day: null,
+  lunch_enabled: true,
+  lunch_start_time: '12:00',
+  lunch_end_time: '13:00',
   created_at: null,
   updated_at: null
 };

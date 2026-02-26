@@ -1,4 +1,5 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import type { WinMethod } from '@/types/models'
 
 export interface MatchRound {
   id: string
@@ -83,10 +84,20 @@ export async function updateRoundScore(
 }
 
 /**
- * Check if match has a winner (2 round wins) and update match accordingly
- * Also advances winner to next match if applicable
+ * Check if match has a winner (2 round wins for SCORE, or explicit winner for
+ * KO/TKO/DQ/WITHDRAWAL/FORFEIT) and advance them to the next bracket slot.
+ *
+ * @param matchId         - Match to evaluate
+ * @param explicitWinnerId - Pre-determined winner (for non-SCORE methods)
+ * @param winMethod       - How the match was decided (defaults to 'SCORE')
+ * @param winningRound    - Round in which the match ended early (if applicable)
  */
-export async function checkAndUpdateMatchWinner(matchId: string): Promise<{
+export async function checkAndUpdateMatchWinner(
+  matchId: string,
+  explicitWinnerId?: string | null,
+  winMethod: WinMethod = 'SCORE',
+  winningRound?: number
+): Promise<{
   hasWinner: boolean
   winnerId: string | null
   player1Wins: number
@@ -94,11 +105,8 @@ export async function checkAndUpdateMatchWinner(matchId: string): Promise<{
 }> {
   const supabase = createServerSupabaseClient()
 
-  // Get all rounds for this match
-  const rounds = await getMatchRounds(matchId)
-
   // Get match details
-  const { data: match, error: matchError } = await (supabase as any)
+  const { data: match, error: matchError } = await supabase
     .from('matches')
     .select('player1_id, player2_id, next_match_id, tournament_id')
     .eq('id', matchId)
@@ -108,102 +116,55 @@ export async function checkAndUpdateMatchWinner(matchId: string): Promise<{
     throw new Error('Match not found')
   }
 
-  // Count wins for each player
   let player1Wins = 0
   let player2Wins = 0
-
-  for (const round of rounds) {
-    if (round.winner_id) {
-      if (round.winner_id === match.player1_id) {
-        player1Wins++
-      } else if (round.winner_id === match.player2_id) {
-        player2Wins++
-      }
-    }
-  }
-
-  // Check if someone has won 2 rounds
-  const hasWinner = player1Wins >= 2 || player2Wins >= 2
   let winnerId: string | null = null
+  let hasWinner = false
 
-  if (hasWinner) {
-    winnerId = player1Wins >= 2 ? match.player1_id : match.player2_id
+  if (winMethod !== 'SCORE' && explicitWinnerId) {
+    // Non-score win: winner is explicitly provided — no round counting needed
+    winnerId = explicitWinnerId
+    hasWinner = true
+    player1Wins = winnerId === match.player1_id ? 1 : 0
+    player2Wins = winnerId === match.player2_id ? 1 : 0
+  } else {
+    // Normal SCORE: count round wins (best-of-3)
+    const rounds = await getMatchRounds(matchId)
 
-    // Update match with winner and scores (round wins)
-    // Also clear court assignment when match is completed
-    await (supabase as any)
-      .from('matches')
-      .update({
-        winner_id: winnerId,
-        score_player1: player1Wins,
-        score_player2: player2Wins,
-        status: 'completed',
-        court_number: null // Remove from court when completed
-      })
-      .eq('id', matchId)
-
-    // Advance winner to next match if there is one
-    if (match.next_match_id && winnerId) {
-      console.log(`[ADVANCEMENT] Match ${matchId} has winner ${winnerId}, advancing to next match ${match.next_match_id}`)
-
-      const { data: nextMatch, error: nextMatchError } = await (supabase as any)
-        .from('matches')
-        .select('player1_id, player2_id')
-        .eq('id', match.next_match_id)
-        .single()
-
-      if (nextMatchError) {
-        console.error(`[ADVANCEMENT ERROR] Failed to fetch next match:`, nextMatchError)
+    for (const round of rounds) {
+      if (round.winner_id) {
+        if (round.winner_id === match.player1_id) player1Wins++
+        else if (round.winner_id === match.player2_id) player2Wins++
       }
+    }
 
-      if (nextMatch) {
-        console.log(`[ADVANCEMENT] Next match current state:`, nextMatch)
+    hasWinner = player1Wins >= 2 || player2Wins >= 2
 
-        // Check if winner is already in the next match (prevent duplicate advancement)
-        if (nextMatch.player1_id === winnerId || nextMatch.player2_id === winnerId) {
-          console.log(`[ADVANCEMENT] Winner ${winnerId} is already in next match, skipping advancement`)
-        } else {
-          // Determine which slot to fill in the next match
-          // If player1_id is null, fill it; otherwise fill player2_id
-          const updateData = nextMatch.player1_id === null
-            ? { player1_id: winnerId }
-            : { player2_id: winnerId }
-
-          console.log(`[ADVANCEMENT] Updating next match with:`, updateData)
-
-          const { error: updateError } = await (supabase as any)
-            .from('matches')
-            .update(updateData)
-            .eq('id', match.next_match_id)
-
-          if (updateError) {
-            console.error(`[ADVANCEMENT ERROR] Failed to update next match:`, updateError)
-          } else {
-            console.log(`[ADVANCEMENT SUCCESS] Winner ${winnerId} advanced to next match ${match.next_match_id}`)
-
-            // Check if next match is now ready (has both players)
-            const updatedP1 = updateData.player1_id || nextMatch.player1_id
-            const updatedP2 = updateData.player2_id || nextMatch.player2_id
-
-            if (updatedP1 && updatedP2) {
-              console.log(`[ADVANCEMENT] Next match ${match.next_match_id} is now ready (CONTEST)`)
-              await (supabase as any)
-                .from('matches')
-                .update({ lifecycle_state: 'CONTEST' })
-                .eq('id', match.next_match_id)
-            }
-          }
-        }
-      }
-    } else {
-      console.log(`[ADVANCEMENT] No advancement needed - next_match_id: ${match.next_match_id}, winnerId: ${winnerId}`)
+    if (hasWinner) {
+      winnerId = player1Wins >= 2 ? match.player1_id : match.player2_id
+      if (!winnerId) throw new Error('Winner ID is null — match player data is corrupted')
     }
   }
 
-  return {
-    hasWinner,
-    winnerId,
-    player1Wins,
-    player2Wins
+  if (hasWinner && winnerId) {
+    // Single atomic RPC call:
+    //   1. Marks match completed (winner, scores, lifecycle, win_method, winning_round, clears court)
+    //   2. Advances winner to next bracket slot using source_match_ids ordering
+    //   3. Transitions next match to CONTEST if both players now known
+    const { error: rpcError } = await supabase.rpc('advance_match_winner', {
+      p_match_id:      matchId,
+      p_winner_id:     winnerId,
+      p_player1_wins:  player1Wins,
+      p_player2_wins:  player2Wins,
+      p_win_method:    winMethod,
+      p_winning_round: winningRound ?? null,
+    })
+
+    if (rpcError) {
+      console.error('Failed to advance match winner:', rpcError)
+      throw new Error(`Failed to advance match winner: ${rpcError.message}`)
+    }
   }
+
+  return { hasWinner, winnerId, player1Wins, player2Wins }
 }

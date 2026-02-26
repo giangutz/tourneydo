@@ -183,6 +183,16 @@ export default class BracketGame extends React.PureComponent<BracketGameProps> {
     if (originalMatch?.status === 'in_progress') statusColor = '#22c55e'; // green
     if (originalMatch?.status === 'completed') statusColor = '#3b82f6'; // blue
 
+    // Win method badge label for completed non-SCORE matches (e.g. "KO R1", "TKO R2", "DQ")
+    const WIN_METHOD_SHORT: Record<string, string> = {
+      KO: 'KO', TKO: 'TKO', DQ: 'DQ', WITHDRAWAL: 'W/D', FORFEIT: 'FF'
+    }
+    let winMethodBadge: string | null = null
+    if (originalMatch?.status === 'completed' && originalMatch?.win_method && originalMatch.win_method !== 'SCORE') {
+      const short = WIN_METHOD_SHORT[originalMatch.win_method] ?? originalMatch.win_method
+      winMethodBadge = originalMatch.winning_round ? `${short} R${originalMatch.winning_round}` : short
+    }
+
     // Readiness border color (only for CONTEST matches)
     let readinessBorderColor = 'none';
     let readinessBorderWidth = 0;
@@ -213,6 +223,13 @@ export default class BracketGame extends React.PureComponent<BracketGameProps> {
         }}>
           {/* Status dot */}
           <circle cx="10" cy="8" r="3" fill={statusColor} />
+
+          {/* Win method badge (e.g. "KO R1", "TKO R2", "DQ") — shown for completed non-SCORE matches */}
+          {winMethodBadge && (
+            <text x="18" y="11" style={{ fill: '#ef4444', fontSize: 9, fontFamily: 'Inter, sans-serif', fontWeight: 'bold' }}>
+              {winMethodBadge}
+            </text>
+          )}
 
           {/* base background with readiness border */}
           <rect x="0" y="15" width="200" height="60" fill={backgroundColor} rx="3" ry="3" 

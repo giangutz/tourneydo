@@ -5,10 +5,8 @@
 
 import { auth } from '@clerk/nextjs/server'
 import { revalidatePath } from 'next/cache'
-import type { ActionResult } from '@/types/api'
 import {
   getTournamentScheduleConfig,
-  upsertTournamentScheduleConfig,
   calculateDivisionPriorities,
   updateMatchSchedule,
   getDivisionScheduleConfigs,
@@ -18,7 +16,20 @@ import { getTournamentMatches } from '@/lib/db/queries/matches'
 import { assignMatchNumbers } from '@/lib/utils/match-scheduler'
 import { getTournamentById } from '@/lib/db/queries/tournaments'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { MatchAssignment } from '@/types/models'
+import { sendScheduleChangedNotification } from '@/lib/email/send-coach-notification'
+import { logger } from '@/lib/logger'
+import { Match, MatchAssignment, ScheduleValidationResult } from '@/types/models'
+
+interface ScheduleSummary {
+  totalMatches: number
+  totalDays: number
+  courtsUsed: number
+  dailyHours: number
+  utilizationPercent: number
+  matchesPerDay: Record<number, number>
+  earliestStart?: string
+  latestEnd?: string
+}
 
 /**
  * Regenerate brackets and assign match numbers
@@ -26,7 +37,7 @@ import { MatchAssignment } from '@/types/models'
  */
 export async function regenerateBracketSchedule(
   tournamentId: string
-): Promise<ActionResult<void> | { success: false; error: string; data: any }> {
+): Promise<{ success: true; data: ScheduleSummary } | { success: false; error: string } | { success: false; error: string; data: ScheduleValidationResult }> {
   try {
     const { userId } = await auth()
     if (!userId) throw new Error('Unauthorized')
@@ -66,22 +77,24 @@ export async function regenerateBracketSchedule(
     const validation = validateSchedule({
       tournamentConfig: scheduleConfig,
       divisionConfigs,
-      matches: matches.map(m => {
-        const raw = m as any
-        return {
-          id: m.id!,
-          divisionId: m.division_id!,
-          categoryId: m.category_id!,
-          round: m.round,
-          status: m.status,
-          winner_id: m.winner_id,
-          next_match_id: raw.next_match_id, // Critical for dependencies
-          belt_level: raw.player1?.belt_level || raw.player2?.belt_level,
-          division_name: raw.tournament_divisions?.name,
-          category_name: raw.tournament_categories?.name,
-          gender: raw.tournament_categories?.gender
-        }
-      }),
+      matches: matches.map(m => ({
+        id: m.id!,
+        divisionId: m.division_id!,
+        categoryId: m.category_id!,
+        round: m.round,
+        status: m.status,
+        winner_id: m.winner_id,
+        next_match_id: m.next_match_id, // Critical for dependencies
+        belt_level: m.player1?.belt_level ?? m.player2?.belt_level ?? undefined,
+        division_name: m.tournament_divisions?.name,
+        category_name: m.tournament_categories?.name,
+        gender: m.tournament_categories?.gender,
+        round_name: m.round_name,
+        round_order: m.round_order,
+        structural_match_number: m.structural_match_number,
+        bracket_position: m.bracket_position,
+        lifecycle_state: m.lifecycle_state
+      })),
       startDate: new Date(tournament.start_date!),
       endDate: new Date(tournament.end_date!)
     })
@@ -96,7 +109,7 @@ export async function regenerateBracketSchedule(
     }
 
     // Helper to sort matches structurally (Top-to-Bottom visual order)
-    function reorderMatchesByStructure(matches: any[]): any[] {
+    function reorderMatchesByStructure(matches: Match[]): Match[] {
       // If all matches have structural_match_number, use it directly
       // (This is the case for newly generated brackets with DFS numbering)
       const allHaveStructural = matches.every(m =>
@@ -107,7 +120,7 @@ export async function regenerateBracketSchedule(
         // Simple sort by round and structural number
         return [...matches].sort((a, b) => {
           if (a.round !== b.round) return a.round - b.round
-          return a.structural_match_number - b.structural_match_number
+          return (a.structural_match_number ?? 0) - (b.structural_match_number ?? 0)
         })
       }
 
@@ -116,7 +129,7 @@ export async function regenerateBracketSchedule(
 
       // Build adjacency list (Parent -> Children) based on `next_match_id`
       // This is a backup in case `source_match_ids` is missing or empty
-      const parentToChildren = new Map<string, any[]>()
+      const parentToChildren = new Map<string, Match[]>()
       for (const m of matches) {
         if (m.next_match_id) {
           if (!parentToChildren.has(m.next_match_id)) {
@@ -141,14 +154,16 @@ export async function regenerateBracketSchedule(
       })
 
       // Depth-First Traversal to assign vertical order
-      function visit(m: any) {
+      function visit(m: Match | undefined) {
         if (!m) return
 
-        let children: any[] = []
+        let children: Match[] = []
 
         // 1. Try explicit source_match_ids (Preferred: trusted Top/Bottom order)
         if (m.source_match_ids && Array.isArray(m.source_match_ids) && m.source_match_ids.length > 0) {
-          children = m.source_match_ids.map((id: string) => matchMap.get(id)).filter(Boolean)
+          children = m.source_match_ids
+            .map(id => matchMap.get(id))
+            .filter((x): x is Match => x !== undefined)
         }
         // 2. Fallback: Use deduced children (Heuristic: Sort by match_number)
         else if (parentToChildren.has(m.id)) {
@@ -197,7 +212,12 @@ export async function regenerateBracketSchedule(
           belt_level: raw.player1?.belt_level || raw.player2?.belt_level,
           division_name: raw.tournament_divisions?.name,
           category_name: raw.tournament_categories?.name,
-          gender: raw.tournament_categories?.gender
+          gender: raw.tournament_categories?.gender,
+          round_name: raw.round_name,
+          round_order: raw.round_order,
+          structural_match_number: raw.structural_match_number,
+          bracket_position: raw.bracket_position,
+          lifecycle_state: raw.lifecycle_state
         }
       }),
       startDate: new Date(tournament.start_date!),
@@ -228,7 +248,9 @@ export async function regenerateBracketSchedule(
       return hours * 60 + minutes
     }
 
-    const totalDays = Math.max(...Object.keys(matchesPerDay).map(Number))
+    const totalDays = Object.keys(matchesPerDay).length > 0
+      ? Math.max(...Object.keys(matchesPerDay).map(Number))
+      : 0
     const startMinutes = timeToMinutes(scheduleConfig.daily_start_time)
     const endMinutes = timeToMinutes(scheduleConfig.daily_end_time)
     const dailyMinutes = endMinutes - startMinutes
@@ -252,11 +274,18 @@ export async function regenerateBracketSchedule(
       latestEnd: latestEnd !== null ? (latestEnd as Date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : undefined
     }
 
+    // Notify coaches of schedule change — fire-and-forget
+    if (tournament) {
+      sendScheduleChangedNotification(tournamentId, tournament.name!).catch(err =>
+        logger.warn({ err, tournamentId }, 'Failed to send schedule changed notifications')
+      )
+    }
+
     revalidatePath(`/dashboard/tournament-organizer/tournaments/${tournamentId}`)
 
-    return { success: true, data: scheduleSummary as any }
+    return { success: true, data: scheduleSummary }
   } catch (error) {
-    console.error(error)
+    logger.error({ error, tournamentId }, 'regenerateBracketSchedule failed')
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to regenerate schedule'

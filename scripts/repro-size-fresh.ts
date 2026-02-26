@@ -59,7 +59,7 @@ async function run() {
     endDate: new Date(),
   }
 
-  const result = await calculateSchedule(input, null as any)
+  const result = await calculateSchedule(input)
 
   if (result.assignments.length > 0) {
     const firstMatch = result.assignments[0]

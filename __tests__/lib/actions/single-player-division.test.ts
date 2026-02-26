@@ -61,7 +61,7 @@ describe('Single Player Division Support', () => {
 
     // Should succeed without errors
     expect(result.success).toBe(true)
-    expect(result.error).toBeUndefined()
+    expect((result as any).error).toBeUndefined()
   })
 
   it('should handle mixed divisions with 1 and multiple participants', async () => {
@@ -118,7 +118,8 @@ describe('Single Player Division Support', () => {
           dob: '2010-01-01',
           gender: 'male',
           weight: 50,
-          belt_level: 'White'
+          height: 150,
+          belt_level: 'White',
         }
       }
     ]

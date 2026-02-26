@@ -38,7 +38,11 @@ describe('Player Queries', () => {
         last_name: player.last_name,
         coach_id: player.coach_id,
         email: player.email,
-        dob: player.dob
+        dob: player.dob,
+        weight: player.weight,
+        height: player.height,
+        belt_level: player.belt_level,
+        gender: player.gender
       })
 
       expect(result).toEqual(player)

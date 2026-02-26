@@ -25,6 +25,8 @@ export const routes = {
     playerNew: '/dashboard/coach/players/new',
     playerDetail: (id: string) => `/dashboard/coach/players/${id}`,
     tournaments: '/dashboard/coach/tournaments',
+    payments: '/dashboard/coach/payments',
+    tournamentPayment: (id: string) => `/dashboard/coach/tournaments/${id}/payment`,
   },
 
   // Tournament Organizer routes
@@ -38,7 +40,9 @@ export const routes = {
     tournamentBracket: (id: string) => `/dashboard/tournament-organizer/tournaments/${id}/bracket`,
     tournamentMatches: (id: string) => `/dashboard/tournament-organizer/tournaments/${id}/matches`,
     weighIn: (id: string) => `/dashboard/tournament-organizer/tournaments/${id}/weigh-in`,
+    randomweighIn: (id: string) => `/dashboard/tournament-organizer/tournaments/${id}/random-weigh-in`,
     participantWeighIn: (id: string, registrationId: string) => `/dashboard/tournament-organizer/tournaments/${id}/weigh-in/${registrationId}`,
+    participantRandomWeighIn: (id: string, registrationId: string) => `/dashboard/tournament-organizer/tournaments/${id}/random-weigh-in/${registrationId}`,
     staff: (id: string) => `/dashboard/tournament-organizer/tournaments/${id}/staff`,
     schedule: (id: string) => `/dashboard/tournament-organizer/tournaments/${id}/schedule`,
     athletes: '/dashboard/tournament-organizer/athletes',

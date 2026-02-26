@@ -117,6 +117,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // 3b. ENFORCE REGISTRATION DEADLINE
+    if (tournament.registration_deadline) {
+      const deadline = new Date(tournament.registration_deadline)
+      if (new Date() > deadline) {
+        return errorResponse(
+          ERROR_CODE.VALIDATION_ERROR,
+          `Registration deadline has passed (${deadline.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })})`,
+          HTTP_STATUS.BAD_REQUEST
+        )
+      }
+    }
+
     // 4. EXECUTE BUSINESS LOGIC
     // Option A: Create new player or use existing
     let finalPlayerId: string
@@ -127,7 +139,7 @@ export async function POST(request: NextRequest) {
     } else if (firstName && lastName) {
       // Create or update player (sequential, but necessary)
       // Search for existing player with same name/DOB to avoid duplicates
-      const existingPlayer = await findPlayerByNameAndDob(firstName, lastName, dob)
+      const existingPlayer = await findPlayerByNameAndDob(firstName, lastName, dob ? (dob instanceof Date ? dob.toISOString().split('T')[0] : dob) : undefined)
 
       if (existingPlayer) {
         finalPlayerId = existingPlayer.id
@@ -149,12 +161,13 @@ export async function POST(request: NextRequest) {
         const newPlayer = await createPlayer({
           first_name: firstName,
           last_name: lastName,
-          dob,
-          gender,
-          weight,
-          height,
-          email,
-          belt_level: beltLevel,
+          dob: dob ? (dob instanceof Date ? dob.toISOString().split('T')[0] : dob) : null,
+          gender: gender || null,
+          weight: weight || null,
+          height: height || null,
+          email: email || null,
+          belt_level: beltLevel || null,
+          coach_id: team.user_id,
         })
         finalPlayerId = newPlayer.id
       }
@@ -168,17 +181,27 @@ export async function POST(request: NextRequest) {
 
     // Add player to team (if not already added)
     // ✅ OPTIMIZATION: Upsert pattern to avoid duplicate inserts
-    await addPlayerToTeam(teamId, finalPlayerId, {
-      onConflict: 'ignore', // Skip if already exists
-    })
+    try {
+      await addPlayerToTeam(teamId, finalPlayerId)
+    } catch (e) {
+      // ignore
+    }
 
     // Create registration
     const registration = await createRegistration({
       tournament_id: tournamentId,
       team_id: teamId,
-      participant_id: finalPlayerId,
-      status: 'registered',
-    })
+      player_id: finalPlayerId,
+      coach_id: team.user_id,
+      status: 'verified',
+      actual_weight: weight || null,
+      actual_height: height || null,
+      disqualified: false,
+      disqualification_reason: null,
+      weighed_in_at: null,
+      weighed_in_by: null,
+      weigh_in_selected: false,
+    } as any)
 
     // 5. LOG & RESPOND
     console.log('[API] Participant added', {
@@ -186,21 +209,21 @@ export async function POST(request: NextRequest) {
       tournamentId,
       teamId,
       playerId: finalPlayerId,
-      registrationId: registration.id,
+      registrationId: (registration as any).id,
     })
 
     // Revalidate tournament page
     revalidatePath(
-      routes.dashboard.tournamentDetail(tournamentId, 'participants')
+      routes.organizer.tournamentParticipants(tournamentId)
     )
 
     return successResponse(
       {
-        id: registration.id,
+        id: (registration as any).id,
         playerId: finalPlayerId,
         teamId,
         tournamentId,
-        status: registration.status,
+        status: (registration as any).status,
       },
       HTTP_STATUS.CREATED
     )

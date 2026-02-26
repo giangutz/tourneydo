@@ -110,7 +110,7 @@ export function ParticipantList({
   tournamentType = 'standard', 
   teams 
 }: ParticipantListProps) {
-  useAdminChannel(tournamentId)
+  const { markManualRefresh } = useAdminChannel(tournamentId)
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
@@ -197,23 +197,25 @@ export function ParticipantList({
       toast.error(result.error)
     } else {
       toast.success(`Participant marked as ${status}`)
+      markManualRefresh()
       router.refresh()
     }
   }
 
   const handleBulkStatusUpdate = async (status: 'verified' | 'paid') => {
     if (selectedIds.length === 0) return
-    
+
     setIsUpdating(true)
     try {
       const results = await Promise.all(
         selectedIds.map(id => updateParticipantStatus(id, tournamentId, status))
       )
-      
+
       const failed = results.filter(r => !r.success)
       if (failed.length === 0) {
         toast.success(`${selectedIds.length} participants marked as ${status}`)
         setSelectedIds([])
+        markManualRefresh()
         router.refresh()
       } else {
         toast.error(`Failed to update ${failed.length} participants`)
@@ -243,6 +245,7 @@ export function ParticipantList({
       if (result?.success) {
         toast.success(`${verifiedIds.length} participants weighed in`)
         setSelectedIds([])
+        markManualRefresh()
         router.refresh()
       } else {
         toast.error(result?.error || 'Failed to weigh in participants')
@@ -262,6 +265,7 @@ export function ParticipantList({
       if (result.success) {
         toast.success('Participant deleted successfully')
         setDeletingParticipant(null)
+        markManualRefresh()
         router.refresh()
       } else {
         toast.error(result.error || 'Failed to delete participant')
@@ -282,6 +286,7 @@ export function ParticipantList({
         toast.success(`${selectedIds.length} participants deleted successfully`)
         setSelectedIds([])
         setShowBulkDeleteDialog(false)
+        markManualRefresh()
         router.refresh()
       } else {
         toast.error(result.error || 'Failed to delete participants')

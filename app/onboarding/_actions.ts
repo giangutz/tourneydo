@@ -1,7 +1,22 @@
 'use server'
 
+/**
+ * Onboarding Server Actions
+ *
+ * Handles role selection and initial profile creation for new users.
+ * Called once per user — subsequent visits to /onboarding are redirected
+ * away by the layout guard.
+ *
+ * Security:
+ *   - Requires authenticated Clerk session
+ *   - Role validated server-side (not trusted from client)
+ *   - Club name uniqueness enforced at DB level (unique index on lower(trim(name)))
+ */
+
 import { auth, clerkClient } from '@clerk/nextjs/server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { logger } from '@/lib/logger'
+import * as Sentry from '@sentry/nextjs'
 import type { UserRole } from '@/types/models'
 
 interface OnboardingResult {
@@ -51,7 +66,6 @@ export const completeOnboarding = async (formData: FormData): Promise<Onboarding
     // Store user in Supabase
     const supabase = await createServerSupabaseClient()
 
-    // Insert or update user in Supabase
     const { error: userError } = await supabase
       .from('users')
       .upsert({
@@ -63,28 +77,39 @@ export const completeOnboarding = async (formData: FormData): Promise<Onboarding
       } as any)
 
     if (userError) {
-      console.error('Error storing user in Supabase:', userError)
+      logger.error({ userError, userId }, 'Error storing user in Supabase during onboarding')
       return { error: 'Failed to store user data' }
     }
 
-    // If coach, also create team record
+    // If coach, create the team record
     if (role === 'coach' && clubName) {
       const { error: teamError } = await supabase
         .from('teams')
         .insert({
-          name: clubName,
+          name: clubName.trim(),
           user_id: userId,
         } as any)
 
       if (teamError) {
-        console.error('Error storing team in Supabase:', teamError)
-        return { error: 'Failed to store team data' }
+        // 23505 = unique_violation — club name already taken
+        if (teamError.code === '23505') {
+          // Roll back Clerk metadata update so the user can try again
+          await client.users.updateUser(userId, {
+            publicMetadata: { onboardingComplete: false },
+          }).catch(() => {/* non-fatal */})
+          return { error: 'A club with this name already exists. Please choose a different name.' }
+        }
+
+        logger.error({ teamError, userId, clubName }, 'Error creating team during onboarding')
+        return { error: 'Failed to create your club. Please try again.' }
       }
     }
 
+    logger.info({ userId, role }, 'Onboarding completed')
     return { success: true, role }
   } catch (err) {
-    console.error('Error completing onboarding:', err)
+    logger.error({ err, userId }, 'Unexpected error completing onboarding')
+    Sentry.captureException(err, { tags: { action: 'complete_onboarding' } })
     return { error: 'There was an error completing onboarding.' }
   }
 }

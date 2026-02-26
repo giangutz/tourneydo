@@ -151,7 +151,11 @@ export async function addParticipant(tournamentId: string, prevState: any, formD
       disqualification_reason: null,
       weighed_in_at: null,
       weighed_in_by: null,
-      weigh_in_selected: false
+      weigh_in_selected: false,
+      random_weigh_in_weight: null,
+      random_weigh_in_at: null,
+      random_weigh_in_passed: null,
+      random_weigh_in_by: null
     })
 
     revalidatePath(routes.organizer.tournamentParticipants(tournamentId))

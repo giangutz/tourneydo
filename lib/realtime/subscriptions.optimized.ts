@@ -12,6 +12,7 @@
 'use client'
 
 import { createClient } from '@/lib/supabase/client'
+import { disconnect } from 'process'
 
 // OPTIMIZATION: Aggressive timeouts for MVP
 const INACTIVITY_TIMEOUT = 10 * 1000 // 10 seconds - disconnect when idle
@@ -68,16 +69,18 @@ export class SubscriptionManager {
   }
 
   private setupSocketListeners() {
-    this.supabase.realtime.onOpen(() => {
-      this.setStatus('CONNECTED')
-    })
-
-    this.supabase.realtime.onClose(() => {
-      this.setStatus('DISCONNECTED_ERROR')
-    })
-
-    this.supabase.realtime.onError(() => {
-      this.setStatus('DISCONNECTED_ERROR')
+    // The `onOpen`, `onClose`, `onError` are not valid methods on supabase.realtime
+    // According to the Supabase docs, the channel.subscribe() returns a status
+    // For the global client, we can listen to the system channel
+    const channel = this.supabase.channel('system')
+    channel.subscribe((status, err) => {
+      if (status === 'SUBSCRIBED') {
+        this.setStatus('CONNECTED')
+      } else if (status === 'CLOSED') {
+        this.setStatus('DISCONNECTED_ERROR')
+      } else if (status === 'CHANNEL_ERROR') {
+        this.setStatus('DISCONNECTED_ERROR')
+      }
     })
   }
 

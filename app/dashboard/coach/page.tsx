@@ -124,7 +124,7 @@ export default async function CoachDashboard() {
       {isStaff && (
          <div className="space-y-4">
             <h2 className="text-xl font-semibold tracking-tight">System Access</h2>
-            <div className="rounded-xl border bg-gradient-to-br from-primary/10 via-background to-background p-6 flex flex-col sm:flex-row justify-between items-center gap-6">
+            <div className="rounded-xl border bg-linear-to-br from-primary/10 via-background to-background p-6 flex flex-col sm:flex-row justify-between items-center gap-6">
                 <div>
                    <h3 className="font-semibold text-lg text-foreground">Organizer Access</h3>
                    <p className="text-sm text-muted-foreground mt-1">You have staff access to {staffTournaments.length} tournaments.</p>

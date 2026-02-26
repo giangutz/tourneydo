@@ -2,7 +2,9 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Prevent Next.js from bundling pino/pino-pretty – they rely on dynamic
+  // worker threads that the bundler cannot statically resolve.
+  serverExternalPackages: ['pino', 'pino-pretty'],
   async headers() {
     return [
       {

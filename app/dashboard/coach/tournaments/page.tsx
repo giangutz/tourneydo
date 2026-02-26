@@ -1,5 +1,4 @@
 import { getTournaments } from '@/lib/db/queries/tournaments'
-import { getTeamsByUserId } from '@/lib/db/queries/teams'
 import { getCoachRegistrations } from '@/lib/db/queries/registrations'
 import { auth } from '@clerk/nextjs/server'
 import { DashboardShell } from '@/components/layouts/dashboard-shell'
@@ -10,9 +9,8 @@ export default async function CoachTournamentsPage() {
   const { userId } = await auth()
   if (!userId) return null
 
-  const [tournaments, teams, registrations] = await Promise.all([
+  const [tournaments, registrations] = await Promise.all([
     getTournaments(),
-    getTeamsByUserId(userId),
     getCoachRegistrations(userId)
   ])
 
@@ -22,7 +20,7 @@ export default async function CoachTournamentsPage() {
         title="Tournaments"
         description="Browse and register for upcoming tournaments."
       />
-      <TournamentList tournaments={tournaments} teams={teams} registrations={registrations} coachId={userId} />
+      <TournamentList tournaments={tournaments} registrations={registrations} coachId={userId} />
     </DashboardShell>
   )
 }

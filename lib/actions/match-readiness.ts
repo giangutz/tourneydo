@@ -1,7 +1,8 @@
 /**
  * Server Actions for Athlete Readiness
- * 
+ *
  * Handles toggling athlete called status from the UI.
+ * Security: All actions verify the caller is the tournament organizer or active staff.
  */
 
 'use server'
@@ -13,9 +14,37 @@ import {
   getMatchReadiness,
   initializeMatchReadiness
 } from '@/lib/db/queries/match-readiness'
+import { invalidateMatchesCache } from '@/lib/cache/result-cache'
 import { getMatchById } from '@/lib/db/queries/matches'
+import { getTournamentById } from '@/lib/db/queries/tournaments'
+import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { logger } from '@/lib/logger'
 import { ActionResult } from '@/types/api'
 import { ReadinessStatus } from '@/types/models'
+
+/**
+ * Verify that userId is the tournament organizer or an active staff member.
+ * Returns an error string if not authorized, or null if authorized.
+ */
+async function authorizeTournamentAccess(
+  tournamentId: string,
+  userId: string
+): Promise<string | null> {
+  const tournament = await getTournamentById(tournamentId)
+  if (!tournament) return 'Tournament not found'
+  if (tournament.organizer_id === userId) return null
+
+  const supabase = createServerSupabaseClient()
+  const { data: staff } = await supabase
+    .from('tournament_staff')
+    .select('id')
+    .eq('tournament_id', tournamentId)
+    .eq('user_id', userId)
+    .eq('status', 'active')
+    .maybeSingle()
+
+  return staff ? null : 'Not authorized to manage this tournament'
+}
 
 /**
  * Toggle athlete called status
@@ -46,6 +75,12 @@ export async function toggleAthleteCalledStatus(
       }
     }
 
+    // Authorize: organizer or active staff only
+    const authError = await authorizeTournamentAccess(match.tournament_id, userId)
+    if (authError) {
+      return { success: false, error: authError }
+    }
+
     // Validate match state
     if (match.lifecycle_state !== 'CONTEST') {
       return {
@@ -72,7 +107,8 @@ export async function toggleAthleteCalledStatus(
     // Toggle readiness
     await dbToggleAthleteReadiness(matchId, athleteId, called, userId)
 
-    // Revalidate bracket and match console pages
+    // Invalidate in-memory match cache and revalidate Next.js Data Cache paths
+    invalidateMatchesCache(match.tournament_id)
     revalidatePath(`/dashboard/tournament-organizer/tournaments/${match.tournament_id}/bracket`)
     revalidatePath(`/dashboard/tournament-organizer/tournaments/${match.tournament_id}/matches`)
 
@@ -81,7 +117,7 @@ export async function toggleAthleteCalledStatus(
       data: undefined
     }
   } catch (error) {
-    console.error('Failed to toggle athlete readiness:', error)
+    logger.error({ error, matchId, athleteId }, 'Failed to toggle athlete readiness')
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to toggle athlete readiness'
@@ -96,6 +132,15 @@ export async function getMatchReadinessStatus(
   matchId: string
 ): Promise<ActionResult<{ athlete1Called: boolean; athlete2Called: boolean }>> {
   try {
+    const { userId } = await auth()
+    if (!userId) return { success: false, error: 'Unauthorized' }
+
+    const match = await getMatchById(matchId)
+    if (!match) return { success: false, error: 'Match not found' }
+
+    const authError = await authorizeTournamentAccess(match.tournament_id, userId)
+    if (authError) return { success: false, error: authError }
+
     const readiness = await getMatchReadiness(matchId)
 
     return {
@@ -103,7 +148,7 @@ export async function getMatchReadinessStatus(
       data: readiness
     }
   } catch (error) {
-    console.error('Failed to get match readiness:', error)
+    logger.error({ error, matchId }, 'Failed to get match readiness')
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to get match readiness'
@@ -118,6 +163,15 @@ export async function initializeMatchReadinessAction(
   matchId: string
 ): Promise<ActionResult<void>> {
   try {
+    const { userId } = await auth()
+    if (!userId) return { success: false, error: 'Unauthorized' }
+
+    const match = await getMatchById(matchId)
+    if (!match) return { success: false, error: 'Match not found' }
+
+    const authError = await authorizeTournamentAccess(match.tournament_id, userId)
+    if (authError) return { success: false, error: authError }
+
     await initializeMatchReadiness(matchId)
 
     return {
@@ -125,7 +179,7 @@ export async function initializeMatchReadinessAction(
       data: undefined
     }
   } catch (error) {
-    console.error('Failed to initialize match readiness:', error)
+    logger.error({ error, matchId }, 'Failed to initialize match readiness')
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to initialize match readiness'

@@ -1,8 +1,8 @@
 /**
  * Tournament access control helpers
- * 
+ *
  * Functions to check if a user has access to manage a tournament
- * either as the organizer or as staff.
+ * either as the organizer or as staff with array-based roles.
  */
 
 import { createServerSupabaseClient } from '@/lib/supabase/server'
@@ -23,7 +23,7 @@ const ROLE_PERMISSIONS: Record<TournamentRole, string[]> = {
 export async function checkTournamentAccess(
   tournamentId: string,
   requiredCapability?: string
-): Promise<{ hasAccess: boolean; userRole?: TournamentRole; isOrganizer?: boolean }> {
+): Promise<{ hasAccess: boolean; userRoles?: TournamentRole[]; isOrganizer?: boolean }> {
   const { userId } = await auth()
   if (!userId) return { hasAccess: false }
 
@@ -37,13 +37,13 @@ export async function checkTournamentAccess(
     .single()
 
   if (tournament?.organizer_id === userId) {
-    return { hasAccess: true, userRole: 'admin', isOrganizer: true }
+    return { hasAccess: true, userRoles: ['admin'], isOrganizer: true }
   }
 
   // Check if user is staff
-  const { data: staffRecord } = await (supabase as any)
+  const { data: staffRecord } = await supabase
     .from('tournament_staff')
-    .select('role')
+    .select('roles')
     .eq('tournament_id', tournamentId)
     .eq('user_id', userId)
     .eq('status', 'active')
@@ -51,19 +51,19 @@ export async function checkTournamentAccess(
 
   if (!staffRecord) return { hasAccess: false }
 
-  const userRole = staffRecord.role as TournamentRole
+  const userRoles = staffRecord.roles as TournamentRole[]
 
   // Check capability permission
   if (requiredCapability) {
-    const permissions = ROLE_PERMISSIONS[userRole] || []
-    if (permissions.includes('all')) return { hasAccess: true, userRole, isOrganizer: false }
+    const permissions = userRoles.flatMap(r => ROLE_PERMISSIONS[r] || [])
+    const hasAll = permissions.includes('all')
+    if (hasAll) return { hasAccess: true, userRoles, isOrganizer: false }
 
-    // Check if user has the specific capability
     const hasPermission = permissions.includes(requiredCapability)
-    return { hasAccess: hasPermission, userRole, isOrganizer: false }
+    return { hasAccess: hasPermission, userRoles, isOrganizer: false }
   }
 
-  return { hasAccess: true, userRole, isOrganizer: false }
+  return { hasAccess: true, userRoles, isOrganizer: false }
 }
 
 /**
@@ -83,15 +83,15 @@ export async function getUserTournaments() {
     .order('created_at', { ascending: false })
 
   // Get tournaments where user is staff
-  const { data: staffAssignments } = await (supabase as any)
+  const { data: staffAssignments } = await supabase
     .from('tournament_staff')
-    .select('tournament_id, role, tournaments(*)')
+    .select('tournament_id, roles, tournaments(*)')
     .eq('user_id', userId)
     .eq('status', 'active')
 
-  const staffTournaments = staffAssignments?.map((s: any) => ({
-    ...s.tournaments,
-    _staffRole: s.role
+  const staffTournaments = staffAssignments?.map((s) => ({
+    ...(s.tournaments as Record<string, unknown>),
+    _staffRoles: s.roles
   })) || []
 
   return {

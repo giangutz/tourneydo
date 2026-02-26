@@ -74,11 +74,53 @@ export function OngoingView({ tournamentId }: OngoingViewProps) {
           stagingQueue: stagingMatches 
         })
         
-        setPaceData([
-          { time: '09:00', scheduled: 5, actual: 5 },
-          { time: '10:00', scheduled: 15, actual: 12 },
-          { time: '11:00', scheduled: 25, actual: 20 },
-          { time: '12:00', scheduled: 35, actual: 38 },
+        // Schedule Pace Chart Data Logic
+        // We group matches by the hour of their scheduled end time.
+        const hourlyData = new Map<string, { time: string, scheduled: number, actual: number }>()
+
+        matches.forEach((m) => {
+          if (!m.scheduled_end_time) return
+          
+          // Get the hour string, e.g., "09:00"
+          const date = new Date(m.scheduled_end_time)
+          const hourKey = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }).substring(0, 3) + '00'
+
+          if (!hourlyData.has(hourKey)) {
+            hourlyData.set(hourKey, { time: hourKey, scheduled: 0, actual: 0 })
+          }
+          hourlyData.get(hourKey)!.scheduled += 1
+        })
+
+        // Also add actual completions to their respective hours based on actual_end_time
+        matches.forEach((m) => {
+          if (m.status === 'completed' && m.actual_end_time) {
+            const date = new Date(m.actual_end_time)
+            const hourKey = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }).substring(0, 3) + '00'
+            
+            if (!hourlyData.has(hourKey)) {
+              hourlyData.set(hourKey, { time: hourKey, scheduled: 0, actual: 0 })
+            }
+            hourlyData.get(hourKey)!.actual += 1
+          }
+        })
+
+        // Sort chronologically and calculate cumulative totals
+        const sortedHours = Array.from(hourlyData.values()).sort((a, b) => a.time.localeCompare(b.time))
+        let cumulativeScheduled = 0
+        let cumulativeActual = 0
+
+        const finalPaceData = sortedHours.map(hour => {
+          cumulativeScheduled += hour.scheduled
+          cumulativeActual += hour.actual
+          return {
+            time: hour.time,
+            scheduled: cumulativeScheduled,
+            actual: cumulativeActual
+          }
+        })
+        
+        setPaceData(finalPaceData.length > 0 ? finalPaceData : [
+          { time: '09:00', scheduled: 0, actual: 0 }
         ])
       }
       setLoading(false)

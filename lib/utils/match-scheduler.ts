@@ -9,6 +9,7 @@ import {
   Match,
   MatchLifecycleState
 } from '@/types/models'
+import { formatMatchNumber } from '@/lib/utils/match-numbering'
 
 
 // ============================================================================
@@ -53,11 +54,6 @@ interface GroupBlock {
   rounds: RoundInfo[]
 }
 
-interface AssignedBlock {
-  block: GroupBlock
-  dayIndex: number
-}
-
 export interface ScheduleInput {
   tournamentConfig: TournamentScheduleConfig
   divisionConfigs: DivisionScheduleConfig[]
@@ -82,8 +78,15 @@ export interface ScheduleInput {
   }>
   startDate: Date
   endDate: Date
-  // Override / Constraints
-  forceLunchBreak?: boolean // default true
+  /**
+   * Per-court availability offsets for live recalculation.
+   * Keys are 1-based court numbers; values are ISO timestamps of when the
+   * court becomes free (i.e. the actual_end_time of the last completed match
+   * on that court, or the scheduled_end_time of any in-progress match).
+   * When provided, each court queue starts from this time instead of from
+   * the tournament's daily_start_time on day 1.
+   */
+  courtInitialTimes?: Record<number, string>
 }
 
 // ============================================================================
@@ -221,13 +224,15 @@ function isPowerOfTwo(n: number): boolean {
 
 function determineRoundName(participants: number): string {
   switch (participants) {
-    case 64: return 'Round of 64'
-    case 32: return 'Round of 32'
-    case 16: return 'Round of 16'
-    case 8: return 'Quarter-finals'
-    case 4: return 'Semi-finals'
-    case 2: return 'Finals'
-    default: return `Round of ${participants} `
+    case 256: return 'Round of 256'
+    case 128: return 'Round of 128'
+    case 64:  return 'Round of 64'
+    case 32:  return 'Round of 32'
+    case 16:  return 'Round of 16'
+    case 8:   return 'Quarter-finals'
+    case 4:   return 'Semi-finals'
+    case 2:   return 'Finals'
+    default:  return `Round of ${participants}`
   }
 }
 
@@ -258,13 +263,6 @@ function calculateRoundsForBracket(bracketSize: number): RoundInfo[] {
   return rounds
 }
 
-function getMatchRoundName(match: SchedulerMatch, block: EnrichedBlock): string {
-  // Assuming match.round is 1-indexed where 1 = first round
-  // Convert to round name based on block's round info
-  const roundInfo = block.rounds.find(r => r.roundOrder === match.round)
-  return roundInfo?.roundName || 'Unknown'
-}
-
 /**
  * Reorders categories to optimize rest time.
  * Fresh categories (did not compete in last round) go FIRST.
@@ -293,15 +291,19 @@ function reorderCategoriesForRest(
   return [...fresh, ...recent]
 }
 
-export function calculateSchedule(input: ScheduleInput, strict: boolean): {
+export function calculateSchedule(input: ScheduleInput): {
   assignments: MatchAssignment[],
   overflow: { count: number, minutes: number },
   dayStats: Map<number, number>
 } {
   const { tournamentConfig, matches, startDate, endDate } = input
 
+  // Guard: must have at least 1 court
+  if (!tournamentConfig.courts || tournamentConfig.courts <= 0) {
+    throw new Error('Tournament must have at least 1 court configured to generate a schedule')
+  }
+
   // 0. Setup Context
-  const dailyMinutes = calculateMinutes(tournamentConfig.daily_start_time, tournamentConfig.daily_end_time)
   const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
 
 
@@ -425,6 +427,8 @@ export function calculateSchedule(input: ScheduleInput, strict: boolean): {
 
   // MAIN HIERARCHY LOOP
   const ROUND_HIERARCHY = [
+    'Round of 256',
+    'Round of 128',
     'Round of 64',
     'Round of 32',
     'Round of 16',
@@ -453,13 +457,9 @@ export function calculateSchedule(input: ScheduleInput, strict: boolean): {
       const competedThisRound = new Set<string>()
 
       for (const block of orderedBlocks) {
-        // Get matches for this specific round
-        const roundMatches = block.matches.filter(m => {
-          // Use direct round_name match (Explicit Metadata)
-          // Fallback to helper if missing (migration safety)
-          const matchRoundName = m.round_name || getMatchRoundName(m, block)
-          return matchRoundName === standardRound
-        })
+        // Get matches for this specific round.
+        // round_name is always set by the bracket generator.
+        const roundMatches = block.matches.filter(m => m.round_name === standardRound)
 
         if (roundMatches.length === 0) continue
 
@@ -513,19 +513,38 @@ export function calculateSchedule(input: ScheduleInput, strict: boolean): {
   const bufferMins = 1 // 1 minute buffer/transition
   const dailyMins = calculateMinutes(tournamentConfig.daily_start_time, tournamentConfig.daily_end_time)
 
-  // Prepare Lunch logic
+  // Prepare Lunch logic — driven by tournament config (defaults: enabled, 12:00-13:00)
   const [startH, startM] = tournamentConfig.daily_start_time.split(':').map(Number)
   const startTimeInDayMins = startH * 60 + startM
-  const lunchStartAbs = 12 * 60
-  const lunchEndAbs = 13 * 60
+  const lunchEnabled = tournamentConfig.lunch_enabled !== false // default true when field absent
+  const lunchStartStr = tournamentConfig.lunch_start_time || '12:00'
+  const lunchEndStr = tournamentConfig.lunch_end_time || '13:00'
+  const [lunchStartH, lunchStartM] = lunchStartStr.split(':').map(Number)
+  const [lunchEndH, lunchEndM] = lunchEndStr.split(':').map(Number)
+  const lunchStartAbs = lunchStartH * 60 + lunchStartM
+  const lunchEndAbs = lunchEndH * 60 + lunchEndM
   const lunchStartRel = Math.max(0, lunchStartAbs - startTimeInDayMins)
   const lunchEndRel = Math.max(0, lunchEndAbs - startTimeInDayMins)
-  const hasLunch = input.forceLunchBreak !== false && lunchEndRel > lunchStartRel
+  const hasLunch = lunchEnabled && lunchEndRel > lunchStartRel
 
   for (let cIdx = 0; cIdx < tournamentConfig.courts; cIdx++) {
     const queue = courtQueues[cIdx]
+    const courtNumber = cIdx + 1
+
+    // Live recalculation: if this court has an initial availability time, start
+    // from that offset rather than day 1 minute 0.
     let currentDay = 1
-    let currentMins = 0 // Relative to day start
+    let currentMins = 0
+    const courtInitialISO = input.courtInitialTimes?.[courtNumber]
+    if (courtInitialISO) {
+      const availableAt = new Date(courtInitialISO)
+      const dayOffset = Math.floor(
+        (availableAt.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
+      )
+      currentDay = Math.min(dayOffset + 1, totalDays)
+      const availMins = availableAt.getHours() * 60 + availableAt.getMinutes()
+      currentMins = Math.max(0, availMins - startTimeInDayMins)
+    }
 
     let seq = 1
     for (const match of queue) {
@@ -545,6 +564,7 @@ export function calculateSchedule(input: ScheduleInput, strict: boolean): {
         // Next Day
         currentDay++
         currentMins = 0
+        seq = 1  // Reset sequence so each day starts at [court]01 (e.g., 101)
         // Reset Lunch check for new day? Yes, applies every day.
       }
 
@@ -575,7 +595,7 @@ export function calculateSchedule(input: ScheduleInput, strict: boolean): {
 
       finalAssignments.push({
         matchId: match.id,
-        matchNumber: ((cIdx + 1) * 1000 + seq).toString(),
+        matchNumber: formatMatchNumber(cIdx + 1, seq),
         day: currentDay,
         court: cIdx + 1,
         sequence: seq,
@@ -616,7 +636,7 @@ export function validateSchedule(input: ScheduleInput): ScheduleValidationResult
   const totalAvailableMinutes = dailyMinutes * tournamentConfig.courts * totalDays
 
   // Run Loose Schedule to check overflow
-  const { overflow, dayStats } = calculateSchedule(input, false)
+  const { overflow, dayStats } = calculateSchedule(input)
 
   const isFeasible = overflow.count === 0 && Array.from(dayStats.keys()).every(d => d <= totalDays)
 
@@ -632,7 +652,6 @@ export function validateSchedule(input: ScheduleInput): ScheduleValidationResult
 
     // Calculate all three options whenever schedule is infeasible
     const overflowHours = overflow.minutes / 60
-    const currentCapacity = dailyMinutes * tournamentConfig.courts * totalDays
     const requiredCapacity = totalRequiredMinutes + overflow.minutes
 
     // Option 1: Add more courts (always show)
@@ -704,6 +723,6 @@ export function validateSchedule(input: ScheduleInput): ScheduleValidationResult
 }
 
 export function assignMatchNumbers(input: ScheduleInput): MatchAssignment[] {
-  const { assignments } = calculateSchedule(input, true)
+  const { assignments } = calculateSchedule(input)
   return assignments
 }

@@ -7,6 +7,7 @@ import { updateMatch, advanceWinner } from '@/lib/db/queries/matches'
 import { safeAction } from '@/lib/utils/errors'
 import type { ActionResult } from '@/types/api'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { invalidateMatchesCache } from '@/lib/cache/result-cache'
 
 interface MatchResultUpdate {
   score_player1: number
@@ -162,6 +163,7 @@ export async function assignMatchToCourt(
       status: status
     })
 
+    invalidateMatchesCache(tournamentId)
     revalidatePath(routes.organizer.tournamentDetail(tournamentId))
   })
 }
@@ -185,6 +187,30 @@ export async function updateMatchStatus(
       status: status
     })
 
+    invalidateMatchesCache(tournamentId)
+    revalidatePath(routes.organizer.tournamentDetail(tournamentId))
+  })
+}
+
+/**
+ * Return an in-progress match back to the queue (Organizer only)
+ * Reverts status to 'scheduled', keeping the court assignment intact.
+ * lifecycle_state automatically recomputes to 'CONTEST'.
+ */
+export async function returnMatchToQueue(
+  matchId: string,
+  tournamentId: string
+): Promise<ActionResult<void>> {
+  return safeAction(async () => {
+    const { userId } = await auth()
+
+    if (!userId) {
+      throw new Error('Unauthorized')
+    }
+
+    await updateMatch(matchId, { status: 'scheduled' })
+
+    invalidateMatchesCache(tournamentId)
     revalidatePath(routes.organizer.tournamentDetail(tournamentId))
   })
 }
@@ -208,6 +234,7 @@ export async function unassignMatch(
       status: 'scheduled'
     })
 
+    invalidateMatchesCache(tournamentId)
     revalidatePath(routes.organizer.tournamentDetail(tournamentId))
   })
 }

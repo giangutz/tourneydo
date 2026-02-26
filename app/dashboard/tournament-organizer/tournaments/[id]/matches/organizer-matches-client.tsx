@@ -16,6 +16,7 @@ interface OrganizerMatchesClientProps {
 }
 
 export function OrganizerMatchesClient({ tournament, matches, participants }: OrganizerMatchesClientProps) {
+  // Realtime updates — isPending indicates data is being refreshed
   useAdminChannel(tournament.id)
 
   // Calculate current tournament day

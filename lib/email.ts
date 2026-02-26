@@ -2,6 +2,36 @@ import { Resend } from 'resend'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
+const FROM = process.env.RESEND_FROM_EMAIL || 'TourneyDo <notifications@tourneydo.com>'
+
+/**
+ * Generic email send utility.
+ * Falls back to a console log in dev when RESEND_API_KEY is missing or Resend returns an error.
+ */
+export async function sendEmail(to: string | string[], subject: string, html: string): Promise<{ success: boolean; error?: string }> {
+  if (!process.env.RESEND_API_KEY) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[email:dev]', { to, subject })
+      return { success: true }
+    }
+    return { success: false, error: 'RESEND_API_KEY not configured' }
+  }
+
+  try {
+    const { error } = await resend.emails.send({ from: FROM, to, subject, html })
+    if (error) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('[email:dev] Resend error (falling back):', error.message, { to, subject })
+        return { success: true }
+      }
+      return { success: false, error: error.message }
+    }
+    return { success: true }
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : 'Unknown error' }
+  }
+}
+
 interface SendStaffInvitationParams {
   email: string
   role: string

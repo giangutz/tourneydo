@@ -7,6 +7,7 @@
 
 import { Match, MatchLifecycleState } from '@/types/models'
 import { getSchedulableMatches } from './match-lifecycle'
+import { formatMatchNumber } from './match-numbering'
 
 // ============================================================================
 // Types
@@ -127,7 +128,7 @@ export function rescheduleRemainingMatches(
   for (const match of sortedMatches) {
     const court = (courtIndex % request.newCourtCount) + 1
     const sequence = courtSequences.get(court) || 1
-    const newMatchNumber = `${court}${sequence.toString().padStart(2, '0')}`
+    const newMatchNumber = formatMatchNumber(court, sequence)
 
     // Check if this is actually a change
     const hasChange =

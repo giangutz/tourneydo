@@ -8,10 +8,13 @@ import { generateBracket } from '@/lib/utils/bracket-generator'
 import { getTournamentDivisions, assignParticipantDivision } from '@/lib/db/queries/divisions'
 import { getTournamentById } from '@/lib/db/queries/tournaments'
 import { calculateAge, findDivisionByAge, findCategory } from '@/lib/constants/divisions'
+import { invalidateMatchesCache } from '@/lib/cache/result-cache'
+import { createAuditEntry } from '@/lib/db/queries/audit-trail'
+import { sendBracketPublishedNotification } from '@/lib/email/send-coach-notification'
+import { logger } from '@/lib/logger'
 import { safeAction } from '@/lib/utils/errors'
 import { routes } from '@/config/routes'
 import type { ActionResult } from '@/types/api'
-import { id } from 'zod/v4/locales'
 import { getBeltSkillCategory } from '@/lib/utils'
 
 /**
@@ -58,11 +61,7 @@ export async function generateTournamentBracket(tournamentId: string): Promise<G
     // 3. Fetch participants (fetch ALL, not just 1000)
     const { data: participants, count: totalCount } = await getTournamentParticipants(tournamentId, { limit: 10000 })
 
-    console.log(`[BRACKET] Total participants in tournament: ${totalCount}, Fetched: ${participants.length}`)
-
     const confirmedParticipants = participants.filter((p: any) => p.status === 'verified' && !p.disqualified)
-
-    console.log(`[BRACKET] Verified non-DQ participants: ${confirmedParticipants.length}`)
 
     if (confirmedParticipants.length < 2) {
       return { success: false, error: 'Need at least 2 verified participants to generate brackets', errorType: 'general' }
@@ -85,16 +84,6 @@ export async function generateTournamentBracket(tournamentId: string): Promise<G
     })
 
     if (participantsWithoutWeighIn.length > 0) {
-      console.log('[BRACKET] Participants without weigh-in:', participantsWithoutWeighIn.map((p: any) => ({
-        id: p.id,
-        name: `${p.player?.first_name} ${p.player?.last_name}`,
-        status: p.status,
-        weighed_in_at: p.weighed_in_at,
-        actual_weight: p.actual_weight,
-        actual_height: p.actual_height,
-        dob: p.player?.dob
-      })))
-
       return {
         success: false,
         error: 'Some participants have not completed weigh-in',
@@ -223,7 +212,6 @@ export async function generateTournamentBracket(tournamentId: string): Promise<G
         (c: any) => c.name.trim().toLowerCase() === category.name.trim().toLowerCase() && c.gender === category.gender
       )
       if (!dbCategory) {
-        console.error(`Mismatch debug: Category '${category.name}' (gender: ${category.gender}) not found in DB division '${dbDivision.name}' categories:`, dbDivision.tournament_categories?.map((c: any) => `${c.name} (${c.gender})`))
         assignmentErrors.push({
           id: participant.id,
           name: `${participant.player?.first_name} ${participant.player?.last_name}`,
@@ -286,21 +274,39 @@ export async function generateTournamentBracket(tournamentId: string): Promise<G
     }
 
     // 7. Generate brackets for each group
-    const allMatches: any[] = []
-    let matchNumberCounter = 1
+    //
+    // Pre-compute starting match-number counter for each group so every group's
+    // offset is known upfront. This removes the serial counter-increment dependency
+    // and makes the generation loop a clean map over independent entries.
+    //
+    // Match count per group (deterministic from participant count):
+    //   single-player → 1 match
+    //   n >= 2        → (2^ceil(log2(n))) - 1 matches  (single-elimination bracket)
+    const groupEntries = Array.from(groups.entries())
+    let counterOffset = 1
+    const groupStartCounters = groupEntries.map(([, participants]) => {
+      const start = counterOffset
+      if (participants.length === 1) {
+        counterOffset += 1
+      } else {
+        const bracketSize = Math.pow(2, Math.ceil(Math.log2(participants.length)))
+        counterOffset += bracketSize - 1
+      }
+      return start
+    })
 
-    for (const [groupKey, groupParticipants] of groups.entries()) {
-      // Handle single-player divisions - they automatically win their division
+    const allMatches: any[] = groupEntries.flatMap(([, groupParticipants], i): any[] => {
+      const startCounter = groupStartCounters[i]
+      const divisionId = groupParticipants[0].division_id
+      const categoryId = groupParticipants[0].category_id
+
+      // Single-player division — participant is the automatic winner
       if (groupParticipants.length === 1) {
-        // Create a single "finals" match where the participant is already the winner
-        const divisionId = groupParticipants[0].division_id
-        const categoryId = groupParticipants[0].category_id
-
-        const singlePlayerMatch = {
+        return [{
           id: crypto.randomUUID(),
           tournament_id: tournamentId,
           round: 1,
-          match_number: matchNumberCounter++,
+          match_number: startCounter,
           player1_id: groupParticipants[0].player_id,
           player2_id: null,
           winner_id: groupParticipants[0].player_id,
@@ -321,47 +327,29 @@ export async function generateTournamentBracket(tournamentId: string): Promise<G
           skill_level: !isOpenBelt && groupParticipants[0]?.player?.belt_level
             ? getBeltSkillCategory(groupParticipants[0].player.belt_level)
             : null,
-          // Missing Timestamps
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-          // Missing Metadata (Consistent with Generator)
           round_name: 'Finals',
           round_order: 6,
           bracket_position: 'F-1',
           structural_match_number: 101
-        }
-
-        allMatches.push(singlePlayerMatch)
-        continue
+        }]
       }
 
-      const matches = generateBracket(tournamentId, groupParticipants, matchNumberCounter)
+      // Standard bracket group
+      const skillLevel: string | null = (!isOpenBelt && groupParticipants[0]?.player?.belt_level)
+        ? getBeltSkillCategory(groupParticipants[0].player.belt_level)
+        : null
 
-      // Update counter for next group
-      matchNumberCounter += matches.length
+      const matches = generateBracket(tournamentId, groupParticipants, startCounter)
 
-      // Add division and category info to matches for display
-      const divisionId = groupParticipants[0].division_id
-      const categoryId = groupParticipants[0].category_id
-
-      // Determine skill level for this bracket group
-      // For Standard tournaments: extract from participant belt level
-      // For Open Belt tournaments: null (all skill levels compete together)
-      let skillLevel: string | null = null
-      if (!isOpenBelt && groupParticipants[0]?.player?.belt_level) {
-        skillLevel = getBeltSkillCategory(groupParticipants[0].player.belt_level)
-      }
-
-      // Add metadata to each match
-      const matchesWithMeta = matches.map(m => ({
+      return matches.map(m => ({
         ...m,
         division_id: divisionId,
         category_id: categoryId,
         skill_level: skillLevel
       }))
-
-      allMatches.push(...matchesWithMeta)
-    }
+    })
 
     if (allMatches.length === 0) {
       throw new Error('No brackets generated. Ensure participants have DOB, gender, weight/height.')
@@ -374,14 +362,30 @@ export async function generateTournamentBracket(tournamentId: string): Promise<G
     // via the "regenerate schedule" action
 
 
-    // Revalidate paths to prevent caching of bracket data
+    // Audit: bracket generated
+    await createAuditEntry({
+      tournamentId,
+      entityType: 'bracket',
+      entityId: tournamentId,
+      action: 'BRACKET_GENERATED',
+      actorId: userId,
+      metadata: { matchCount: allMatches.length },
+    })
+
+    // Notify coaches — fire-and-forget (email failure must not block response)
+    sendBracketPublishedNotification(tournamentId, tournament.name).catch(err =>
+      logger.warn({ err, tournamentId }, 'Failed to send bracket published notifications')
+    )
+
+    // Invalidate in-memory match cache and revalidate Next.js Data Cache paths
+    invalidateMatchesCache(tournamentId)
     revalidatePath(routes.organizer.tournamentDetail(tournamentId))
     revalidatePath(routes.organizer.tournamentBracket(tournamentId))
     revalidatePath(`/tournaments/${tournamentId}`)
 
     return { success: true }
   } catch (error) {
-    console.error('Error in generateTournamentBracket:', error)
+    logger.error({ error, tournamentId }, 'generateTournamentBracket failed')
     return {
       success: false,
       error: error instanceof Error ? error.message : 'An unexpected error occurred',

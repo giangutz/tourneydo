@@ -62,7 +62,19 @@ describe('Tournament Queries', () => {
         organizer_id: tournament.organizer_id,
         start_date: tournament.start_date,
         end_date: tournament.end_date,
-        status: 'upcoming'
+        status: 'upcoming',
+        weigh_in_start: tournament.weigh_in_start,
+        weigh_in_end: tournament.weigh_in_end,
+        description: tournament.description,
+        entry_fee: tournament.entry_fee,
+        venue: tournament.venue,
+        max_players: tournament.max_players,
+        registration_deadline: tournament.registration_deadline,
+        courts: tournament.courts,
+        tournament_type: tournament.tournament_type,
+        gender_preference: tournament.gender_preference,
+        allowed_belt_groups: tournament.allowed_belt_groups,
+        division_move_policy: tournament.division_move_policy
       })
 
       expect(result).toEqual(tournament)
@@ -70,12 +82,18 @@ describe('Tournament Queries', () => {
   })
 
   describe('updateTournament', () => {
-    it('should update and return tournament', async () => {
-      const tournament = mockTournament({ name: 'Updated Name' })
-      mockSuccessQuery(tournament)
+    it('should update tournament without throwing', async () => {
+      mockSuccessQuery(null)
+      await expect(
+        updateTournament('tournament-1', { name: 'Updated Name' })
+      ).resolves.toBeUndefined()
+    })
 
-      const result = await updateTournament('tournament-1', { name: 'Updated Name' })
-      expect(result.name).toBe('Updated Name')
+    it('should throw on database error', async () => {
+      mockErrorQuery('Database error')
+      await expect(
+        updateTournament('tournament-1', { name: 'Updated Name' })
+      ).rejects.toThrow('Failed to update tournament')
     })
   })
 

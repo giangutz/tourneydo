@@ -25,6 +25,9 @@ describe('Strict WT Scheduler Upgraded', () => {
     default_poomsae_duration: 10,
     default_breaking_duration: 10,
     max_divisions_per_day: null,
+    lunch_enabled: true,
+    lunch_start_time: '12:00',
+    lunch_end_time: '13:00',
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
   };
@@ -96,7 +99,7 @@ describe('Strict WT Scheduler Upgraded', () => {
     // Config: 1 Court.
 
     const input = { ...baseInput, matches };
-    const { assignments } = calculateSchedule(input, true);
+    const { assignments } = calculateSchedule(input);
 
     // Sort by time
     assignments.sort((a, b) => new Date(a.scheduledStartTime).getTime() - new Date(b.scheduledStartTime).getTime());
@@ -151,7 +154,7 @@ describe('Strict WT Scheduler Upgraded', () => {
     const matchesNovice = Array.from({ length: 32 }, (_, i) => createMatch(`Nov${i}`, 'D-Nov', 'C1', 1, 'Novice', 'M'));
 
     const input = { ...baseInput, matches: [...matchesBeginner, ...matchesNovice] };
-    const { assignments } = calculateSchedule(input, true);
+    const { assignments } = calculateSchedule(input);
 
     // We expect Beginner (White/10) to run BEFORE Novice (Yellow/20) despite Novice being huge
     const firstBeg = assignments.find(m => m.divisionId === 'D-Beg');
@@ -182,7 +185,7 @@ describe('Strict WT Scheduler Upgraded', () => {
     const matches = [...setA_1, ...setA_2, ...setB_1, ...setB_2];
 
     const input = { ...baseInput, matches };
-    const { assignments } = calculateSchedule(input, true);
+    const { assignments } = calculateSchedule(input);
 
     // Indices
     const idxA1 = assignments.findIndex(m => m.divisionId === 'Div-Y' && m.categoryId === 'Cat-Fin');
@@ -227,7 +230,7 @@ describe('Strict WT Scheduler Upgraded', () => {
     const matches = [...matchesAdvanced, ...matchesNovice];
     const input = { ...baseInput, matches };
 
-    const { assignments } = calculateSchedule(input, true);
+    const { assignments } = calculateSchedule(input);
 
     const firstNov = assignments.find(m => m.divisionId === 'Div-Nov');
     const firstAdv = assignments.find(m => m.divisionId === 'Div-Adv');
@@ -255,7 +258,7 @@ describe('Strict WT Scheduler Upgraded', () => {
     const matches = [...matchesA, ...matchesB];
     const input = { ...baseInput, matches };
 
-    const { assignments } = calculateSchedule(input, true);
+    const { assignments } = calculateSchedule(input);
 
     // 1. Verify Block A matches are scheduled generally before Block B matches?
     // Or at least clumped.

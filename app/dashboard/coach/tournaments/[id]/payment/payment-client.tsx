@@ -9,11 +9,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
-import { CreditCard, Users, AlertCircle, CheckCircle2, Clock, User, Calendar, Weight, Ruler } from "lucide-react"
+import { CreditCard, Users, CheckCircle2, Clock, Weight, Ruler } from "lucide-react"
 import { toast } from "sonner"
 import { submitBulkPayments } from "@/lib/actions/payments"
 import { useRouter } from "next/navigation"
-import { success } from "zod"
 
 interface PaymentClientProps {
   tournament: Tournament

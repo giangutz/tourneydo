@@ -29,12 +29,21 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { MoreHorizontal, Trash2, Shield, User, Gavel, Mail, Search, ChevronLeft, ChevronRight, Scale, Trophy, Users } from 'lucide-react'
-import { TournamentStaff } from "@/types/models"
+import { TournamentRole, TournamentStaff } from "@/types/models"
 import { removeStaff, resendStaffInvitation } from "@/lib/actions/staff"
 import { toast } from "sonner"
 import { formatShortDate } from "@/lib/utils"
 import { EditRoleDialog } from "./edit-role-dialog"
 import { useDebouncedCallback } from 'use-debounce'
+
+const ROLE_LABELS: Record<TournamentRole, string> = {
+  admin: 'Admin',
+  staff: 'General Staff',
+  bracket_manager: 'Bracket Manager',
+  registration_manager: 'Registration Manager',
+  weigh_in_staff: 'Weigh-In Staff',
+  official: 'Table Official',
+}
 
 interface StaffListProps {
   staff: TournamentStaff[]
@@ -46,7 +55,7 @@ interface StaffListProps {
 export function StaffList({ staff, tournamentId, totalPages, currentPage }: StaffListProps) {
   const [loadingId, setLoadingId] = useState<string | null>(null)
   const [editingStaff, setEditingStaff] = useState<TournamentStaff | null>(null)
-  
+
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -71,7 +80,7 @@ export function StaffList({ staff, tournamentId, totalPages, currentPage }: Staf
     } else {
       params.delete('search')
     }
-    params.set('page', '1') // Reset to page 1 on search
+    params.set('page', '1')
     router.replace(`${pathname}?${params.toString()}`)
   }, 300)
 
@@ -82,7 +91,7 @@ export function StaffList({ staff, tournamentId, totalPages, currentPage }: Staf
     } else {
       params.delete('role')
     }
-    params.set('page', '1') // Reset to page 1 on filter
+    params.set('page', '1')
     router.push(`${pathname}?${params.toString()}`)
   }
 
@@ -93,16 +102,16 @@ export function StaffList({ staff, tournamentId, totalPages, currentPage }: Staf
   const handleResend = async (staffId: string) => {
     setLoadingId(staffId)
     try {
-        const result = await resendStaffInvitation(staffId, tournamentId)
-        if (result.success) {
-            toast.success("Invitation resent.")
-        } else {
-            toast.error(result.error)
-        }
-    } catch (error) {
-        toast.error("Failed to resend.")
+      const result = await resendStaffInvitation(staffId, tournamentId)
+      if (result.success) {
+        toast.success("Invitation resent.")
+      } else {
+        toast.error(result.error)
+      }
+    } catch {
+      toast.error("Failed to resend.")
     } finally {
-        setLoadingId(null)
+      setLoadingId(null)
     }
   }
 
@@ -115,52 +124,63 @@ export function StaffList({ staff, tournamentId, totalPages, currentPage }: Staf
       } else {
         toast.error(result.error)
       }
-    } catch (error) {
-       toast.error("Failed to remove staff.")
+    } catch {
+      toast.error("Failed to remove staff.")
     } finally {
       setLoadingId(null)
     }
   }
 
-  const getRoleIcon = (role: string) => {
+  const getRoleIcon = (role: TournamentRole) => {
     switch (role) {
-      case 'admin': return <Shield className="h-4 w-4 text-purple-500" />
-      case 'official': return <Gavel className="h-4 w-4 text-orange-500" />
-      case 'bracket_manager': return <Trophy className="h-4 w-4 text-yellow-500" />
-      case 'registration_manager': return <Users className="h-4 w-4 text-green-500" />
-      case 'weigh_in_staff': return <Scale className="h-4 w-4 text-blue-500" />
-      default: return <User className="h-4 w-4 text-slate-500" />
+      case 'admin': return <Shield className="h-3 w-3 text-purple-500" />
+      case 'staff': return <User className="h-3 w-3 text-indigo-500" />
+      case 'official': return <Gavel className="h-3 w-3 text-orange-500" />
+      case 'bracket_manager': return <Trophy className="h-3 w-3 text-yellow-500" />
+      case 'registration_manager': return <Users className="h-3 w-3 text-green-500" />
+      case 'weigh_in_staff': return <Scale className="h-3 w-3 text-blue-500" />
     }
   }
+
+  const RoleBadges = ({ roles }: { roles: TournamentRole[] }) => (
+    <div className="flex flex-wrap gap-1">
+      {roles.map(role => (
+        <Badge key={role} variant="secondary" className="flex items-center gap-1 text-xs">
+          {getRoleIcon(role)}
+          {ROLE_LABELS[role]}
+        </Badge>
+      ))}
+    </div>
+  )
 
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
         <div className="relative flex-1">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-                placeholder="Search staff..."
-                className="pl-8"
-                defaultValue={searchParams.get('search')?.toString()}
-                onChange={(e) => handleSearch(e.target.value)}
-            />
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search staff..."
+            className="pl-8"
+            defaultValue={searchParams.get('search')?.toString()}
+            onChange={(e) => handleSearch(e.target.value)}
+          />
         </div>
-        <Select 
-            defaultValue={searchParams.get('role')?.toString() || "all"}
-            onValueChange={handleRoleFilter}
+        <Select
+          defaultValue={searchParams.get('role')?.toString() || "all"}
+          onValueChange={handleRoleFilter}
         >
-            <SelectTrigger className="w-full sm:w-[180px]">
-                <SelectValue placeholder="Filter by Role" />
-            </SelectTrigger>
-            <SelectContent>
-                <SelectItem value="all">All Roles</SelectItem>
-                <SelectItem value="admin">Admin</SelectItem>
-                <SelectItem value="staff">Staff</SelectItem>
-                <SelectItem value="bracket_manager">Bracket Manager</SelectItem>
-                <SelectItem value="registration_manager">Registration Manager</SelectItem>
-                <SelectItem value="weigh_in_staff">Weigh-in Staff</SelectItem>
-                <SelectItem value="official">Official</SelectItem>
-            </SelectContent>
+          <SelectTrigger className="w-full sm:w-[200px]">
+            <SelectValue placeholder="Filter by Role" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Roles</SelectItem>
+            <SelectItem value="admin">Admin</SelectItem>
+            <SelectItem value="staff">General Staff</SelectItem>
+            <SelectItem value="bracket_manager">Bracket Manager</SelectItem>
+            <SelectItem value="registration_manager">Registration Manager</SelectItem>
+            <SelectItem value="weigh_in_staff">Weigh-In Staff</SelectItem>
+            <SelectItem value="official">Table Official</SelectItem>
+          </SelectContent>
         </Select>
       </div>
 
@@ -172,61 +192,58 @@ export function StaffList({ staff, tournamentId, totalPages, currentPage }: Staf
           </div>
         ) : (
           staff.map((member) => (
-             <div key={member.id} className="border rounded-lg p-4 space-y-3 shadow-sm bg-card">
-                <div className="flex justify-between items-start">
-                   <div className="space-y-1">
-                      <div className="font-medium truncate pr-4">{member.email}</div>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground capitalize">
-                        {getRoleIcon(member.role)}
-                        {member.role.replace('_', ' ')}
-                      </div>
-                   </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <span className="sr-only">Open menu</span>
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                              className="cursor-pointer"
-                              onClick={() => setEditingStaff(member)}
-                          >
-                              <Shield className="mr-2 h-4 w-4" />
-                              Change Role
-                          </DropdownMenuItem>
-                         <DropdownMenuItem 
-                          className="cursor-pointer"
-                          onClick={() => handleResend(member.id)}
-                          disabled={loadingId === member.id}
-                        >
-                          <Mail className="mr-2 h-4 w-4" />
-                          Resend Invitation
-                        </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          className="text-destructive focus:text-destructive cursor-pointer"
-                          onClick={() => handleRemove(member.id)}
-                          disabled={loadingId === member.id}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Remove Access
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+            <div key={member.id} className="border rounded-lg p-4 space-y-3 shadow-sm bg-card">
+              <div className="flex justify-between items-start">
+                <div className="space-y-1.5">
+                  <div className="font-medium truncate pr-4">{member.email}</div>
+                  <RoleBadges roles={member.roles} />
                 </div>
-                
-                <div className="flex items-center justify-between text-sm pt-2 border-t">
-                    <Badge variant={member.status === 'active' ? 'default' : 'secondary'}>
-                      {member.status}
-                    </Badge>
-                    <span className="text-muted-foreground">
-                        Joined {formatShortDate(member.created_at)}
-                    </span>
-                </div>
-             </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="h-8 w-8 p-0">
+                      <span className="sr-only">Open menu</span>
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="cursor-pointer"
+                      onClick={() => setEditingStaff(member)}
+                    >
+                      <Shield className="mr-2 h-4 w-4" />
+                      Change Roles
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="cursor-pointer"
+                      onClick={() => handleResend(member.id)}
+                      disabled={loadingId === member.id}
+                    >
+                      <Mail className="mr-2 h-4 w-4" />
+                      Resend Invitation
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="text-destructive focus:text-destructive cursor-pointer"
+                      onClick={() => handleRemove(member.id)}
+                      disabled={loadingId === member.id}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Remove Access
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+
+              <div className="flex items-center justify-between text-sm pt-2 border-t">
+                <Badge variant={member.status === 'active' ? 'default' : 'secondary'}>
+                  {member.status}
+                </Badge>
+                <span className="text-muted-foreground">
+                  Joined {formatShortDate(member.created_at)}
+                </span>
+              </div>
+            </div>
           ))
         )}
       </div>
@@ -236,7 +253,7 @@ export function StaffList({ staff, tournamentId, totalPages, currentPage }: Staf
           <TableHeader>
             <TableRow>
               <TableHead>User / Email</TableHead>
-              <TableHead>Role</TableHead>
+              <TableHead>Roles</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Invited At</TableHead>
               <TableHead className="w-[70px]"></TableHead>
@@ -253,14 +270,11 @@ export function StaffList({ staff, tournamentId, totalPages, currentPage }: Staf
               staff.map((member) => (
                 <TableRow key={member.id}>
                   <TableCell>
-                      <div className="font-medium">{member.email}</div>
-                      {member.user_id && <div className="text-xs text-muted-foreground">Registered User</div>}
+                    <div className="font-medium">{member.email}</div>
+                    {member.user_id && <div className="text-xs text-muted-foreground">Registered User</div>}
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-2 capitalize">
-                      {getRoleIcon(member.role)}
-                      {member.role.replace('_', ' ')}
-                    </div>
+                    <RoleBadges roles={member.roles} />
                   </TableCell>
                   <TableCell>
                     <Badge variant={member.status === 'active' ? 'default' : 'secondary'}>
@@ -268,7 +282,7 @@ export function StaffList({ staff, tournamentId, totalPages, currentPage }: Staf
                     </Badge>
                   </TableCell>
                   <TableCell className="text-muted-foreground text-sm" suppressHydrationWarning>
-                      {formatShortDate(member.created_at)}
+                    {formatShortDate(member.created_at)}
                   </TableCell>
                   <TableCell>
                     <DropdownMenu>
@@ -281,14 +295,14 @@ export function StaffList({ staff, tournamentId, totalPages, currentPage }: Staf
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
                         <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                              className="cursor-pointer"
-                              onClick={() => setEditingStaff(member)}
-                          >
-                              <Shield className="mr-2 h-4 w-4" />
-                              Change Role
-                          </DropdownMenuItem>
-                         <DropdownMenuItem 
+                        <DropdownMenuItem
+                          className="cursor-pointer"
+                          onClick={() => setEditingStaff(member)}
+                        >
+                          <Shield className="mr-2 h-4 w-4" />
+                          Change Roles
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
                           className="cursor-pointer"
                           onClick={() => handleResend(member.id)}
                           disabled={loadingId === member.id}
@@ -296,7 +310,7 @@ export function StaffList({ staff, tournamentId, totalPages, currentPage }: Staf
                           <Mail className="mr-2 h-4 w-4" />
                           Resend Invitation
                         </DropdownMenuItem>
-                        <DropdownMenuItem 
+                        <DropdownMenuItem
                           className="text-destructive focus:text-destructive cursor-pointer"
                           onClick={() => handleRemove(member.id)}
                           disabled={loadingId === member.id}
@@ -343,12 +357,12 @@ export function StaffList({ staff, tournamentId, totalPages, currentPage }: Staf
 
       {editingStaff && (
         <EditRoleDialog
-            open={!!editingStaff}
-            onOpenChange={(open) => !open && setEditingStaff(null)}
-            tournamentId={tournamentId}
-            staffId={editingStaff.id}
-            currentRole={editingStaff.role}
-            email={editingStaff.email}
+          open={!!editingStaff}
+          onOpenChange={(open) => !open && setEditingStaff(null)}
+          tournamentId={tournamentId}
+          staffId={editingStaff.id}
+          currentRoles={editingStaff.roles}
+          email={editingStaff.email}
         />
       )}
     </div>

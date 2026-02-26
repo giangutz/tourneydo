@@ -1,12 +1,43 @@
 'use server'
 
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerSupabaseClient, createServiceRoleSupabaseClient } from "@/lib/supabase/server"
 import { auth } from "@clerk/nextjs/server"
 import { revalidatePath } from "next/cache"
+import { SupabaseClient } from "@supabase/supabase-js"
 import { TournamentStaff, TournamentRole } from "@/types/models"
 import { sendStaffInvitationEmail } from "@/lib/email"
 
-export async function inviteStaff(tournamentId: string, email: string, role: TournamentRole) {
+/**
+ * Authorization guard for staff-management operations.
+ * Only the tournament organizer or an active admin staff member may manage staff.
+ */
+async function requireStaffManageAccess(
+  supabase: SupabaseClient,
+  tournamentId: string,
+  userId: string
+): Promise<void> {
+  const { data: tournament } = await supabase
+    .from('tournaments')
+    .select('organizer_id')
+    .eq('id', tournamentId)
+    .single()
+
+  if (tournament?.organizer_id === userId) return
+
+  const { data: staffRecord } = await supabase
+    .from('tournament_staff')
+    .select('roles')
+    .eq('tournament_id', tournamentId)
+    .eq('user_id', userId)
+    .eq('status', 'active')
+    .single()
+
+  if (!staffRecord?.roles?.includes('admin')) {
+    throw new Error('Forbidden: Only organizers and admins can manage staff.')
+  }
+}
+
+export async function inviteStaff(tournamentId: string, email: string, roles: TournamentRole[]) {
   try {
     const session = await auth()
     if (!session?.userId) {
@@ -14,6 +45,8 @@ export async function inviteStaff(tournamentId: string, email: string, role: Tou
     }
 
     const supabase = createServerSupabaseClient()
+
+    await requireStaffManageAccess(supabase, tournamentId, session.userId)
 
     // 1. Get Tournament Details (for email)
     const { data: tournament } = await supabase
@@ -24,24 +57,26 @@ export async function inviteStaff(tournamentId: string, email: string, role: Tou
 
     if (!tournament) throw new Error("Tournament not found")
 
-    // 2. Check if user exists in our users table
-    const { data: existingUser } = await supabase
+    // 2. Check if user exists — use service role to bypass RLS on users table
+    //    (organizer's JWT can only read their own row; we need to look up the invitee)
+    const serviceClient = createServiceRoleSupabaseClient()
+    const { data: existingUser } = await serviceClient
       .from('users')
       .select('user_id')
       .eq('email', email)
       .single()
 
-    const userId = (existingUser as any)?.user_id || null
-    const status = userId ? 'active' : 'pending'
+    const inviteeUserId = existingUser?.user_id || null
+    const status = inviteeUserId ? 'active' : 'pending'
 
     // 3. Insert into tournament_staff
     const { error } = await supabase
-      .from('tournament_staff' as any)
+      .from('tournament_staff')
       .insert({
         tournament_id: tournamentId,
         email: email,
-        role: role,
-        user_id: userId,
+        roles: roles,
+        user_id: inviteeUserId,
         status: status
       })
 
@@ -52,12 +87,10 @@ export async function inviteStaff(tournamentId: string, email: string, role: Tou
       throw new Error(error.message)
     }
 
-    // ... (previous code)
-
     // 4. Send Email Invitation
     const emailResult = await sendStaffInvitationEmail({
       email,
-      role,
+      role: roles.join(', '),
       tournamentName: tournament.name,
       tournamentId,
     })
@@ -69,8 +102,8 @@ export async function inviteStaff(tournamentId: string, email: string, role: Tou
     }
 
     return { success: true }
-  } catch (error: any) {
-    return { success: false, error: error.message }
+  } catch (error: unknown) {
+    return { success: false, error: (error as Error).message }
   }
 }
 
@@ -83,9 +116,11 @@ export async function resendStaffInvitation(staffId: string, tournamentId: strin
 
     const supabase = createServerSupabaseClient()
 
+    await requireStaffManageAccess(supabase, tournamentId, session.userId)
+
     // 1. Get Staff & Tournament Details
     const { data: staffMember, error: staffError } = await supabase
-      .from('tournament_staff' as any)
+      .from('tournament_staff')
       .select('*, tournaments(name)')
       .eq('id', staffId)
       .single()
@@ -93,8 +128,7 @@ export async function resendStaffInvitation(staffId: string, tournamentId: strin
     if (staffError || !staffMember) throw new Error("Staff member not found")
 
     // Rate Limiting Check
-    const memberData = staffMember as any
-    const lastInvited = memberData.last_invited_at ? new Date(memberData.last_invited_at) : null
+    const lastInvited = staffMember.last_invited_at ? new Date(staffMember.last_invited_at) : null
     if (lastInvited) {
       const timeSinceLastInvite = new Date().getTime() - lastInvited.getTime()
       const cooldown = 60000 // 1 minute in ms
@@ -105,13 +139,12 @@ export async function resendStaffInvitation(staffId: string, tournamentId: strin
       }
     }
 
-    const tournamentName = (staffMember as any).tournaments?.name || "Tournament"
+    const tournamentName = (staffMember.tournaments as { name: string } | null)?.name || "Tournament"
 
     // 2. Send Email
-    const member = staffMember as any
     const emailResult = await sendStaffInvitationEmail({
-      email: member.email,
-      role: member.role,
+      email: staffMember.email,
+      role: (staffMember.roles as string[]).join(', '),
       tournamentName: tournamentName,
       tournamentId,
     })
@@ -122,13 +155,13 @@ export async function resendStaffInvitation(staffId: string, tournamentId: strin
 
     // 3. Update last_invited_at
     await supabase
-      .from('tournament_staff' as any)
+      .from('tournament_staff')
       .update({ last_invited_at: new Date().toISOString() })
       .eq('id', staffId)
 
     return { success: true }
-  } catch (error: any) {
-    return { success: false, error: error.message }
+  } catch (error: unknown) {
+    return { success: false, error: (error as Error).message }
   }
 }
 
@@ -141,8 +174,10 @@ export async function removeStaff(staffId: string, tournamentId: string) {
 
     const supabase = createServerSupabaseClient()
 
+    await requireStaffManageAccess(supabase, tournamentId, session.userId)
+
     const { error } = await supabase
-      .from('tournament_staff' as any)
+      .from('tournament_staff')
       .delete()
       .eq('id', staffId)
 
@@ -150,13 +185,13 @@ export async function removeStaff(staffId: string, tournamentId: string) {
 
     revalidatePath(`/dashboard/tournament-organizer/tournaments/${tournamentId}/staff`)
     return { success: true }
-  } catch (error: any) {
-    return { success: false, error: error.message }
+  } catch (error: unknown) {
+    return { success: false, error: (error as Error).message }
   }
 }
 
 
-export async function updateStaffRole(staffId: string, newRole: TournamentRole, tournamentId: string) {
+export async function updateStaffRoles(staffId: string, newRoles: TournamentRole[], tournamentId: string) {
   try {
     const session = await auth()
     if (!session?.userId) {
@@ -165,14 +200,11 @@ export async function updateStaffRole(staffId: string, newRole: TournamentRole, 
 
     const supabase = createServerSupabaseClient()
 
-    // 1. Verify Organizer Permission (implicit via RLS, but good to double check or catch early)
-    // The RLS "Organizers can manage staff" should handle the update permission, 
-    // but explicit check protects against logic errors.
+    await requireStaffManageAccess(supabase, tournamentId, session.userId)
 
-    // 2. Update Role
     const { error } = await supabase
-      .from('tournament_staff' as any)
-      .update({ role: newRole })
+      .from('tournament_staff')
+      .update({ roles: newRoles })
       .eq('id', staffId)
       .select()
       .single()
@@ -181,8 +213,8 @@ export async function updateStaffRole(staffId: string, newRole: TournamentRole, 
 
     revalidatePath(`/dashboard/tournament-organizer/tournaments/${tournamentId}/staff`)
     return { success: true }
-  } catch (error: any) {
-    return { success: false, error: error.message }
+  } catch (error: unknown) {
+    return { success: false, error: (error as Error).message }
   }
 }
 
@@ -200,7 +232,7 @@ export async function getTournamentStaff(
   const supabase = createServerSupabaseClient()
 
   let query = supabase
-    .from('tournament_staff' as any)
+    .from('tournament_staff')
     .select('*', { count: 'exact' })
     .eq('tournament_id', tournamentId)
 
@@ -209,9 +241,9 @@ export async function getTournamentStaff(
     query = query.ilike('email', `%${search}%`)
   }
 
-  // Apply role filter
+  // Apply role filter — use array containment: roles @> ARRAY[role]
   if (role && role !== 'all') {
-    query = query.eq('role', role)
+    query = query.contains('roles', [role])
   }
 
   // Apply pagination
@@ -223,7 +255,7 @@ export async function getTournamentStaff(
   const { data, error, count } = await query
 
   if (error) {
-    console.error("Error fetching staff:", error.message, error.code, JSON.stringify(error, null, 2))
+    console.error("Error fetching staff:", error.message, error.code)
     return { data: [], total: 0, totalPages: 0 }
   }
 

@@ -6,8 +6,8 @@ import { MatchInsert, MatchUpdate, Match } from '@/types/models'
  * Save a generated bracket (delete existing and insert new)
  */
 // Helper to map Domain Match/MatchInsert to DB Row
-function toDbMatch(match: Partial<Match> | MatchInsert): any {
-  const dbMatch: any = { ...match }
+function toDbMatch(match: Partial<Match> | MatchInsert): Record<string, unknown> {
+  const dbMatch: Record<string, unknown> = { ...match }
 
   // Map fields
   // if ('round' in match) {
@@ -53,38 +53,36 @@ export async function deleteTournamentMatches(tournamentId: string): Promise<voi
 
 export async function saveBracket(tournamentId: string, matches: MatchInsert[]): Promise<void> {
   const supabase = createServerSupabaseClient()
-
-  console.log(`saveBracket: Saving ${matches.length} matches for tournament ${tournamentId}`)
-
   const dbMatches = matches.map(toDbMatch)
 
-  // 1. Clear existing matches
-  await deleteTournamentMatches(tournamentId)
+  // 1. Capture existing match IDs before making any changes.
+  //    This enables insert-before-delete: if the insert fails, old data remains intact.
+  const { data: existing } = await supabase
+    .from('matches')
+    .select('id')
+    .eq('tournament_id', tournamentId)
+  const oldMatchIds = existing?.map((m: { id: string }) => m.id) || []
 
-  // 2. Insert new matches
-  const { data, error: insertError } = await supabase
+  // 2. Insert new matches (all have fresh UUIDs — no conflicts with existing rows).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error: insertError } = await (supabase as any)
     .from('matches')
     .insert(dbMatches)
     .select()
 
   if (insertError) {
-    console.error('Insert error:', insertError)
+    // Old matches are still intact — no data loss.
     throw new Error(`Failed to save bracket: ${insertError.message}`)
   }
 
-  console.log(`Successfully inserted ${data?.length || 0} matches`)
-
-  // 3. Create 3 rounds for each match (Batch Insert)
+  // 3. Create 3 rounds for each new match (batch in chunks of 1000).
   if (data && data.length > 0) {
-    console.log('Creating rounds for matches...')
-
-    const allRounds = data.flatMap(match => [
+    const allRounds = data.flatMap((match: { id: string }) => [
       { match_id: match.id, round_number: 1 },
       { match_id: match.id, round_number: 2 },
       { match_id: match.id, round_number: 3 }
     ])
 
-    // Batch insert in chunks of 1000 to be safe
     const CHUNK_SIZE = 1000
     for (let i = 0; i < allRounds.length; i += CHUNK_SIZE) {
       const chunk = allRounds.slice(i, i + CHUNK_SIZE)
@@ -93,12 +91,24 @@ export async function saveBracket(tournamentId: string, matches: MatchInsert[]):
         .insert(chunk)
 
       if (roundsError) {
-        console.error('Failed to insert batch of rounds:', roundsError)
         throw new Error(`Failed to create rounds: ${roundsError.message}`)
       }
     }
+  }
 
-    console.log(`Successfully created ${allRounds.length} rounds`)
+  // 4. Delete old matches AFTER the insert succeeded.
+  //    match_rounds for old matches cascade-delete via FK.
+  if (oldMatchIds.length > 0) {
+    const { error: deleteError } = await supabase
+      .from('matches')
+      .delete()
+      .in('id', oldMatchIds)
+
+    if (deleteError) {
+      // Non-fatal: new bracket is live, old matches are stale duplicates.
+      // Log for manual cleanup but do not throw.
+      console.error('Failed to delete old bracket matches (non-fatal):', deleteError)
+    }
   }
 }
 
@@ -149,7 +159,7 @@ export async function advanceWinner(matchId: string, updates: Partial<Match>): P
 /**
  * Helper to transform DB match to Match interface
  */
-export function transformMatch(m: any): Match {
+export function transformMatch(m: Record<string, unknown>): Match {
   const rounds = m.match_rounds as any[] || []
   const r1 = rounds.find(r => r.round_number === 1)
   const r2 = rounds.find(r => r.round_number === 2)
@@ -338,18 +348,15 @@ export async function forfeitMatch(matchId: string, disqualifiedPlayerId: string
     return
   }
 
-  console.log(`[FORFEIT] Match ${matchId}: Forfeiting player ${disqualifiedPlayerId}, Winner is ${winnerId}`)
-
-  // 2. Update match status
+  // 2. Update match status — mark completed, free the court slot, and update lifecycle state
+  // so both the court queue (uses status) and the bracket view (uses lifecycle_state) reflect the forfeit.
   const { error: updateError } = await supabase
     .from('matches')
     .update({
       status: 'completed',
+      lifecycle_state: 'COMPLETED',
       winner_id: winnerId,
-      tournament_id: typedMatch.tournament_id,
-      // For IBJJF/common logic, scores often stay 0 or marked special. 
-      // We will leave scores as is or set to 0. 
-      // We aren't setting win_reason column as it doesn't exist yet, relying on logic/logs.
+      court_number: null,   // free the court slot so it can be used by other matches
     })
     .eq('id', matchId)
 
@@ -361,65 +368,43 @@ export async function forfeitMatch(matchId: string, disqualifiedPlayerId: string
   if (typedMatch.next_match_id) {
     const { data: nextMatch } = await supabase
       .from('matches')
-      .select('id, player1_id, player2_id, tournament_id')
+      .select('id, player1_id, player2_id, source_match_ids, tournament_id')
       .eq('id', typedMatch.next_match_id)
       .single()
 
     if (nextMatch) {
-      // Find sibling match (the other feeder) to determine slot
-      // The rule is: Lower match_number feeds player1, Higher match_number feeds player2
-
-      const { data: feederMatches } = await supabase
-        .from('matches')
-        .select('id, match_number')
-        .eq('next_match_id', typedMatch.next_match_id)
-        .order('match_number', { ascending: true })
-
-      let targetSlot = 'player1_id' // Default
-
-      if (feederMatches && feederMatches.length === 2) {
-        // If we are the second match (higher number), we go to player2
-        if (feederMatches[1].id === typedMatch.id) {
-          targetSlot = 'player2_id'
-        }
-      } else {
-        // Fallback or single feeder? 
-        // If we only found 1 (us), we can't be sure, but standard logic implies:
-        // Match numbers: [Odd] -> P1, [Even] -> P2 (relative to structure)
-        // Simple heuristic: If (match_number % 2 === 1) -> P1? 
-        // No, match numbers are global: 4, 5, 6, 7. 
-        // 4->P1, 5->P2. 6->P1, 7->P2.
-        // So (match_number % 2 === 0) -> P1 or P2?
-        // 4 (even) -> P1. 5 (odd) -> P2.
-        // It's (match_number % 2 === 0) ? P1 : P2 ? 
-        // Wait, startMatchNumber can be anything.
-        // Let's stick to the feederMatches logic. If fetch fails, fallback to existing behavior.
-
-        // Fallback: If player1 is taken and not us, take player2.
-        const typedNextMatch = nextMatch as unknown as { player1_id: string | null; player2_id: string | null; tournament_id: string }
-        if (typedNextMatch.player1_id !== null && typedNextMatch.player1_id !== winnerId) {
-          targetSlot = 'player2_id'
-        }
+      const typedNextMatch = nextMatch as unknown as {
+        id: string
+        player1_id: string | null
+        player2_id: string | null
+        source_match_ids: string[] | null
+        tournament_id: string
       }
 
-      // Prepare update
-      const updateData = targetSlot === 'player1_id'
-        ? { player1_id: winnerId, tournament_id: nextMatch.tournament_id }
-        : { player2_id: winnerId, tournament_id: nextMatch.tournament_id }
+      // Prevent duplicate advancement
+      if (typedNextMatch.player1_id !== winnerId && typedNextMatch.player2_id !== winnerId) {
+        // Use source_match_ids ordering to determine correct slot.
+        // source_match_ids[0] → player1, source_match_ids[1] → player2.
+        const sourceIds: string[] = typedNextMatch.source_match_ids || []
+        const sourceIndex = sourceIds.indexOf(typedMatch.id)
+        const targetSlot = sourceIndex === 1 ? 'player2_id' : 'player1_id'
 
-      await supabase.from('matches').update(updateData).eq('id', typedMatch.next_match_id)
-      console.log(`[FORFEIT] Advanced winner ${winnerId} to ${typedMatch.next_match_id} (${targetSlot})`)
+        const updateData = targetSlot === 'player1_id'
+          ? { player1_id: winnerId }
+          : { player2_id: winnerId }
 
-      // Check if next match is now ready
-      const nextMatchHasP1 = updateData.player1_id || nextMatch.player1_id
-      const nextMatchHasP2 = updateData.player2_id || nextMatch.player2_id
+        await supabase.from('matches').update(updateData).eq('id', typedMatch.next_match_id)
 
-      if (nextMatchHasP1 && nextMatchHasP2) {
-        console.log(`[FORFEIT] Next match ${typedMatch.next_match_id} is now ready (CONTEST)`)
-        await supabase
-          .from('matches')
-          .update({ lifecycle_state: 'CONTEST' })
-          .eq('id', typedMatch.next_match_id)
+        // Check if next match is now ready (both players known)
+        const updatedP1 = updateData.player1_id ?? typedNextMatch.player1_id
+        const updatedP2 = updateData.player2_id ?? typedNextMatch.player2_id
+
+        if (updatedP1 && updatedP2) {
+          await supabase
+            .from('matches')
+            .update({ lifecycle_state: 'CONTEST' })
+            .eq('id', typedMatch.next_match_id)
+        }
       }
     }
   }

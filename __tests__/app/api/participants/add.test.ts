@@ -22,7 +22,7 @@ jest.mock('next/server', () => {
   return {
     ...actual,
     NextResponse: {
-      json: jest.fn((data, init) => {
+      json: jest.fn((data: any, init?: any) => {
         const response = new Response(JSON.stringify(data), {
           status: init?.status || 200,
           headers: {
@@ -60,7 +60,7 @@ describe('POST /api/participants/add', () => {
 
   describe('Authentication', () => {
     it('returns 401 when user is not authenticated', async () => {
-      mockAuth.mockResolvedValue({ userId: null })
+      mockAuth.mockResolvedValue({ userId: null } as any)
 
       const request = new NextRequest('http://localhost/api/participants/add', {
         method: 'POST',
@@ -82,7 +82,7 @@ describe('POST /api/participants/add', () => {
 
   describe('Input Validation', () => {
     beforeEach(() => {
-      mockAuth.mockResolvedValue({ userId: 'user-123' })
+      mockAuth.mockResolvedValue({ userId: 'user-123' } as any)
     })
 
     it('returns 400 for invalid JSON', async () => {
@@ -175,7 +175,7 @@ describe('POST /api/participants/add', () => {
 
   describe('Authorization', () => {
     beforeEach(() => {
-      mockAuth.mockResolvedValue({ userId: 'user-123' })
+      mockAuth.mockResolvedValue({ userId: 'user-123' } as any)
     })
 
     it('returns 403 when user does not own the team', async () => {
@@ -224,7 +224,7 @@ describe('POST /api/participants/add', () => {
 
   describe('Business Logic - Existing Player', () => {
     beforeEach(() => {
-      mockAuth.mockResolvedValue({ userId: 'user-123' })
+      mockAuth.mockResolvedValue({ userId: 'user-123' } as any)
       mockGetTeamById.mockResolvedValue({
         id: 'team-1',
         user_id: 'user-123',
@@ -259,7 +259,7 @@ describe('POST /api/participants/add', () => {
 
     it('returns 409 when player already registered', async () => {
       const error = new Error('Unique constraint failed')
-      ;(error as any).code = 'P2002' // Prisma unique constraint error
+        ; (error as any).code = 'P2002' // Prisma unique constraint error
       mockCreateRegistration.mockRejectedValue(error)
 
       const request = new NextRequest('http://localhost/api/participants/add', {
@@ -280,7 +280,7 @@ describe('POST /api/participants/add', () => {
 
   describe('Business Logic - New Player', () => {
     beforeEach(() => {
-      mockAuth.mockResolvedValue({ userId: 'user-123' })
+      mockAuth.mockResolvedValue({ userId: 'user-123' } as any)
       mockGetTeamById.mockResolvedValue({
         id: 'team-1',
         user_id: 'user-123',
@@ -333,7 +333,7 @@ describe('POST /api/participants/add', () => {
 
   describe('Error Handling', () => {
     beforeEach(() => {
-      mockAuth.mockResolvedValue({ userId: 'user-123' })
+      mockAuth.mockResolvedValue({ userId: 'user-123' } as any)
       mockGetTeamById.mockResolvedValue({
         id: 'team-1',
         user_id: 'user-123',

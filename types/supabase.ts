@@ -34,6 +34,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      audit_trail: {
+        Row: {
+          id: string
+          tournament_id: string
+          entity_type: string
+          entity_id: string
+          action: string
+          actor_id: string
+          previous_state: Json | null
+          new_state: Json | null
+          metadata: Json | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          tournament_id: string
+          entity_type: string
+          entity_id: string
+          action: string
+          actor_id: string
+          previous_state?: Json | null
+          new_state?: Json | null
+          metadata?: Json | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          tournament_id?: string
+          entity_type?: string
+          entity_id?: string
+          action?: string
+          actor_id?: string
+          previous_state?: Json | null
+          new_state?: Json | null
+          metadata?: Json | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       division_schedule_config: {
         Row: {
           avg_match_duration: number | null
@@ -205,6 +244,8 @@ export type Database = {
       }
       matches: {
         Row: {
+          actual_end_time: string | null
+          actual_start_time: string | null
           athlete1_available_at: string | null
           athlete2_available_at: string | null
           category_id: string | null
@@ -243,8 +284,12 @@ export type Database = {
           winner_round1: string | null
           winner_round2: string | null
           winner_round3: string | null
+          win_method: string | null
+          winning_round: number | null
         }
         Insert: {
+          actual_end_time?: string | null
+          actual_start_time?: string | null
           athlete1_available_at?: string | null
           athlete2_available_at?: string | null
           category_id?: string | null
@@ -283,8 +328,12 @@ export type Database = {
           winner_round1?: string | null
           winner_round2?: string | null
           winner_round3?: string | null
+          win_method?: string | null
+          winning_round?: number | null
         }
         Update: {
+          actual_end_time?: string | null
+          actual_start_time?: string | null
           athlete1_available_at?: string | null
           athlete2_available_at?: string | null
           category_id?: string | null
@@ -323,6 +372,8 @@ export type Database = {
           winner_round1?: string | null
           winner_round2?: string | null
           winner_round3?: string | null
+          win_method?: string | null
+          winning_round?: number | null
         }
         Relationships: [
           {
@@ -628,6 +679,11 @@ export type Database = {
           updated_at: string
           weigh_in_selected: boolean
           weighed_in_at: string | null
+          weighed_in_by: string | null
+          random_weigh_in_weight: number | null
+          random_weigh_in_at: string | null
+          random_weigh_in_passed: boolean | null
+          random_weigh_in_by: string | null
         }
         Insert: {
           actual_height?: number | null
@@ -646,6 +702,11 @@ export type Database = {
           updated_at?: string
           weigh_in_selected?: boolean
           weighed_in_at?: string | null
+          weighed_in_by?: string | null
+          random_weigh_in_weight?: number | null
+          random_weigh_in_at?: string | null
+          random_weigh_in_passed?: boolean | null
+          random_weigh_in_by?: string | null
         }
         Update: {
           actual_height?: number | null
@@ -664,6 +725,11 @@ export type Database = {
           updated_at?: string
           weigh_in_selected?: boolean
           weighed_in_at?: string | null
+          weighed_in_by?: string | null
+          random_weigh_in_weight?: number | null
+          random_weigh_in_at?: string | null
+          random_weigh_in_passed?: boolean | null
+          random_weigh_in_by?: string | null
         }
         Relationships: [
           {
@@ -729,6 +795,9 @@ export type Database = {
           junior_kyeshi_time: number | null
           junior_rest_between_rounds: number | null
           junior_round_time: number | null
+          lunch_enabled: boolean
+          lunch_end_time: string
+          lunch_start_time: string
           max_divisions_per_day: number | null
           senior_kyeshi_time: number | null
           senior_rest_between_rounds: number | null
@@ -754,6 +823,9 @@ export type Database = {
           junior_kyeshi_time?: number | null
           junior_rest_between_rounds?: number | null
           junior_round_time?: number | null
+          lunch_enabled?: boolean
+          lunch_end_time?: string
+          lunch_start_time?: string
           max_divisions_per_day?: number | null
           senior_kyeshi_time?: number | null
           senior_rest_between_rounds?: number | null
@@ -779,6 +851,9 @@ export type Database = {
           junior_kyeshi_time?: number | null
           junior_rest_between_rounds?: number | null
           junior_round_time?: number | null
+          lunch_enabled?: boolean
+          lunch_end_time?: string
+          lunch_start_time?: string
           max_divisions_per_day?: number | null
           senior_kyeshi_time?: number | null
           senior_rest_between_rounds?: number | null
@@ -802,7 +877,7 @@ export type Database = {
           email: string
           id: string
           last_invited_at: string | null
-          role: string
+          roles: string[]
           status: string
           tournament_id: string
           updated_at: string | null
@@ -813,7 +888,7 @@ export type Database = {
           email: string
           id?: string
           last_invited_at?: string | null
-          role: string
+          roles: string[]
           status?: string
           tournament_id: string
           updated_at?: string | null
@@ -824,7 +899,7 @@ export type Database = {
           email?: string
           id?: string
           last_invited_at?: string | null
-          role?: string
+          roles?: string[]
           status?: string
           tournament_id?: string
           updated_at?: string | null
@@ -849,6 +924,7 @@ export type Database = {
       }
       tournaments: {
         Row: {
+          allowed_belt_groups: string[] | null
           courts: number | null
           created_at: string
           description: string | null
@@ -857,6 +933,7 @@ export type Database = {
             | null
           end_date: string | null
           entry_fee: number | null
+          gender_preference: string | null
           id: string
           max_players: number | null
           name: string
@@ -867,8 +944,11 @@ export type Database = {
           tournament_type: string
           updated_at: string
           venue: string | null
+          weigh_in_end: string | null
+          weigh_in_start: string | null
         }
         Insert: {
+          allowed_belt_groups?: string[] | null
           courts?: number | null
           created_at?: string
           description?: string | null
@@ -877,6 +957,7 @@ export type Database = {
             | null
           end_date?: string | null
           entry_fee?: number | null
+          gender_preference?: string | null
           id?: string
           max_players?: number | null
           name: string
@@ -887,8 +968,11 @@ export type Database = {
           tournament_type?: string
           updated_at?: string
           venue?: string | null
+          weigh_in_end?: string | null
+          weigh_in_start?: string | null
         }
         Update: {
+          allowed_belt_groups?: string[] | null
           courts?: number | null
           created_at?: string
           description?: string | null
@@ -897,6 +981,7 @@ export type Database = {
             | null
           end_date?: string | null
           entry_fee?: number | null
+          gender_preference?: string | null
           id?: string
           max_players?: number | null
           name?: string
@@ -907,6 +992,8 @@ export type Database = {
           tournament_type?: string
           updated_at?: string
           venue?: string | null
+          weigh_in_end?: string | null
+          weigh_in_start?: string | null
         }
         Relationships: [
           {
@@ -953,8 +1040,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      advance_match_winner: {
+        Args: {
+          p_match_id: string
+          p_winner_id: string
+          p_player1_wins: number
+          p_player2_wins: number
+        }
+        Returns: Json
+      }
       archive_match_numbers: {
         Args: { p_tournament_id: string }
+        Returns: undefined
+      }
+      batch_update_match_schedule: {
+        Args: { p_assignments: Json }
         Returns: undefined
       }
       get_match_readiness_status: {
@@ -966,6 +1066,30 @@ export type Database = {
       }
       initialize_match_readiness: {
         Args: { p_match_id: string }
+        Returns: undefined
+      }
+      reverse_match_advancement: {
+        Args: { p_match_id: string }
+        Returns: undefined
+      }
+      save_match_scores_atomic: {
+        Args: {
+          p_match_id: string
+          p_rounds: Json
+        }
+        Returns: undefined
+      }
+      insert_audit_entry: {
+        Args: {
+          p_tournament_id: string
+          p_entity_type: string
+          p_entity_id: string
+          p_action: string
+          p_actor_id: string
+          p_previous_state?: Json
+          p_new_state?: Json
+          p_metadata?: Json
+        }
         Returns: undefined
       }
     }

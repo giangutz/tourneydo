@@ -53,29 +53,24 @@ export class SubscriptionManager {
   }
 
   private setupSocketListeners() {
-    // Get the underlying Phoenix socket
-    const socket = (this.supabase.realtime as any).socket;
+    // Use stateChangeCallbacks (public API) instead of the internal .socket property
+    this.supabase.realtime.stateChangeCallbacks.open.push(() => {
+      // Only set to CONNECTED if recovering from an unexpected error
+      if (this.status === 'DISCONNECTED_ERROR') {
+        this.setStatus('CONNECTED');
+      }
+    });
 
-    if (socket) {
-      // Listen for socket connection events
-      socket.onOpen(() => {
-        // Only set to CONNECTED if we intended to be connected
-        if (this.status === 'DISCONNECTED_ERROR') {
-          this.setStatus('CONNECTED');
-        }
-      });
-
-      socket.onClose(() => {
-        // If we didn't initiate the disconnect (status isn't IDLE or HIDDEN), it's likely an error/network drop
-        if (this.status === 'CONNECTED') {
-          this.setStatus('DISCONNECTED_ERROR');
-        }
-      });
-
-      socket.onError(() => {
+    this.supabase.realtime.stateChangeCallbacks.close.push(() => {
+      // Only treat as error if we didn't initiate the disconnect
+      if (this.status === 'CONNECTED') {
         this.setStatus('DISCONNECTED_ERROR');
-      });
-    }
+      }
+    });
+
+    this.supabase.realtime.stateChangeCallbacks.error.push(() => {
+      this.setStatus('DISCONNECTED_ERROR');
+    });
   }
 
   private setupVisibilityListener() {
@@ -109,11 +104,11 @@ export class SubscriptionManager {
       }
     };
 
-    window.addEventListener('mousemove', handleActivity);
-    window.addEventListener('keydown', handleActivity);
-    window.addEventListener('click', handleActivity);
-    window.addEventListener('touchstart', handleActivity);
-    window.addEventListener('scroll', handleActivity);
+    window.addEventListener('mousemove', handleActivity, { passive: true });
+    window.addEventListener('keydown', handleActivity, { passive: true });
+    window.addEventListener('click', handleActivity, { passive: true });
+    window.addEventListener('touchstart', handleActivity, { passive: true });
+    window.addEventListener('scroll', handleActivity, { passive: true });
 
     // Initial timer
     this.resetInactivityTimer();

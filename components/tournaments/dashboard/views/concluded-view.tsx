@@ -4,8 +4,9 @@ import { useEffect, useState } from 'react'
 import { useSession } from '@clerk/nextjs'
 import { createClerkSupabaseClient } from '@/lib/supabase/client'
 import { KPICard } from '../kpi-card'
-import { DollarSign, Trophy, UserCheck, Calculator, Pencil, Trash2 } from 'lucide-react'
+import { DollarSign, Trophy, UserCheck, Calculator, Pencil, Trash2, Download } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { toast } from 'sonner'
 import { 
   Table, 
   TableBody, 
@@ -78,13 +79,15 @@ export function ConcludedView({ tournamentId }: ConcludedViewProps) {
       .select('*')
       .eq('tournament_id', tournamentId)
     const { data: matchesData } = await supabase.from('matches').select('*').eq('tournament_id', tournamentId)
+    const { data: tournamentData } = await (supabase as any).from('tournaments').select('entry_fee').eq('id', tournamentId).single()
 
     const regs = regsData as Registration[] | null
     const exp = expData as any[] | null
     const matches = matchesData as any[] | null
+    const entryFee = tournamentData?.entry_fee || 0
 
     // Calculate Revenue
-    const revenue = (regs?.filter((r) => r.status === 'paid').length || 0) * 50 
+    const revenue = (regs?.filter((r) => r.status === 'paid' || r.status === 'verified').length || 0) * entryFee 
     
     // Calculate Expenses
     const expenseTotal = exp?.reduce((sum: number, e: any) => sum + Number(e.amount), 0) || 0
@@ -198,6 +201,9 @@ export function ConcludedView({ tournamentId }: ConcludedViewProps) {
         setEditingExpense(null)
         setIsExpenseModalOpen(false)
         fetchData()
+      } else {
+        console.error('Failed to update expense:', error)
+        toast.error('Failed to update expense: ' + error.message)
       }
     } else {
       // Insert new expense
@@ -212,6 +218,9 @@ export function ConcludedView({ tournamentId }: ConcludedViewProps) {
         setNewExpense({ category: '', amount: '', description: '' })
         setIsExpenseModalOpen(false)
         fetchData()
+      } else {
+        console.error('Failed to add expense:', error)
+        toast.error('Failed to add expense: ' + error.message)
       }
     }
   }
@@ -283,11 +292,26 @@ export function ConcludedView({ tournamentId }: ConcludedViewProps) {
         />
       </div>
 
-      <div className="flex justify-end">
-        <Dialog open={isExpenseModalOpen} onOpenChange={handleCloseExpenseModal}>
-          <DialogTrigger asChild>
-            <Button variant="outline"><Calculator className="mr-2 h-4 w-4" /> Add Expense</Button>
-          </DialogTrigger>
+      <div className="flex justify-end gap-2">
+        <Button variant="outline" asChild>
+          <a href={`/api/tournaments/${tournamentId}/export?format=csv&type=participants`} download>
+            <Download className="mr-2 h-4 w-4" /> Participants CSV
+          </a>
+        </Button>
+        <Button variant="outline" asChild>
+          <a href={`/api/tournaments/${tournamentId}/export?format=csv&type=results`} download>
+            <Download className="mr-2 h-4 w-4" /> Results CSV
+          </a>
+        </Button>
+        <Button variant="outline" asChild>
+          <a href={`/api/tournaments/${tournamentId}/export?format=pdf&type=results`} download>
+            <Download className="mr-2 h-4 w-4" /> Results PDF
+          </a>
+        </Button>
+        <Button variant="outline" onClick={() => setIsExpenseModalOpen(true)}>
+          <Calculator className="mr-2 h-4 w-4" /> Add Expense
+        </Button>
+        <Dialog open={isExpenseModalOpen} onOpenChange={(open) => { if (!open) handleCloseExpenseModal() }}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>{editingExpense ? 'Edit' : 'Add'} Tournament Expense</DialogTitle>

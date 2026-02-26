@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Tournament, Team, Player, TournamentRegistration } from "@/types/models"
+import { Tournament, TournamentRegistration } from "@/types/models"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -12,26 +12,14 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { 
-  Eye, 
-  PhilippinePeso, 
-  Calendar, 
-  MapPin, 
-  Trophy, 
-  Users, 
-  Clock, 
-  Printer, 
+  Eye,
+  PhilippinePeso,
+  MapPin,
+  Trophy,
+  Users,
+  Clock,
+  Printer,
   Search,
-  Loader2, 
   Check,
   CreditCard
 } from "lucide-react"
@@ -43,97 +31,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { formatShortDate, formatCurrency } from "@/lib/utils"
+import { formatShortDate } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { registerTeam } from "./actions"
-import { getTeamPlayers } from "@/lib/actions/teams"
-import { useRouter } from "next/navigation"
 import { EmptyState } from "@/components/ui/empty-state"
-import { toast } from "sonner"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Label } from "@/components/ui/label"
 
 interface TournamentListProps {
   tournaments: Tournament[]
-  teams: Team[]
   registrations: TournamentRegistration[]
   coachId: string
 }
 
-export function TournamentList({ tournaments, teams, registrations, coachId }: TournamentListProps) {
-  const [selectedTeam, setSelectedTeam] = useState<string>("")
-  const [teamPlayers, setTeamPlayers] = useState<Player[]>([])
-  const [selectedPlayers, setSelectedPlayers] = useState<string[]>([])
-  const [isLoadingPlayers, setIsLoadingPlayers] = useState(false)
-  const [isRegistering, setIsRegistering] = useState(false)
-  const [openDialogId, setOpenDialogId] = useState<string | null>(null)
-  const router = useRouter()
-
-  const handleTeamSelect = async (teamId: string, tournamentId: string) => {
-    setSelectedTeam(teamId)
-    setSelectedPlayers([])
-    setTeamPlayers([])
-    
-    if (!teamId) return
-
-    setIsLoadingPlayers(true)
-    try {
-      const players = await getTeamPlayers(teamId)
-      setTeamPlayers(players)
-      
-      // Check for existing registrations for this team and tournament
-      const existingTeamRegistrations = registrations.filter(
-        r => r.tournament_id === tournamentId && r.team_id === teamId
-      )
-
-      if (existingTeamRegistrations.length > 0) {
-        // Pre-select registered players
-        setSelectedPlayers(existingTeamRegistrations.map(r => r.player_id))
-      } else {
-        // Default to selecting all players if no existing registration
-        setSelectedPlayers(players.map(p => p.id))
-      }
-    } catch (error) {
-      console.error("Failed to fetch players", error)
-      toast.error("Failed to fetch team players")
-    } finally {
-      setIsLoadingPlayers(false)
-    }
-  }
-
-  const togglePlayer = (playerId: string) => {
-    setSelectedPlayers(prev => 
-      prev.includes(playerId)
-        ? prev.filter(id => id !== playerId)
-        : [...prev, playerId]
-    )
-  }
-
-  const handleRegister = async (tournamentId: string) => {
-    if (!selectedTeam) return
-
-    setIsRegistering(true)
-    const playersToRegister = selectedPlayers // Capture before clearing state
-    try {
-      const result = await registerTeam(tournamentId, selectedTeam, playersToRegister)
-      if (result.success) {
-        setOpenDialogId(null)
-        setSelectedTeam("")
-        setTeamPlayers([])
-        setSelectedPlayers([])
-        toast.success(playersToRegister.length === 0 ? "Unregistered successfully!" : "Registration updated successfully!")
-      } else {
-        toast.error(result.error || "Failed to register team")
-        console.error(result.error)
-      }
-    } catch (error) {
-      console.error("Failed to register", error)
-    } finally {
-      setIsRegistering(false)
-    }
-  }
-
+export function TournamentList({ tournaments, registrations, coachId }: TournamentListProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("upcoming")
 
@@ -273,31 +182,16 @@ export function TournamentList({ tournaments, teams, registrations, coachId }: T
               )}
 
               {/* Payment Button */}
-              {(() => {
-                const tournamentTeams = Array.from(new Set(registrations.filter(r => r.tournament_id === tournament.id).map(r => r.team_id)))
-                
-                const unpaidTeams = tournamentTeams.map(teamId => {
-                   const teamRegs = registrations.filter(r => r.tournament_id === tournament.id && r.team_id === teamId)
-                   const unpaidRegs = teamRegs.filter(r => r.status !== 'paid' && r.status !== 'verified')
-                   const amountOwed = unpaidRegs.length * (tournament.entry_fee || 0)
-                   
-                   return {
-                     teamId,
-                     amountOwed
-                   }
-                }).filter(t => t.amountOwed > 0)
-
-                if (unpaidTeams.length === 0) return null
-
-                return (
-                  <Link href={`/dashboard/coach/tournaments/${tournament.id}/payment`} className="flex-1">
-                    <Button className="bg-green-600 hover:bg-green-700 text-white w-full" size="sm">
-                      <CreditCard className="mr-2 h-4 w-4" />
-                      Make Payment
-                    </Button>
-                  </Link>
-                )
-              })()}
+              {registrations.some(
+                r => r.tournament_id === tournament.id && r.status === 'pending'
+              ) && (
+                <Link href={`/dashboard/coach/tournaments/${tournament.id}/payment`} className="flex-1">
+                  <Button className="bg-green-600 hover:bg-green-700 text-white w-full" size="sm">
+                    <CreditCard className="mr-2 h-4 w-4" />
+                    Make Payment
+                  </Button>
+                </Link>
+              )}
               
               <Button size="sm" className="flex-1" asChild>
                 <Link href={`/dashboard/coach/tournaments/${tournament.id}/register`}>

@@ -88,7 +88,7 @@ export const tournamentFormSchema = z.object({
   registration_deadline: z.string().refine((val) => val !== '', { message: "Registration deadline is required" }),
   courts: z.preprocess(
     (val) => (val === '' || val === undefined || val === null ? null : Number(val)),
-    z.number().int().min(1, "Must have at least 1 court") // Made required as per feedback
+    z.number().int().min(1, "Must have at least 1 court").nullable()
   ),
   status: z.preprocess(
     (val) => (val === '' || val === undefined || val === null ? 'upcoming' : val),

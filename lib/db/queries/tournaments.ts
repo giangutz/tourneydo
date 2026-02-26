@@ -5,7 +5,7 @@
  * All queries are properly typed and handle errors consistently.
  */
 
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { resultCache, invalidateTournamentCache } from '@/lib/cache/result-cache'
 import type { Tournament, TournamentInsert, TournamentUpdate } from '@/types/models'
 
@@ -23,6 +23,7 @@ import type { Tournament, TournamentInsert, TournamentUpdate } from '@/types/mod
  */
 export async function getTournamentsByOrganizerId(userId: string): Promise<Tournament[]> {
   const supabase = createServerSupabaseClient()
+  const serviceClient = createServiceRoleSupabaseClient()
 
   // 1. Get tournaments where user is organizer
   const { data: organized, error: organizedError } = await supabase
@@ -35,29 +36,45 @@ export async function getTournamentsByOrganizerId(userId: string): Promise<Tourn
     throw new Error(`Failed to fetch organized tournaments: ${organizedError.message}`)
   }
 
-  // 2. Get tournaments where user is staff
-  const { data: staffAssignments, error: staffError } = await (supabase as any)
+  // 2. Auto-activate any pending staff invitations matching this user's email.
+  //    This handles users who were invited before they created their account,
+  //    or invites created before the service-role lookup fix was in place.
+  const { data: userRecord } = await supabase
+    .from('users')
+    .select('email')
+    .eq('user_id', userId)
+    .single()
+
+  if (userRecord?.email) {
+    await serviceClient
+      .from('tournament_staff')
+      .update({ user_id: userId, status: 'active' })
+      .eq('email', userRecord.email)
+      .eq('status', 'pending')
+      .is('user_id', null)
+  }
+
+  // 3. Get tournaments where user is active staff
+  const { data: staffAssignments, error: staffError } = await supabase
     .from('tournament_staff')
-    .select('tournament:tournaments(*), role')
+    .select('tournament:tournaments(*), roles')
     .eq('user_id', userId)
     .eq('status', 'active')
 
   if (staffError) {
-    // Log error but don't fail entire request? Or fail? 
-    // It filters out if table doesn't exist, but we created it.
     console.error(`Failed to fetch staff tournaments: ${staffError.message}`)
   }
 
-  const staffTournaments = staffAssignments?.map((s: any) => ({
-    ...s.tournament,
-    _staffRole: s.role // Add role to local object if needed for UI
+  const staffTournaments = staffAssignments?.map((s) => ({
+    ...(s.tournament as Record<string, unknown>),
+    _staffRoles: s.roles
   })) || []
 
   // Combine and deduplicate (though they shouldn't overlap if organizer isn't also staff)
-  const allTournaments = [...(organized || []), ...staffTournaments]
+  const allTournaments: Tournament[] = [...(organized || []), ...staffTournaments] as any[]
 
   // Sort by created_at desc
-  allTournaments.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+  allTournaments.sort((a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime())
 
   // Check and update status for each
   await Promise.all(allTournaments.map(t => checkAndUpdateStatus(t)))
@@ -129,29 +146,31 @@ export async function createTournament(tournamentData: TournamentInsert): Promis
 
 /**
  * Update an existing tournament
- * 
+ *
  * @param id - Tournament ID to update
  * @param tournamentData - Partial tournament data to update
- * @returns Updated tournament object
+ *
+ * NOTE: We intentionally omit .select().single() here. PostgREST returns
+ * "Cannot coerce the result to a single JSON object" when the UPDATE
+ * RLS policy and the SELECT RLS policy differ — the row is written
+ * successfully but the follow-up SELECT returns 0 rows. Since the action
+ * layer discards the return value, we only need to confirm the write
+ * succeeded (no error), then invalidate the cache.
  */
-export async function updateTournament(id: string, tournamentData: TournamentUpdate): Promise<Tournament> {
+export async function updateTournament(id: string, tournamentData: TournamentUpdate): Promise<void> {
   const supabase = createServerSupabaseClient()
 
-  const { data, error } = await (supabase as any)
+  const { error } = await (supabase as any)
     .from('tournaments')
     .update(tournamentData)
     .eq('id', id)
-    .select()
-    .single()
 
   if (error) {
     throw new Error(`Failed to update tournament: ${error.message}`)
   }
 
-  // OPTIMIZATION: Invalidate cache after write
+  // Invalidate cache so the next read reflects the update
   invalidateTournamentCache(id)
-
-  return data as unknown as Tournament
 }
 
 /**

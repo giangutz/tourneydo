@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { BracketView } from '@/components/tournaments/bracket-view'
@@ -66,8 +66,9 @@ import { BELT_GROUPS } from '@/lib/constants/belts'
 const SKILL_ORDER = [...Object.keys(BELT_GROUPS), 'Unknown']
 
 export function BracketPageClient({ tournament, participants, matches, userRole }: BracketPageClientProps) {
-  useAdminChannel(tournament.id)
+  const { isPending: realtimePending, markManualRefresh } = useAdminChannel(tournament.id)
   const router = useRouter()
+  const [isRefreshing, startTransition] = useTransition()
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [generating, setGenerating] = useState(false)
@@ -102,8 +103,8 @@ export function BracketPageClient({ tournament, participants, matches, userRole 
       
       if (result.success) {
         toast.success("Bracket deleted successfully")
-        console.log("Refreshing router...")
-        router.refresh()
+        markManualRefresh()
+        startTransition(() => { router.refresh() })
         window.location.reload()
       } else {
         console.error("Delete failed:", result.error)
@@ -145,7 +146,8 @@ export function BracketPageClient({ tournament, participants, matches, userRole 
         }
       } else {
         toast.success("Bracket generated successfully")
-        router.refresh() // Refresh to show new matches
+        markManualRefresh()
+        startTransition(() => { router.refresh() })
       }
     } catch (err) {
       toast.error("Failed to generate bracket")
@@ -181,7 +183,8 @@ export function BracketPageClient({ tournament, participants, matches, userRole 
           console.log('No data in result, showing toast')
           toast.success(hasMatchNumbers ? 'Schedule regenerated successfully' : 'Schedule generated successfully')
         }
-        router.refresh()
+        markManualRefresh()
+        startTransition(() => { router.refresh() })
       } else {
         // Check if we have validation data
         if ('data' in result && result.data && !result.data.feasible) {
@@ -296,8 +299,17 @@ export function BracketPageClient({ tournament, participants, matches, userRole 
   // Set default selection if empty
   const activeDivision = selectedDivision || (sortedDivisionNames.length > 0 ? sortedDivisionNames[0] : '')
 
+  const showRefreshIndicator = isRefreshing || realtimePending
+
   return (
-    <div className="space-y-6 w-full max-w-full overflow-hidden">
+    <div className="space-y-6 w-full max-w-full overflow-hidden relative">
+      {showRefreshIndicator && (
+        <div className="absolute top-0 left-0 right-0 z-20">
+          <div className="h-1 w-full bg-primary/20 overflow-hidden rounded-full">
+            <div className="h-full bg-primary animate-pulse w-1/2" />
+          </div>
+        </div>
+      )}
       <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 w-full">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

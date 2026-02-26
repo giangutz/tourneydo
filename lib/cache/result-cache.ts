@@ -1,13 +1,28 @@
 /**
  * Result Caching Layer for TourneyDo
- * 
- * Reduces database query load by caching frequently accessed data
- * 
+ *
+ * Reduces database query load by caching frequently accessed data.
+ *
+ * ⚠️  SERVERLESS LIMITATION
+ * This cache is stored in Node.js module-level memory (process heap).
+ * Each Vercel serverless function invocation may spin up a NEW cold instance,
+ * meaning the cache is NOT shared across concurrent requests and is wiped on
+ * every cold start. In practice this means:
+ *   - Cache hit rates on Vercel will be much lower than local dev.
+ *   - Data is never stale across instances, but the cache provides little
+ *     benefit for traffic spikes that spawn many fresh instances in parallel.
+ *   - Singleton pattern (`getInstance()`) only guarantees one instance per
+ *     process, not across the fleet.
+ *
+ * Future improvement: replace with Vercel KV (Redis) for a shared,
+ * persistent cache that works correctly in a serverless environment.
+ * See: https://vercel.com/docs/storage/vercel-kv
+ *
  * Features:
  * - Automatic TTL invalidation
  * - Manual invalidation on writes
  * - Metrics tracking (hit rate, memory usage)
- * - Per-query configurable TTL
+ * - Per-query configurable TTL (default: 60 s to minimise stale-data window)
  * - Development logging
  */
 
@@ -52,7 +67,7 @@ export class ResultCache {
   public async get<T>(
     key: string,
     fetchFn: () => Promise<T>,
-    ttl: number = 5 * 60 * 1000
+    ttl: number = 60 * 1000  // 60 s default — keeps stale-data window short on serverless
   ): Promise<T> {
     const entry = this.cache.get(key)
 
@@ -271,8 +286,13 @@ export function invalidateTournamentCache(tournamentId: string): void {
   resultCache.invalidate(`registrations:${tournamentId}`)
 }
 
+export function invalidateMatchesCache(tournamentId: string): void {
+  resultCache.invalidate(`matches-readiness:${tournamentId}`)
+}
+
 export function invalidateAllTournamentCaches(): void {
   resultCache.invalidatePattern('^tournament:')
   resultCache.invalidatePattern('^tournament_divisions:')
   resultCache.invalidatePattern('^registrations:')
+  resultCache.invalidatePattern('^matches-readiness:')
 }

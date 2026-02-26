@@ -21,7 +21,7 @@ jest.mock('next/server', () => {
   return {
     ...actual,
     NextResponse: {
-      json: jest.fn((data, init) => {
+      json: jest.fn((data: any, init?: any) => {
         const response = new Response(JSON.stringify(data), {
           status: init?.status || 200,
           headers: {
@@ -57,7 +57,7 @@ describe('PUT /api/participants/update', () => {
 
   describe('Authentication', () => {
     it('returns 401 when user is not authenticated', async () => {
-      mockAuth.mockResolvedValue({ userId: null })
+      mockAuth.mockResolvedValue({ userId: null } as any)
 
       const request = new NextRequest('http://localhost/api/participants/update', {
         method: 'PUT',
@@ -78,7 +78,7 @@ describe('PUT /api/participants/update', () => {
 
   describe('Input Validation', () => {
     beforeEach(() => {
-      mockAuth.mockResolvedValue({ userId: 'user-123' })
+      mockAuth.mockResolvedValue({ userId: 'user-123' } as any)
     })
 
     it('returns 400 for invalid JSON', async () => {
@@ -182,7 +182,7 @@ describe('PUT /api/participants/update', () => {
 
   describe('Authorization', () => {
     beforeEach(() => {
-      mockAuth.mockResolvedValue({ userId: 'user-123' })
+      mockAuth.mockResolvedValue({ userId: 'user-123' } as any)
       const mockSupabase = {
         from: jest.fn().mockReturnValue({
           select: jest.fn().mockReturnValue({
@@ -198,7 +198,7 @@ describe('PUT /api/participants/update', () => {
           }),
         }),
       }
-      mockCreateServerSupabaseClient.mockResolvedValue(mockSupabase as any)
+        ; (mockCreateServerSupabaseClient as jest.Mock).mockResolvedValue(mockSupabase)
     })
 
     // Note: These tests would require more complex Supabase mocking
@@ -232,7 +232,7 @@ describe('PUT /api/participants/update', () => {
           }),
         }),
       }
-      mockCreateServerSupabaseClient.mockResolvedValue(mockSupabase as any)
+        ; (mockCreateServerSupabaseClient as jest.Mock).mockResolvedValue(mockSupabase)
 
       const request = new NextRequest('http://localhost/api/participants/update', {
         method: 'PUT',
@@ -255,7 +255,7 @@ describe('PUT /api/participants/update', () => {
     // Note: Business logic tests would require complex Supabase mocking
     // These are covered in integration tests
     it.skip('successfully updates registration status', async () => {
-      mockAuth.mockResolvedValue({ userId: 'user-123' })
+      mockAuth.mockResolvedValue({ userId: 'user-123' } as any)
       const mockSupabase = {
         from: jest.fn().mockReturnThis(),
         select: jest.fn().mockReturnThis(),
@@ -279,7 +279,7 @@ describe('PUT /api/participants/update', () => {
             error: null,
           }),
       }
-      mockCreateServerSupabaseClient.mockResolvedValue(mockSupabase as any)
+        ; (mockCreateServerSupabaseClient as jest.Mock).mockResolvedValue(mockSupabase)
 
       const request = new NextRequest('http://localhost/api/participants/update', {
         method: 'PUT',
@@ -302,7 +302,7 @@ describe('PUT /api/participants/update', () => {
     // Note: Business logic tests would require complex Supabase mocking
     // These are covered in integration tests
     it.skip('successfully updates participant measurements', async () => {
-      mockAuth.mockResolvedValue({ userId: 'user-123' })
+      mockAuth.mockResolvedValue({ userId: 'user-123' } as any)
       mockGetPlayerById.mockResolvedValue({
         id: 'player-1',
         first_name: 'John',
@@ -334,7 +334,7 @@ describe('PUT /api/participants/update', () => {
             error: null,
           }),
       }
-      mockCreateServerSupabaseClient.mockResolvedValue(mockSupabase as any)
+        ; (mockCreateServerSupabaseClient as jest.Mock).mockResolvedValue(mockSupabase)
       mockUpdatePlayer.mockResolvedValue({
         id: 'player-1',
         weight: 72.5,
@@ -358,7 +358,7 @@ describe('PUT /api/participants/update', () => {
     })
 
     it.skip('successfully marks weigh-in when measurements provided', async () => {
-      mockAuth.mockResolvedValue({ userId: 'user-123' })
+      mockAuth.mockResolvedValue({ userId: 'user-123' } as any)
       mockGetPlayerById.mockResolvedValue({
         id: 'player-1',
         first_name: 'John',
@@ -391,7 +391,7 @@ describe('PUT /api/participants/update', () => {
             error: null,
           }),
       }
-      mockCreateServerSupabaseClient.mockResolvedValue(mockSupabase as any)
+        ; (mockCreateServerSupabaseClient as jest.Mock).mockResolvedValue(mockSupabase)
       mockUpdatePlayer.mockResolvedValue({
         id: 'player-1',
         weight: 72.5,
@@ -418,7 +418,7 @@ describe('PUT /api/participants/update', () => {
 
   describe('Error Handling', () => {
     beforeEach(() => {
-      mockAuth.mockResolvedValue({ userId: 'user-123' })
+      mockAuth.mockResolvedValue({ userId: 'user-123' } as any)
       const mockSupabase = {
         from: jest.fn().mockReturnValue({
           select: jest.fn().mockReturnValue({
@@ -438,7 +438,7 @@ describe('PUT /api/participants/update', () => {
           }),
         }),
       }
-      mockCreateServerSupabaseClient.mockResolvedValue(mockSupabase as any)
+        ; (mockCreateServerSupabaseClient as jest.Mock).mockResolvedValue(mockSupabase)
     })
 
     it('returns 500 and logs to Sentry on unexpected error', async () => {

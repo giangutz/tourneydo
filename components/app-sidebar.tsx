@@ -138,7 +138,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   return (
     <Sidebar collapsible="icon" {...props} className="border-none pt-2">
-      <SidebarHeader className="group-data-[collapsible=icon]:!pt-4">
+      <SidebarHeader className="group-data-[collapsible=icon]:pt-4!">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
@@ -154,7 +154,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
-      <SidebarContent className="px-2 group-data-[collapsible=icon]:!px-2 group-data-[collapsible=icon]:!pt-2">
+      <SidebarContent className="px-2 group-data-[collapsible=icon]:px-2! group-data-[collapsible=icon]:pt-2!">
          {items.map((group, index) => (
              <NavMain key={index} items={group.items} label={group.label} />
          ))}

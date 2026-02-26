@@ -23,6 +23,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 // Table imports removed as we switched to grid layout
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
+import { Switch } from '@/components/ui/switch'
 
 import { saveTournamentScheduleConfig, generateSchedule } from '@/lib/actions/schedule'
 import { TournamentScheduleConfig } from '@/types/models'
@@ -31,6 +32,11 @@ const scheduleFormSchema = z.object({
   daily_start_time: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Invalid time format (HH:MM)'),
   daily_end_time: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Invalid time format (HH:MM)'),
   courts: z.coerce.number().min(1, 'Must have at least 1 court'),
+  
+  // Lunch configuration
+  lunch_enabled: z.boolean().default(true),
+  lunch_start_time: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Invalid time format (HH:MM)'),
+  lunch_end_time: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Invalid time format (HH:MM)'),
   
   // Division constraints
   gradeschool_round_time: z.coerce.number().min(30, 'Minimum 30s'),
@@ -89,6 +95,10 @@ export function ScheduleConfigForm({ tournamentId, initialConfig, tournamentCour
       daily_end_time: initialConfig?.daily_end_time?.slice(0, 5) || '18:00',
       courts: tournamentCourts || initialConfig?.courts || 4,
       
+      lunch_enabled: initialConfig?.lunch_enabled ?? true,
+      lunch_start_time: initialConfig?.lunch_start_time?.slice(0, 5) || '12:00',
+      lunch_end_time: initialConfig?.lunch_end_time?.slice(0, 5) || '13:00',
+      
       gradeschool_round_time: initialConfig?.gradeschool_round_time || 90,
       gradeschool_kyeshi_time: initialConfig?.gradeschool_kyeshi_time || 60,
       gradeschool_rest_between_rounds: initialConfig?.gradeschool_rest_between_rounds || 30,
@@ -117,6 +127,9 @@ export function ScheduleConfigForm({ tournamentId, initialConfig, tournamentCour
         daily_start_time: values.daily_start_time,
         daily_end_time: values.daily_end_time,
         courts: values.courts,
+        lunch_enabled: values.lunch_enabled,
+        lunch_start_time: values.lunch_start_time,
+        lunch_end_time: values.lunch_end_time,
         gradeschool_round_time: values.gradeschool_round_time,
         gradeschool_kyeshi_time: values.gradeschool_kyeshi_time,
         gradeschool_rest_between_rounds: values.gradeschool_rest_between_rounds,
@@ -322,6 +335,68 @@ export function ScheduleConfigForm({ tournamentId, initialConfig, tournamentCour
                     </FormItem>
                   )}
                 />
+
+                <div className="col-span-1 border-t pt-4 mt-2">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-base">Lunch Break</FormLabel>
+                      <FormDescription>
+                        Pause all matches during this time period
+                      </FormDescription>
+                    </div>
+                    <FormField
+                      control={form.control}
+                      name="lunch_enabled"
+                      render={({ field }) => (
+                        <FormItem className="flex items-center space-x-2 space-y-0">
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  {form.watch('lunch_enabled') && (
+                    <div className="grid grid-cols-2 gap-4 animate-in slide-in-from-top-2 fade-in duration-200">
+                      <FormField
+                        control={form.control}
+                        name="lunch_start_time"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm">Start Time</FormLabel>
+                            <FormControl>
+                              <div className="relative">
+                                  <Input type="time" {...field} className="pl-9" />
+                                  <Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="lunch_end_time"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm">End Time</FormLabel>
+                            <FormControl>
+                              <div className="relative">
+                                  <Input type="time" {...field} className="pl-9" />
+                                  <Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  )}
+                </div>
                  <FormField
                   control={form.control}
                   name="courts"

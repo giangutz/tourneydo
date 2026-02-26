@@ -21,10 +21,10 @@ test.beforeEach(async ({ page }) => {
   // Enable performance monitoring
   await page.addInitScript(() => {
     // Store performance marks for later analysis
-    window.performanceMarks = []
+    (window as any).performanceMarks = []
     const observer = new PerformanceObserver(list => {
       for (const entry of list.getEntries()) {
-        ;(window as any).performanceMarks.push({
+        ; (window as any).performanceMarks.push({
           name: entry.name,
           duration: (entry as any).duration,
           startTime: entry.startTime,

@@ -325,11 +325,13 @@ export async function getTournamentParticipants(
 
   if (weighInStatus && weighInStatus !== 'all') {
     if (weighInStatus === 'completed') {
-      queryBuilder = queryBuilder.not('weighed_in_at', 'is', null)
+      // "completed" means the random check was performed (passed or failed)
+      queryBuilder = queryBuilder.not('random_weigh_in_at', 'is', null)
     } else if (weighInStatus === 'pending') {
-      queryBuilder = queryBuilder.is('weighed_in_at', null).eq('status', 'verified')
+      // "pending" means selected for random check but not yet checked
+      queryBuilder = queryBuilder.is('random_weigh_in_at', null).eq('status', 'verified')
     } else if (weighInStatus === 'not-required') {
-      queryBuilder = queryBuilder.is('weighed_in_at', null).neq('status', 'verified')
+      queryBuilder = queryBuilder.is('random_weigh_in_at', null).neq('status', 'verified')
     }
   }
 
@@ -666,7 +668,8 @@ export async function getRecentRegistrationsByOrganizerId(organizerId: string, l
 }
 
 /**
- * Clear weigh-in selection for all participants in a tournament
+ * Clear random weigh-in selection for all participants in a tournament.
+ * Only clears random-specific columns — official weigh-in data is preserved.
  */
 export async function clearWeighInSelected(tournamentId: string): Promise<void> {
   const supabase = createServerSupabaseClient()
@@ -675,10 +678,10 @@ export async function clearWeighInSelected(tournamentId: string): Promise<void> 
     .from('tournament_registrations')
     .update({
       weigh_in_selected: false,
-      weighed_in_at: null,
-      actual_weight: null,
-      actual_height: null,
-      weighed_in_by: null
+      random_weigh_in_weight: null,
+      random_weigh_in_at: null,
+      random_weigh_in_passed: null,
+      random_weigh_in_by: null,
     })
     .eq('tournament_id', tournamentId)
 

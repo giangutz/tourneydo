@@ -16,13 +16,20 @@ export default async function TournamentOrganizerDashboard() {
   const { userId } = await auth()
   if (!userId) return null
 
-  // Fetch data in parallel
-  const [tournaments, totalRegistrations, recentActivity, totalRevenue] = await Promise.all([
+  // Fetch data in parallel (recentActivity is separated so a transient fetch error
+  // doesn't crash the entire page — matches the pattern used in notifications-nav.tsx)
+  const [tournaments, totalRegistrations, totalRevenue] = await Promise.all([
     getTournamentsByOrganizerId(userId),
     getTotalRegistrationsByOrganizerId(userId),
-    getRecentRegistrationsByOrganizerId(userId),
     getTotalRevenueByOrganizerId(userId)
   ])
+
+  let recentActivity: Awaited<ReturnType<typeof getRecentRegistrationsByOrganizerId>> = []
+  try {
+    recentActivity = await getRecentRegistrationsByOrganizerId(userId)
+  } catch (err) {
+    console.error('Failed to load recent activity:', err)
+  }
 
   const stats = {
     total: tournaments.length,
@@ -122,7 +129,7 @@ export default async function TournamentOrganizerDashboard() {
                 recentActivity.map((activity: any, i: number) => (
                   <div key={activity.id} className="group flex items-start gap-4 p-3 -mx-3 rounded-xl hover:bg-muted/50 transition-colors">
                      {/* Avatar / Icon Placeholder */}
-                    <div className="h-10 w-10 flex-shrink-0 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs ring-2 ring-background group-hover:ring-muted transition-all">
+                    <div className="h-10 w-10 shrink-0 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs ring-2 ring-background group-hover:ring-muted transition-all">
                         {activity.players?.first_name?.[0]}{activity.players?.last_name?.[0]}
                     </div>
                     

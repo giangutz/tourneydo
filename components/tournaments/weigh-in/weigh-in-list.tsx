@@ -22,11 +22,17 @@ interface Participant {
   division_id?: string
   category_id?: string
   weigh_in_selected: boolean
+  // Official weigh-in (read-only here — not used for random list status)
   weighed_in_at: string | null
   disqualified: boolean
   disqualification_reason: string | null
   actual_weight: number | null
   actual_height: number | null
+  // Random (surprise) weigh-in — source of truth for this list's status
+  random_weigh_in_weight: number | null
+  random_weigh_in_at: string | null
+  random_weigh_in_passed: boolean | null  // null = pending, true = passed, false = failed
+  random_weigh_in_by: string | null
   player?: {
     first_name: string
     last_name: string
@@ -34,35 +40,41 @@ interface Participant {
   team?: {
     name: string
   }
+  status?: string
 }
 
 interface Division {
   id: string
   name: string
-  tournament_categories: Array<{
-    id: string
-    name: string
-    gender: string
-    max_weight?: number | null
-  }>
+  tournament_categories: Category[]
+}
+
+type Category = {
+  id: string
+  name: string
+  gender: string
+  max_weight?: number | null
+  min_weight?: number | null
+  max_height?: number | null
+  min_height?: number | null
 }
 
 interface WeighInListProps {
-  participants: any[] 
-  divisions: any[]
+  participants: Participant[] 
+  divisions: Division[]
   tournamentId: string
   page: number
   totalPages: number
   totalCount: number
 }
 
-import { startTransition, useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Loader2, Download, Trash2, Search, ArrowLeft, ArrowRight, X, Scale } from 'lucide-react'
+import { Loader2, Download, Trash2, Search, ArrowLeft, ArrowRight, Scale } from 'lucide-react'
 import { toast } from 'sonner'
 import { useDebounce } from 'use-debounce'
 import {
@@ -76,7 +88,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { deleteWeighInChecklist } from '@/lib/actions/participants'
-import { id } from 'zod/v4/locales'
 
 export function WeighInList({ participants, divisions, tournamentId, page, totalPages, totalCount }: WeighInListProps) {
   const router = useRouter()
@@ -86,7 +97,7 @@ export function WeighInList({ participants, divisions, tournamentId, page, total
   const [isExporting, setIsExporting] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
-  const [weighingId, setWeighingId] = useState<string | null>(null)
+
 
   // URL State management
   const [searchQuery, setSearchQuery] = useState(searchParams.get('query') || '')
@@ -105,7 +116,7 @@ export function WeighInList({ participants, divisions, tournamentId, page, total
     }
     params.set('page', '1') // Reset page on search
     router.replace(`${pathname}?${params.toString()}`)
-  }, [debouncedQuery, pathname, router]) // Intentionally excluded searchParams to avoid loop, though careful dependency management needed.
+  }, [debouncedQuery, pathname, router, searchParams])
 
   // Update Filters
   const updateFilter = (key: string, value: string) => {
@@ -151,9 +162,9 @@ export function WeighInList({ participants, divisions, tournamentId, page, total
         if (result.data) {
           // Convert to CSV
           const headers = ['First Name', 'Last Name', 'Team', 'Division', 'Category', 'Max Weight', 'Status', 'Weigh-In Status', 'Actual Weight', 'Actual Height']
-          const rows = result.data.map((p: any) => {
+          const rows = result.data.map((p: Participant) => {
               const div = divisions.find((d: Division) => d.id === p.division_id)
-              const cat = div?.tournament_categories.find((c: any) => c.id === p.category_id)
+              const cat = div?.tournament_categories.find((c: Category) => c.id === p.category_id)
               return [
                 p.player?.first_name || '',
                 p.player?.last_name || '',
@@ -170,7 +181,7 @@ export function WeighInList({ participants, divisions, tournamentId, page, total
             
           const csvContent = [
             headers.join(','),
-            ...rows.map((row: any[]) => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+            ...rows.map((row: (string | number | undefined)[]) => row.map(cell => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(','))
           ].join('\n')
             
           const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
@@ -189,7 +200,7 @@ export function WeighInList({ participants, divisions, tournamentId, page, total
         toast.error(result.error || 'Failed to export participants')
       }
     } catch (error) {
-      toast.error('An error occurred during export')
+      toast.error('An error occurred during export', { description: (error as Error).message })
     } finally {
       setIsExporting(false)
     }
@@ -215,7 +226,7 @@ export function WeighInList({ participants, divisions, tournamentId, page, total
   }
 
   // Render format helper
-  const getCategoryLabel = (cat: any, divisionName: string) => {
+  const getCategoryLabel = (cat: Category, divisionName: string) => {
     const isAdult = divisionName?.toLowerCase().includes('senior')
     let genderPrefix = ''
     
@@ -241,10 +252,10 @@ export function WeighInList({ participants, divisions, tournamentId, page, total
 
   const getCategoryDetails = (divisionId?: string, categoryId?: string) => {
     const div = divisions.find((d: Division) => d.id === divisionId)
-    const cat = div?.tournament_categories.find((c: any) => c.id === categoryId)
+    const cat = div?.tournament_categories.find((c: Category) => c.id === categoryId)
     return {
       divisionName: div?.name || 'Unknown',
-      categoryName: cat ? getCategoryLabel(cat, div?.name) : 'Unknown', // Use same label format
+      categoryName: cat ? getCategoryLabel(cat, div?.name ?? '') : 'Unknown', // Use same label format
       maxWeight: cat?.max_weight
     }
   }
@@ -316,7 +327,7 @@ export function WeighInList({ participants, divisions, tournamentId, page, total
                   </Select>
 
                   <Select value={divisionFilter} onValueChange={(val) => updateFilter('divisionId', val)}>
-                    <SelectTrigger className="w-full sm:w-[160px]">
+                     <SelectTrigger className="w-full sm:w-40">
                       <SelectValue placeholder="Select Division" />
                     </SelectTrigger>
                     <SelectContent>
@@ -338,19 +349,19 @@ export function WeighInList({ participants, divisions, tournamentId, page, total
                       {(() => {
                           // Deduplicate categories by label
                           const uniqueCategories = new Map();
-                          availableCategories.forEach((c: any) => {
-                              const label = getCategoryLabel(c, activeDivision?.name || '');
-                              if (!uniqueCategories.has(label)) {
-                                  uniqueCategories.set(label, c);
-                              } else {
-                                  const existing = uniqueCategories.get(label);
-                                  if (!existing.max_weight && c.max_weight) {
-                                      uniqueCategories.set(label, c);
-                                  }
-                              }
-                          });
-                          
-                          return Array.from(uniqueCategories.values()).map((c: any) => (
+                          availableCategories.forEach((c: Category) => {
+                               const label = getCategoryLabel(c, activeDivision?.name || '');
+                               if (!uniqueCategories.has(label)) {
+                                   uniqueCategories.set(label, c);
+                               } else {
+                                   const existing = uniqueCategories.get(label) as Category;
+                                   if (!existing.max_weight && c.max_weight) {
+                                       uniqueCategories.set(label, c);
+                                   }
+                               }
+                           });
+                           
+                           return Array.from(uniqueCategories.values()).map((c: Category) => (
                               <SelectItem key={c.id} value={c.id}>
                                   {getCategoryLabel(c, activeDivision?.name || '')}
                               </SelectItem>
@@ -383,12 +394,10 @@ export function WeighInList({ participants, divisions, tournamentId, page, total
                 const teamName = p.team?.name || p.team_name || '-'
 
                 let statusBadge = <Badge variant="outline"><Clock className="mr-1 h-3 w-3" /> Pending</Badge>
-                if (p.disqualified && p.disqualification_reason?.includes('Weigh-in')) {
-                  statusBadge = <Badge variant="destructive"><XCircle className="mr-1 h-3 w-3" /> Failed</Badge>
-                } else if (p.weighed_in_at && !p.disqualified) {
+                if (p.random_weigh_in_passed === true) {
                   statusBadge = <Badge variant="default" className="bg-green-600 hover:bg-green-700"><CheckCircle2 className="mr-1 h-3 w-3" /> Passed</Badge>
-                } else if (p.disqualified) {
-                  statusBadge = <Badge variant="destructive">Disqualified</Badge>
+                } else if (p.random_weigh_in_passed === false) {
+                  statusBadge = <Badge variant="destructive"><XCircle className="mr-1 h-3 w-3" /> Failed</Badge>
                 }
 
                 return (
@@ -406,12 +415,24 @@ export function WeighInList({ participants, divisions, tournamentId, page, total
                       {details.maxWeight ? `${(details.maxWeight * 1.05).toFixed(2)}kg` : 'Open'}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="secondary" size="sm" asChild>
-                        <Link href={`/dashboard/tournament-organizer/tournaments/${tournamentId}/random-weigh-in/${p.id}`}>
+                      {p.random_weigh_in_passed === null ? (
+                        <Button variant="secondary" size="sm" asChild>
+                          <Link href={`/dashboard/tournament-organizer/tournaments/${tournamentId}/random-weigh-in/${p.id}`}>
+                            <Scale className="h-4 w-4 mr-2" />
+                            Random Check
+                          </Link>
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          disabled
+                          title={p.random_weigh_in_passed ? 'Already passed' : 'Failed — disqualified (final)'}
+                        >
                           <Scale className="h-4 w-4 mr-2" />
                           Random Check
-                        </Link>
-                      </Button>
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 )
@@ -442,12 +463,10 @@ export function WeighInList({ participants, divisions, tournamentId, page, total
                 const teamName = p.team?.name || p.team_name || '-'
 
                 let statusBadge = <Badge variant="outline"><Clock className="mr-1 h-3 w-3" /> Pending</Badge>
-                if (p.disqualified && p.disqualification_reason?.includes('Weigh-in')) {
-                  statusBadge = <Badge variant="destructive"><XCircle className="mr-1 h-3 w-3" /> Failed</Badge>
-                } else if (p.weighed_in_at && !p.disqualified) {
+                if (p.random_weigh_in_passed === true) {
                   statusBadge = <Badge variant="default" className="bg-green-600 hover:bg-green-700"><CheckCircle2 className="mr-1 h-3 w-3" /> Passed</Badge>
-                } else if (p.disqualified) {
-                  statusBadge = <Badge variant="destructive">Disqualified</Badge>
+                } else if (p.random_weigh_in_passed === false) {
+                  statusBadge = <Badge variant="destructive"><XCircle className="mr-1 h-3 w-3" /> Failed</Badge>
                 }
 
                 return (
@@ -475,12 +494,24 @@ export function WeighInList({ participants, divisions, tournamentId, page, total
                       </div>
                     </div>
 
-                    <Button variant="secondary" className="w-full" asChild>
-                      <Link href={`/dashboard/tournament-organizer/tournaments/${tournamentId}/random-weigh-in/${p.id}`}>
+                    {p.random_weigh_in_passed === null ? (
+                      <Button variant="secondary" className="w-full" asChild>
+                        <Link href={`/dashboard/tournament-organizer/tournaments/${tournamentId}/random-weigh-in/${p.id}`}>
+                          <Scale className="h-4 w-4 mr-2" />
+                          Random Check
+                        </Link>
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="secondary"
+                        className="w-full"
+                        disabled
+                        title={p.random_weigh_in_passed ? 'Already passed' : 'Failed — disqualified (final)'}
+                      >
                         <Scale className="h-4 w-4 mr-2" />
                         Random Check
-                      </Link>
-                    </Button>
+                      </Button>
+                    )}
                   </div>
                 )
              })
