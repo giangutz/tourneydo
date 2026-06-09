@@ -1007,6 +1007,68 @@ export type Database = {
           },
         ]
       }
+      tournament_placements: {
+        Row: {
+          category_id: string | null
+          computed_at: string
+          division_id: string | null
+          id: string
+          medal: string
+          placement: number
+          player_id: string
+          tournament_id: string
+        }
+        Insert: {
+          category_id?: string | null
+          computed_at?: string
+          division_id?: string | null
+          id?: string
+          medal: string
+          placement: number
+          player_id: string
+          tournament_id: string
+        }
+        Update: {
+          category_id?: string | null
+          computed_at?: string
+          division_id?: string | null
+          id?: string
+          medal?: string
+          placement?: number
+          player_id?: string
+          tournament_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tournament_placements_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "tournament_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tournament_placements_division_id_fkey"
+            columns: ["division_id"]
+            isOneToOne: false
+            referencedRelation: "tournament_divisions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tournament_placements_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tournament_placements_tournament_id_fkey"
+            columns: ["tournament_id"]
+            isOneToOne: false
+            referencedRelation: "tournaments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tournament_registrations: {
         Row: {
           actual_height: number | null

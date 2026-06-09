@@ -16,8 +16,10 @@ import { MatchDetailsDialog } from '@/components/tournaments/match-details-dialo
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { DivisionBreakdown } from '@/components/tournaments/shared/division-breakdown'
 import { TeamDelegationsChart, BeltDistributionChart, GenderSplitChart } from '@/components/tournaments/overview/charts'
+import { PlacementsView } from '@/components/tournaments/placements-view'
 import { formatShortDate } from '@/lib/utils'
 import { matches } from 'underscore'
+import type { PlacementGroup } from '@/lib/db/queries/placements'
 
 interface Participant {
   id: string
@@ -43,9 +45,10 @@ interface PublicTournamentClientProps {
   tournament: Tournament
   matches: Match[]
   participants: Participant[]
+  placementGroups: PlacementGroup[]
 }
 
-export function PublicTournamentClient({ tournament, matches: initialMatches, participants }: PublicTournamentClientProps) {
+export function PublicTournamentClient({ tournament, matches: initialMatches, participants, placementGroups }: PublicTournamentClientProps) {
   // 1. Local State for High-Frequency Updates
   const [matches, setMatches] = useState<Match[]>(initialMatches)
 
@@ -202,7 +205,14 @@ export function PublicTournamentClient({ tournament, matches: initialMatches, pa
 
         {/* VIEW: RESULTS */}
         {currentView === 'results' && (
-           <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+           <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-8">
+
+              {/* Medal standings — shown once any division is complete */}
+              {placementGroups.length > 0 && (
+                <PlacementsView groups={placementGroups} />
+              )}
+
+              <div>
               <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                  <Trophy className="h-5 w-5 text-yellow-500" />
                  Recent Results
@@ -244,6 +254,7 @@ export function PublicTournamentClient({ tournament, matches: initialMatches, pa
                  {matches.filter((m: Match) => m.status === 'completed').length === 0 && (
                    <p className="text-muted-foreground col-span-full text-center py-10">No completed matches yet.</p>
                  )}
+              </div>
               </div>
            </div>
         )}

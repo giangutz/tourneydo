@@ -23,6 +23,7 @@ import { getTournamentById } from '@/lib/db/queries/tournaments'
 import { matchScoresSchema, type MatchScoresInput } from '@/lib/validations/match-scores'
 import { createAuditEntry } from '@/lib/db/queries/audit-trail'
 import { logger } from '@/lib/logger'
+import { computeDivisionPlacements } from '@/lib/db/queries/placements'
 import { invalidateMatchesCache } from '@/lib/cache/result-cache'
 import { routes } from '@/config/routes'
 import type { WinMethod } from '@/types/models'
@@ -77,7 +78,7 @@ export async function rescoreMatch(
     const { data: match, error: matchError } = await supabase
       .from('matches')
       .select(
-        'player1_id, player2_id, tournament_id, winner_id, win_method, winning_round, ' +
+        'player1_id, player2_id, tournament_id, winner_id, win_method, winning_round, next_match_id, ' +
         'score_round1_player1, score_round1_player2, score_round2_player1, score_round2_player2, ' +
         'score_round3_player1, score_round3_player2'
       )
@@ -148,6 +149,11 @@ export async function rescoreMatch(
         .from('matches')
         .update({ actual_end_time: new Date().toISOString() })
         .eq('id', matchId)
+
+      // Re-compute placements if this is the final (rescoring a final changes medals)
+      if (!typedMatch.next_match_id) {
+        await computeDivisionPlacements(supabase, matchId)
+      }
     }
 
     // Step 5: Audit trail

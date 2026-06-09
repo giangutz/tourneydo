@@ -18,6 +18,7 @@ interface BracketPageProps {
 
 
 import { checkTournamentAccess } from '@/lib/auth/tournament-access'
+import { getTournamentPlacements } from '@/lib/db/queries/placements'
 
 export default async function BracketPage({ params }: BracketPageProps) {
   const { id } = await params
@@ -25,10 +26,11 @@ export default async function BracketPage({ params }: BracketPageProps) {
   // Check access and get role
   const access = await checkTournamentAccess(id)
   
-  const [tournament, { data: participants }, matches] = await Promise.all([
+  const [tournament, { data: participants }, matches, placementGroups] = await Promise.all([
     getTournamentById(id),
     getTournamentParticipants(id, { limit: 10000 }),
-    getMatchesWithReadiness(id)
+    getMatchesWithReadiness(id),
+    getTournamentPlacements(id),
   ])
 
   if (!tournament) {
@@ -53,11 +55,12 @@ export default async function BracketPage({ params }: BracketPageProps) {
         title="Bracket"
         description="Manage tournament bracket and results."
       />
-      <BracketPageClient 
-        tournament={tournament} 
-        participants={participants} 
-        matches={matches} 
+      <BracketPageClient
+        tournament={tournament}
+        participants={participants}
+        matches={matches}
         userRole={role}
+        placementGroups={placementGroups}
       />
     </DashboardShell>
   )

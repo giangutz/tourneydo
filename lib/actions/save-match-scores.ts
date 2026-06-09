@@ -15,6 +15,7 @@ import {
 } from '@/lib/validations/match-scores'
 import { createAuditEntry } from '@/lib/db/queries/audit-trail'
 import { isExplicitWinnerMethod, DEFAULT_WT_RULES } from '@/lib/constants/wt-rules'
+import { computeDivisionPlacements } from '@/lib/db/queries/placements'
 import { logger } from '@/lib/logger'
 import type { WinMethod } from '@/types/models'
 
@@ -70,7 +71,7 @@ export async function saveMatchScores(
     // Get the match to find player IDs, tournament, and current version
     const { data: match, error: matchError } = await supabase
       .from('matches')
-      .select('player1_id, player2_id, tournament_id, updated_at')
+      .select('player1_id, player2_id, tournament_id, updated_at, next_match_id, division_id, category_id')
       .eq('id', matchId)
       .single()
 
@@ -183,6 +184,12 @@ export async function saveMatchScores(
         .from('matches')
         .update({ actual_end_time: new Date().toISOString() })
         .eq('id', matchId)
+
+      // If this is the final match (no downstream match), compute placements
+      const typedMatch = match as any
+      if (!typedMatch.next_match_id) {
+        await computeDivisionPlacements(supabase, matchId)
+      }
     }
 
     // Audit (non-blocking)

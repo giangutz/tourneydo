@@ -53,19 +53,22 @@ interface BracketPageClientProps {
   participants: any[]
   matches: MatchWithReadiness[]
   userRole?: TournamentRole | 'admin' | null
+  placementGroups?: PlacementGroup[]
 }
 
 import { useAdminChannel } from '@/lib/realtime/admin-channel'
 import { BracketGenerationModal } from './bracket/bracket-generation-modal'
 import { BracketValidationDialog } from './bracket/bracket-validation-dialog'
 import { DivisionBreakdown } from './shared/division-breakdown'
+import { PlacementsView } from './placements-view'
+import type { PlacementGroup } from '@/lib/db/queries/placements'
 import { ScheduleInfeasibilityDialog } from './schedule-infeasibility-dialog'
 import { ScheduleSuccessSummaryDialog } from './schedule-success-summary-dialog'
 import { getBeltSkillCategory, getCategoryDisplayName } from '@/lib/utils'
 import { BELT_GROUPS } from '@/lib/constants/belts'
 const SKILL_ORDER = [...Object.keys(BELT_GROUPS), 'Unknown']
 
-export function BracketPageClient({ tournament, participants, matches, userRole }: BracketPageClientProps) {
+export function BracketPageClient({ tournament, participants, matches, userRole, placementGroups = [] }: BracketPageClientProps) {
   const { isPending: realtimePending, markManualRefresh } = useAdminChannel(tournament.id)
   const router = useRouter()
   const [isRefreshing, startTransition] = useTransition()
@@ -415,6 +418,13 @@ export function BracketPageClient({ tournament, participants, matches, userRole 
           canScore={userRole !== 'bracket_manager'}
           canManageParticipants={userRole !== 'bracket_manager'}
         />
+      )}
+
+      {/* Medal standings — shown once any division bracket completes */}
+      {placementGroups.length > 0 && (
+        <div className="mt-6">
+          <PlacementsView groups={placementGroups} />
+        </div>
       )}
 
       {/* Match Readiness Dialog - readiness management only */}
