@@ -2,7 +2,7 @@ import * as React from 'react';
 import { RectClipped } from './Clipped';
 import { Game, Side, SideInfo } from '@/lib/types/bracket-models';
 import * as _ from 'underscore';
-import { Pencil, ArrowLeftRight } from 'lucide-react';
+import { Pencil, ArrowLeftRight, Printer } from 'lucide-react';
 import { Match, MatchWithReadiness } from '@/types/models';
 
 interface BracketGameProps {
@@ -289,13 +289,29 @@ export default class BracketGame extends React.PureComponent<BracketGameProps> {
           </text>
         </g>
         
-        {/* Action buttons (only visible for organizer) - Larger and more visible */}
+        {/* Action buttons (only visible for organizer) */}
         {isOrganizer && originalMatch && (
-          <foreignObject x="140" y="-22" width="70" height="30">
+          <foreignObject x="100" y="-22" width="115" height="30">
             <div className="flex justify-end gap-2">
+              {/* Print match slip — only when both players are confirmed */}
+              {originalMatch.player1_id && originalMatch.player2_id && (
+                <button
+                  className="bg-white text-gray-700 hover:bg-violet-50 hover:text-violet-600 hover:border-violet-300 rounded-md p-1.5 shadow-md border-2 border-gray-300 transition-all"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    window.open(
+                      `/print/tournament/${originalMatch.tournament_id}?mode=slip&match=${originalMatch.id}`,
+                      '_blank'
+                    );
+                  }}
+                  title="Print match slip"
+                >
+                  <Printer size={14} />
+                </button>
+              )}
               {/* Switch sides button */}
               {onSwitchSides && (
-                <button 
+                <button
                   className="bg-white text-gray-700 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300 rounded-md p-1.5 shadow-md border-2 border-gray-300 transition-all"
                   onClick={(e) => {
                     e.stopPropagation();
@@ -308,7 +324,7 @@ export default class BracketGame extends React.PureComponent<BracketGameProps> {
               )}
               {/* Edit match button */}
               {onEditMatch && (
-                <button 
+                <button
                   className="bg-white text-gray-700 hover:bg-green-50 hover:text-green-600 hover:border-green-300 rounded-md p-1.5 shadow-md border-2 border-gray-300 transition-all"
                   onClick={(e) => {
                     e.stopPropagation();

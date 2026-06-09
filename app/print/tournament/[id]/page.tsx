@@ -11,8 +11,9 @@ interface PrintPageProps {
     id: string
   }>
   searchParams: Promise<{
-    mode?: 'brackets' | 'slips'
+    mode?: 'brackets' | 'slips' | 'slip'
     division?: string
+    match?: string
   }>
 }
 
@@ -38,6 +39,12 @@ export default async function PrintPage({ params, searchParams }: PrintPageProps
 
   const participants = participantsResult.data
   const mode = resolvedSearchParams.mode || 'brackets'
+  const singleMatchId = resolvedSearchParams.match ?? null
+
+  // Single-slip mode: filter to the requested match
+  const printMatches = singleMatchId
+    ? matches.filter(m => m.id === singleMatchId)
+    : matches
 
   // Auto-trigger print
   const printScript = (
@@ -58,9 +65,9 @@ export default async function PrintPage({ params, searchParams }: PrintPageProps
   return (
     <div className="bg-white min-h-screen text-black p-4">
       {printScript}
-      {mode === 'slips' ? (
-        <MatchSlipsView 
-            matches={matches} 
+      {(mode === 'slips' || mode === 'slip') ? (
+        <MatchSlipsView
+            matches={printMatches}
             participants={participants}
             tournament={tournament}
         />

@@ -37,7 +37,7 @@ import {
 import { assignMatchToCourt, unassignMatch, updateMatchStatus, returnMatchToQueue } from '@/lib/actions/matches'
 import { disqualifyParticipant } from '@/lib/actions/participants'
 import { toast } from 'sonner'
-import { ArrowRightLeft, Trash2, XCircle, Monitor, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react'
+import { ArrowRightLeft, Trash2, XCircle, Monitor, ChevronLeft, ChevronRight, RotateCcw, Printer } from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { LiveDisplayMode } from '@/components/tournaments/live-display-mode'
@@ -404,6 +404,20 @@ export function CourtManager({ tournament, matches, participants }: CourtManager
                       >
                         Score
                       </Button>
+                      {currentMatch.player1_id && currentMatch.player2_id && (
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          title="Print match slip"
+                          className="text-violet-600 hover:text-violet-700 hover:bg-violet-50 hover:border-violet-300"
+                          onClick={() => window.open(
+                            `/print/tournament/${currentMatch.tournament_id}?mode=slip&match=${currentMatch.id}`,
+                            '_blank'
+                          )}
+                        >
+                          <Printer className="h-4 w-4" />
+                        </Button>
+                      )}
                       <Button
                         variant="outline"
                         size="icon"
@@ -520,9 +534,23 @@ export function CourtManager({ tournament, matches, participants }: CourtManager
                                 Move
                               </Button>
                             )}
-                            <Button 
-                              size="icon" 
-                              variant="outline" 
+                            {match.player1_id && match.player2_id && (
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                className="h-7 w-7 text-violet-600 hover:text-violet-700 hover:bg-violet-50 hover:border-violet-300 shrink-0"
+                                title="Print match slip"
+                                onClick={() => window.open(
+                                  `/print/tournament/${match.tournament_id}?mode=slip&match=${match.id}`,
+                                  '_blank'
+                                )}
+                              >
+                                <Printer className="h-3 w-3" />
+                              </Button>
+                            )}
+                            <Button
+                              size="icon"
+                              variant="outline"
                               className="h-7 w-7 text-destructive hover:bg-destructive/10 shrink-0"
                               onClick={() => setMatchToRemove(match)}
                               title="Remove from court"
