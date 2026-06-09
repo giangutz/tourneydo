@@ -6,13 +6,17 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Match, WinMethod } from '@/types/models'
-import { WIN_METHOD_LABELS } from '@/lib/constants/wt-rules'
+import { WIN_METHOD_LABELS, DEFAULT_WT_RULES, type TechniqueKey } from '@/lib/constants/wt-rules'
+import type { GamJeomInput, TechniqueStatInput } from '@/lib/validations/match-scores'
 import { saveMatchScores } from '@/lib/actions/save-match-scores'
 import { rescoreMatch } from '@/lib/actions/rescore-match'
 import { enqueue as enqueueOffline } from '@/lib/offline/score-queue'
 import { broadcastManager } from '@/lib/realtime/broadcast'
 import { fetchMatchRounds } from '@/lib/actions/fetch-match-rounds'
+import { GamJeomPanel } from './match-result/gam-jeom-panel'
+import { TechniquePanel } from './match-result/technique-panel'
 import { toast } from 'sonner'
 import { Loader2, Trophy, CheckCircle2, Zap, RotateCcw, AlertTriangle } from 'lucide-react'
 
@@ -35,6 +39,14 @@ interface RoundData {
 // WT explicit early-termination methods (winner declared directly, not by score).
 // Round-derived methods (PTF/PTG/GDP/SUP) flow through the normal scoring path.
 const EARLY_TERMINATION_METHODS: WinMethod[] = ['RSC', 'WDR', 'DSQ', 'PUN']
+
+// Round-derived (non-explicit) WT win methods shown in the review step selector
+const ROUND_DERIVED_METHODS: { value: WinMethod; label: string }[] = [
+  { value: 'PTF', label: WIN_METHOD_LABELS['PTF'] },
+  { value: 'PTG', label: WIN_METHOD_LABELS['PTG'] },
+  { value: 'GDP', label: WIN_METHOD_LABELS['GDP'] },
+  { value: 'SUP', label: WIN_METHOD_LABELS['SUP'] },
+]
 
 export function MatchResultDialog({ match, open, onOpenChange, participants }: MatchResultDialogProps) {
   const router = useRouter()
@@ -59,6 +71,15 @@ export function MatchResultDialog({ match, open, onOpenChange, participants }: M
   const [earlyWinnerId, setEarlyWinnerId] = useState<string | null>(null)
   const [earlyRound, setEarlyRound] = useState<number | null>(null)
 
+  // Gam-jeoms and technique stats
+  const [gamJeoms, setGamJeoms] = useState<GamJeomInput[]>([])
+  const [techniques, setTechniques] = useState<TechniqueStatInput[]>([])
+
+  // Golden point (round 4)
+  const [gpScore1, setGpScore1] = useState(0)
+  const [gpScore2, setGpScore2] = useState(0)
+  const [gpManualWinner, setGpManualWinner] = useState<string | null>(null)
+
   // Rescore / dispute mode
   const [isRescore, setIsRescore] = useState(false)
   const [rescoreReason, setRescoreReason] = useState('')
@@ -74,6 +95,11 @@ export function MatchResultDialog({ match, open, onOpenChange, participants }: M
       setWinMethod('PTF')
       setEarlyWinnerId(null)
       setEarlyRound(null)
+      setGamJeoms([])
+      setTechniques([])
+      setGpScore1(0)
+      setGpScore2(0)
+      setGpManualWinner(null)
       setIsRescore(false)
       setRescoreReason('')
       setCurrentStep(1)
@@ -117,8 +143,9 @@ export function MatchResultDialog({ match, open, onOpenChange, participants }: M
   const team2 = p2?.team?.name || 'Unattached'
 
   const isEarlyTermination = EARLY_TERMINATION_METHODS.includes(winMethod)
+  const isGoldenPoint = winMethod === 'GDP'
 
-  // Calculate round wins dynamically (for SCORE method)
+  // Calculate round wins dynamically
   let player1Wins = 0
   let player2Wins = 0
 
@@ -142,6 +169,41 @@ export function MatchResultDialog({ match, open, onOpenChange, participants }: M
   const overallWinner = isEarlyTermination
     ? earlyWinnerName
     : (scoreWinnerName || (match.status === 'completed' ? dbWinnerName : null))
+
+  // Gam-jeom helpers
+  const addGamJeom = (playerId: string, type: string, round: number) => {
+    setGamJeoms(prev => [...prev, { roundNumber: round, playerId, type }])
+  }
+
+  const removeGamJeom = (playerId: string, type: string, round: number) => {
+    setGamJeoms(prev => {
+      const ri = [...prev].reverse().findIndex(
+        g => g.roundNumber === round && g.playerId === playerId && g.type === type
+      )
+      if (ri === -1) return prev
+      const i = prev.length - 1 - ri
+      return [...prev.slice(0, i), ...prev.slice(i + 1)]
+    })
+  }
+
+  const updateTechnique = (roundNumber: number, playerId: string, key: TechniqueKey, value: number) => {
+    setTechniques(prev => {
+      const i = prev.findIndex(t => t.roundNumber === roundNumber && t.playerId === playerId)
+      const blank = { roundNumber, playerId, punch: 0, body_kick: 0, head_kick: 0, spin_body_kick: 0, spin_head_kick: 0 }
+      if (i === -1) return [...prev, { ...blank, [key]: value }]
+      return prev.map((t, j) => j === i ? { ...t, [key]: value } : t)
+    })
+  }
+
+  const handleWinMethodChange = (value: WinMethod) => {
+    setWinMethod(value)
+    // Deselect golden point data if switching away from GDP
+    if (value !== 'GDP') {
+      setGpScore1(0)
+      setGpScore2(0)
+      setGpManualWinner(null)
+    }
+  }
 
   const validateStep = (step: number): boolean => {
     if (step === 1 && (round1Score1 < 0 || round1Score2 < 0)) {
@@ -182,26 +244,19 @@ export function MatchResultDialog({ match, open, onOpenChange, participants }: M
 
   const handleBack = () => {
     if (currentStep === 4 && (matchDecidedByScore || isEarlyTermination)) {
-      // For early termination we go back to where they declared it
       setCurrentStep(isEarlyTermination && earlyRound ? earlyRound : 2)
     } else {
       setCurrentStep(prev => prev - 1)
     }
   }
 
-  /**
-   * Declare early termination (KO/TKO/DQ/WITHDRAWAL/FORFEIT).
-   * Records which round and winner, then skips to Review.
-   */
   const handleEarlyTermination = (method: WinMethod, round: number) => {
     setWinMethod(method)
     setEarlyRound(round)
-    // Require winner selection before proceeding to Review
     setCurrentStep(4)
   }
 
   const handleSaveAll = async () => {
-    // For early termination, a winner must be explicitly selected
     if (isEarlyTermination && !earlyWinnerId) {
       toast.error(`Please select the winner for the ${WIN_METHOD_LABELS[winMethod]} decision.`)
       return
@@ -216,6 +271,7 @@ export function MatchResultDialog({ match, open, onOpenChange, participants }: M
       round1: { player1: round1Score1, player2: round1Score2, winnerId: manualWinner1 },
       round2: { player1: round2Score1, player2: round2Score2, winnerId: manualWinner2 },
       round3: { player1: round3Score1, player2: round3Score2, winnerId: manualWinner3 },
+      ...(isGoldenPoint ? { round4: { player1: gpScore1, player2: gpScore2, winnerId: gpManualWinner } } : {}),
     }
 
     setSaving(true)
@@ -241,7 +297,9 @@ export function MatchResultDialog({ match, open, onOpenChange, participants }: M
           winMethod,
           earlyRound ?? undefined,
           earlyWinnerId ?? undefined,
-          match.updated_at ?? undefined  // optimistic lock version
+          match.updated_at ?? undefined,
+          gamJeoms,
+          techniques,
         )
       }
 
@@ -269,7 +327,6 @@ export function MatchResultDialog({ match, open, onOpenChange, participants }: M
         onOpenChange(false)
         router.refresh()
       } else if ('conflict' in result && result.conflict) {
-        // Another user saved scores while this dialog was open — close and reload
         toast.error('Match was updated by someone else. Reloading...')
         onOpenChange(false)
         router.refresh()
@@ -277,7 +334,6 @@ export function MatchResultDialog({ match, open, onOpenChange, participants }: M
         toast.error(result.error || 'Failed to save scores')
       }
     } catch (err) {
-      // Network error — enqueue for offline sync (not for rescore mode)
       if (!isRescore && !navigator.onLine) {
         try {
           await enqueueOffline(
@@ -306,7 +362,6 @@ export function MatchResultDialog({ match, open, onOpenChange, participants }: M
     return null
   }
 
-  /** Buttons for declaring early termination at a given round */
   const renderEarlyTerminationButtons = (round: number) => (
     <div className="mt-4 border-t pt-4">
       <p className="text-xs text-muted-foreground text-center mb-2 font-medium uppercase tracking-wider">
@@ -415,6 +470,29 @@ export function MatchResultDialog({ match, open, onOpenChange, participants }: M
             </div>
           </div>
         )}
+
+        {/* Gam-jeom entry */}
+        <GamJeomPanel
+          roundNumber={roundNum}
+          player1Id={match.player1_id}
+          player2Id={match.player2_id}
+          name1={name1}
+          name2={name2}
+          gamJeoms={gamJeoms}
+          onAdd={(playerId, type) => addGamJeom(playerId, type, roundNum)}
+          onRemove={(playerId, type) => removeGamJeom(playerId, type, roundNum)}
+        />
+
+        {/* Optional technique breakdown */}
+        <TechniquePanel
+          roundNumber={roundNum}
+          player1Id={match.player1_id}
+          player2Id={match.player2_id}
+          name1={name1}
+          name2={name2}
+          techniques={techniques}
+          onChange={updateTechnique}
+        />
       </div>
 
       {/* Early termination buttons */}
@@ -423,8 +501,8 @@ export function MatchResultDialog({ match, open, onOpenChange, participants }: M
   )
 
   const renderReview = () => (
-    <div className="space-y-6 pt-2">
-      {/* Early termination winner selector (shown when non-SCORE method was declared) */}
+    <div className="space-y-4 pt-2">
+      {/* Early termination winner selector */}
       {isEarlyTermination && (
         <div className="bg-destructive/10 border border-destructive/30 p-4 rounded-xl animate-in slide-in-from-top-2">
           <div className="flex items-center gap-2 mb-3">
@@ -453,9 +531,26 @@ export function MatchResultDialog({ match, open, onOpenChange, participants }: M
         </div>
       )}
 
+      {/* Win method selector (round-derived methods) */}
+      {!isEarlyTermination && (
+        <div className="flex items-center gap-3 p-3 bg-muted/20 rounded-lg">
+          <label className="text-sm font-medium min-w-[90px] text-muted-foreground">Win Method</label>
+          <Select value={winMethod} onValueChange={v => handleWinMethodChange(v as WinMethod)}>
+            <SelectTrigger className="h-8 flex-1">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {ROUND_DERIVED_METHODS.map(m => (
+                <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {/* Final Result summary */}
       <div className="text-center relative py-6 bg-muted/20 rounded-xl border border-dashed">
         <h3 className="text-lg font-medium text-muted-foreground mb-4">Final Result</h3>
-
         {overallWinner ? (
           <div className="flex flex-col items-center gap-2 animate-in zoom-in">
             <Trophy className="h-8 w-8 text-yellow-500 mb-1" />
@@ -465,6 +560,8 @@ export function MatchResultDialog({ match, open, onOpenChange, participants }: M
             <Badge variant="outline" className="mt-1">
               {isEarlyTermination
                 ? `Win by ${WIN_METHOD_LABELS[winMethod]} (Round ${earlyRound})`
+                : isGoldenPoint
+                ? 'Win by Golden Point'
                 : 'Match Winner'}
             </Badge>
           </div>
@@ -473,6 +570,7 @@ export function MatchResultDialog({ match, open, onOpenChange, participants }: M
         )}
       </div>
 
+      {/* Round scores grid */}
       <div className="grid gap-2 text-sm">
         <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
           <span className="font-medium">Round 1</span>
@@ -499,12 +597,77 @@ export function MatchResultDialog({ match, open, onOpenChange, participants }: M
             </span>
           </div>
         )}
+        {isGoldenPoint && (
+          <div className="flex items-center justify-between p-3 bg-amber-500/5 border border-amber-500/30 rounded-lg">
+            <span className="font-medium">Golden Point (R4)</span>
+            <div className="font-mono font-bold text-lg">{gpScore1} – {gpScore2}</div>
+          </div>
+        )}
       </div>
+
+      {/* Golden Point entry (shown when GDP is selected) */}
+      {isGoldenPoint && (
+        <div className="space-y-3 p-3 border border-amber-500/30 bg-amber-500/5 rounded-lg">
+          <h4 className="text-sm font-semibold text-amber-700 dark:text-amber-400">Golden Point Round 4</h4>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-muted-foreground block mb-1">{name1}</label>
+              <Input
+                type="number" min="0"
+                value={gpScore1}
+                onChange={e => setGpScore1(Math.max(0, Number(e.target.value)))}
+                className="text-center text-xl h-12 font-bold"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground block mb-1 text-right">{name2}</label>
+              <Input
+                type="number" min="0"
+                value={gpScore2}
+                onChange={e => setGpScore2(Math.max(0, Number(e.target.value)))}
+                className="text-center text-xl h-12 font-bold"
+              />
+            </div>
+          </div>
+          {gpScore1 === gpScore2 && (
+            <div>
+              <p className="text-xs text-muted-foreground mb-2">GP tied — select winner:</p>
+              <div className="flex gap-2">
+                <Button
+                  variant={gpManualWinner === match.player1_id ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setGpManualWinner(gpManualWinner === match.player1_id ? null : match.player1_id)}
+                  className="flex-1 text-xs h-9"
+                >
+                  {name1}
+                </Button>
+                <Button
+                  variant={gpManualWinner === match.player2_id ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setGpManualWinner(gpManualWinner === match.player2_id ? null : match.player2_id)}
+                  className="flex-1 text-xs h-9"
+                >
+                  {name2}
+                </Button>
+              </div>
+            </div>
+          )}
+          <GamJeomPanel
+            roundNumber={4}
+            player1Id={match.player1_id}
+            player2Id={match.player2_id}
+            name1={name1}
+            name2={name2}
+            gamJeoms={gamJeoms}
+            onAdd={(playerId, type) => addGamJeom(playerId, type, 4)}
+            onRemove={(playerId, type) => removeGamJeom(playerId, type, 4)}
+          />
+        </div>
+      )}
     </div>
   )
 
   const isOnReviewStep = currentStep === 4
-  const stepLabels = ['R1', 'R2', 'R3', 'Review']
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -558,7 +721,7 @@ export function MatchResultDialog({ match, open, onOpenChange, participants }: M
             </div>
           </div>
         ) : (
-          <div className="min-h-[300px] sm:min-h-[400px] flex flex-col justify-center">
+          <div className="min-h-[300px] sm:min-h-[400px] flex flex-col justify-center overflow-y-auto max-h-[70vh]">
             {isRescore && currentStep === 1 && (
               <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm">
                 <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-amber-500" />
