@@ -37,8 +37,10 @@ export function calculateRoundWins(match: Match): { player1Wins: number, player2
     if (match.winner_round1 === match.player1_id) player1Wins++;
     else if (match.winner_round1 === match.player2_id) player2Wins++;
   } else {
-    if (match.score_round1_player1 > match.score_round1_player2) player1Wins++;
-    else if (match.score_round1_player2 > match.score_round1_player1) player2Wins++;
+    const s1p1 = match.score_round1_player1 ?? 0
+    const s1p2 = match.score_round1_player2 ?? 0
+    if (s1p1 > s1p2) player1Wins++;
+    else if (s1p2 > s1p1) player2Wins++;
   }
 
   // Round 2
@@ -46,8 +48,10 @@ export function calculateRoundWins(match: Match): { player1Wins: number, player2
     if (match.winner_round2 === match.player1_id) player1Wins++;
     else if (match.winner_round2 === match.player2_id) player2Wins++;
   } else {
-    if (match.score_round2_player1 > match.score_round2_player2) player1Wins++;
-    else if (match.score_round2_player2 > match.score_round2_player1) player2Wins++;
+    const s2p1 = match.score_round2_player1 ?? 0
+    const s2p2 = match.score_round2_player2 ?? 0
+    if (s2p1 > s2p2) player1Wins++;
+    else if (s2p2 > s2p1) player2Wins++;
   }
 
   // Round 3
@@ -55,8 +59,10 @@ export function calculateRoundWins(match: Match): { player1Wins: number, player2
     if (match.winner_round3 === match.player1_id) player1Wins++;
     else if (match.winner_round3 === match.player2_id) player2Wins++;
   } else {
-    if (match.score_round3_player1 > match.score_round3_player2) player1Wins++;
-    else if (match.score_round3_player2 > match.score_round3_player1) player2Wins++;
+    const s3p1 = match.score_round3_player1 ?? 0
+    const s3p2 = match.score_round3_player2 ?? 0
+    if (s3p1 > s3p2) player1Wins++;
+    else if (s3p2 > s3p1) player2Wins++;
   }
 
   return { player1Wins, player2Wins };

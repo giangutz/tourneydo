@@ -5,6 +5,7 @@ import { auth } from '@clerk/nextjs/server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { updateRoundScore, checkAndUpdateMatchWinner } from '@/lib/db/queries/match-rounds'
 import { routes } from '@/config/routes'
+import { logger } from '@/lib/logger'
 
 /**
  * Update a specific round's score in a match
@@ -69,7 +70,7 @@ export async function updateMatchRoundScore(
     revalidatePath(routes.organizer.tournamentBracket(match.tournament_id))
     return { success: true }
   } catch (error) {
-    console.error('Error updating round score:', error)
+    logger.error({ error: error }, 'Error updating round score')
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to update round score'

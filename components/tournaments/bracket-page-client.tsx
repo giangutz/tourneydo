@@ -94,12 +94,9 @@ export function BracketPageClient({ tournament, participants, matches, userRole 
   const [scheduleSuccessDialogOpen, setScheduleSuccessDialogOpen] = useState(false)
 
   const handleDeleteBracket = async () => {
-    console.log("handleDeleteBracket called")
     setDeleting(true)
     try {
-      console.log("Calling server action deleteTournamentBracket...")
       const result = await deleteTournamentBracket(tournament.id)
-      console.log("Server action result:", result)
       
       if (result.success) {
         toast.success("Bracket deleted successfully")
@@ -107,11 +104,9 @@ export function BracketPageClient({ tournament, participants, matches, userRole 
         startTransition(() => { router.refresh() })
         window.location.reload()
       } else {
-        console.error("Delete failed:", result.error)
         toast.error(result.error || "Failed to delete bracket")
       }
     } catch (error) {
-       console.error("Unexpected error in handleDeleteBracket:", error)
        toast.error("An unexpected error occurred")
     } finally {
       setDeleting(false)
@@ -171,16 +166,13 @@ export function BracketPageClient({ tournament, participants, matches, userRole 
 
     try {
       const result = await regenerateBracketSchedule(tournament.id)
-      console.log('Schedule generation result:', result)
       
       if (result.success) {
         // Show success summary dialog
         if ('data' in result && result.data && typeof result.data === 'object') {
-          console.log('Opening success dialog with data:', result.data)
           setScheduleSummary(result.data)
           setScheduleSuccessDialogOpen(true)
         } else {
-          console.log('No data in result, showing toast')
           toast.success(hasMatchNumbers ? 'Schedule regenerated successfully' : 'Schedule generated successfully')
         }
         markManualRefresh()
@@ -202,7 +194,6 @@ export function BracketPageClient({ tournament, participants, matches, userRole 
         }
       }
     } catch (err) {
-      console.error('Schedule generation error:', err)
       toast.error('Failed to generate schedule')
     } finally {
       setGeneratingSchedule(false)
@@ -336,7 +327,6 @@ export function BracketPageClient({ tournament, participants, matches, userRole 
                <Button 
                 variant="destructive" 
                 onClick={() => {
-                  console.log("Delete button clicked, opening dialog")
                   setDeleteDialogOpen(true)
                 }}
                 disabled={generating || deleting}

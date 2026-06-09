@@ -1,5 +1,9 @@
 'use client'
 
+// TODO(H4): This component is 830 lines — 30 over the project 800-line limit.
+// To reduce further: extract <ParticipantToolbar>, <ParticipantTable>, and <ParticipantFilters>
+// as sub-components. Requires tests covering filter/sort/selection state to do safely.
+
 import { useState, useMemo } from 'react'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
@@ -34,72 +38,16 @@ import { AddParticipantDialog } from './add-participant-dialog'
 import { EditParticipantDialog } from './edit-participant-dialog'
 import { Team } from '@/types/models'
 import { Pencil, MoreHorizontal, Search, Check, X, DollarSign, Loader2, Scale, CheckCircle2, AlertTriangle, ArrowUpDown, Filter, ChevronLeft, ChevronRight, Trash2, Download } from 'lucide-react'
-import { updateParticipantStatus, bulkWeighIn, deleteParticipant, bulkDeleteParticipants, weighInParticipant } from '@/lib/actions/participants'
+import { updateParticipantStatus, bulkWeighIn, deleteParticipant, bulkDeleteParticipants } from '@/lib/actions/participants'
+import { weighInParticipant } from '@/lib/actions/participants-weigh-in'
 import { DeleteConfirmDialog } from './delete-confirm-dialog'
 import { toast } from 'sonner'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useDebouncedCallback } from 'use-debounce'
 
-interface Participant {
-  id: string
-  tournament_id: string
-  status: 'pending' | 'verified' | 'paid'
-  actual_weight: number | null
-  actual_height: number | null
-  disqualified: boolean
-  disqualification_reason: string | null
-  weighed_in_at: string | null
-  created_at: string
-  player: {
-    id: string
-    first_name: string
-    last_name: string
-    email: string | null
-    belt_level: string | null
-    weight: number | null
-    height: number | null
-    dob: string
-    gender: 'male' | 'female'
-  }
-  team: {
-    name: string
-  }
-  division_id?: string | null
-  category_id?: string | null
-  weighed_in_by_user?: {
-    first_name: string | null
-    last_name: string | null
-  } | null
-  tournament_divisions?: {
-    id: string
-    name: string
-  } | null
-  tournament_categories?: {
-    id: string
-    name: string
-    gender: string
-    min_weight: number | null
-    max_weight: number | null
-    min_height: number | null
-    max_height: number | null
-  } | null
-}
-
-interface ParticipantListProps {
-  participants: Participant[]
-  count: number
-  page: number
-  limit: number
-  totalPages: number
-  tournamentId: string
-  tournamentType?: 'standard' | 'open-belt'
-  teams: Team[]
-}
-
+import type { Participant, ParticipantListProps } from './participant-list.types'
 import { useAdminChannel } from '@/lib/realtime/admin-channel'
-
-
 export function ParticipantList({ 
   participants, 
   count, 

@@ -17,7 +17,6 @@ export function useWebVitals() {
     // Only report in production to reduce noise
     const reportMetric = (metric: { name: string; value: number; id: string }) => {
       if (process.env.NODE_ENV === 'development') {
-        console.log(`[Web Vitals] ${metric.name}: ${metric.value.toFixed(2)}`)
       }
 
       // In production, Sentry automatically captures these via its integration

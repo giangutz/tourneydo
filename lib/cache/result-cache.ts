@@ -1,3 +1,5 @@
+import { logger } from '@/lib/logger'
+
 /**
  * Result Caching Layer for TourneyDo
  *
@@ -75,11 +77,7 @@ export class ResultCache {
       this.metrics.hits++
       entry.hits++
 
-      if (process.env.NODE_ENV === 'development') {
-        console.log(
-          `[Cache] HIT: ${key} (${entry.hits} hits, TTL: ${Math.round((entry.ttl - (Date.now() - entry.timestamp)) / 1000)}s remaining)`
-        )
-      }
+      logger.debug({ key, hits: entry.hits, ttlRemainingS: Math.round((entry.ttl - (Date.now() - entry.timestamp)) / 1000) }, 'Cache: hit')
 
       return entry.data
     }
@@ -87,7 +85,7 @@ export class ResultCache {
     this.metrics.misses++
 
     if (process.env.NODE_ENV === 'development') {
-      console.log(`[Cache] MISS: ${key} - fetching...`)
+      logger.debug({ key }, 'Cache: miss')
     }
 
     try {
@@ -102,7 +100,7 @@ export class ResultCache {
     } catch (error) {
       // On error, return stale cache if available
       if (entry) {
-        console.warn(`[Cache] Fetch failed for ${key}, returning stale cache`)
+        logger.warn({ key }, 'Cache: fetch failed, returning stale entry')
         return entry.data
       }
       throw error
@@ -121,7 +119,7 @@ export class ResultCache {
     })
 
     if (process.env.NODE_ENV === 'development') {
-      console.log(`[Cache] SET: ${key}`)
+      logger.debug({ key }, 'Cache: set')
     }
   }
 
@@ -132,7 +130,7 @@ export class ResultCache {
     this.cache.delete(key)
 
     if (process.env.NODE_ENV === 'development') {
-      console.log(`[Cache] INVALIDATED: ${key}`)
+      logger.debug({ key }, 'Cache: invalidated')
     }
   }
 
@@ -152,7 +150,7 @@ export class ResultCache {
     }
 
     if (process.env.NODE_ENV === 'development') {
-      console.log(`[Cache] INVALIDATED ${count} entries matching ${pattern}`)
+      logger.debug({ count, pattern }, 'Cache: pattern invalidation')
     }
   }
 
@@ -164,7 +162,7 @@ export class ResultCache {
     this.cache.clear()
 
     if (process.env.NODE_ENV === 'development') {
-      console.log(`[Cache] CLEARED all ${size} entries`)
+      logger.debug({ size }, 'Cache: cleared all entries')
     }
   }
 
@@ -194,12 +192,13 @@ export class ResultCache {
    */
   public printMetrics(): void {
     const metrics = this.getMetrics()
-    console.log('=== Cache Metrics ===')
-    console.log(
-      `Hit Rate: ${metrics.hitRate.toFixed(1)}% (${metrics.totalHits} hits, ${metrics.totalMisses} misses)`
-    )
-    console.log(`Entries: ${metrics.entries}`)
-    console.log(`Memory: ~${(metrics.memoryUsed / 1024).toFixed(2)} KB`)
+    logger.info({
+      hitRate: `${metrics.hitRate.toFixed(1)}%`,
+      hits: metrics.totalHits,
+      misses: metrics.totalMisses,
+      entries: metrics.entries,
+      memoryKB: (metrics.memoryUsed / 1024).toFixed(2),
+    }, 'Cache metrics')
   }
 
   /**

@@ -1,5 +1,6 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import type { WinMethod } from '@/types/models'
+import { logger } from '@/lib/logger'
 
 export interface MatchRound {
   id: string
@@ -161,7 +162,7 @@ export async function checkAndUpdateMatchWinner(
     })
 
     if (rpcError) {
-      console.error('Failed to advance match winner:', rpcError)
+      logger.error({ error: rpcError }, 'Failed to advance match winner')
       throw new Error(`Failed to advance match winner: ${rpcError.message}`)
     }
   }

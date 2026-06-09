@@ -51,7 +51,6 @@ export class BroadcastManager {
         )
         .subscribe((status) => {
           if (status === 'SUBSCRIBED') {
-            console.log(`[Broadcast] Subscribed to ${channelId}`);
           }
         });
 
@@ -119,7 +118,6 @@ export class BroadcastManager {
       await this.supabase.removeChannel(channel);
       this.channels.delete(channelId);
       this.subscribers.delete(channelId);
-      console.log(`[Broadcast] Unsubscribed from ${channelId}`);
     }
   }
 }

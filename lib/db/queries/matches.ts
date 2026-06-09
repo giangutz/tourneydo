@@ -1,37 +1,29 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { MatchInsert, MatchUpdate, Match } from '@/types/models'
+import { logger } from '@/lib/logger'
 
 
 /**
  * Save a generated bracket (delete existing and insert new)
  */
-// Helper to map Domain Match/MatchInsert to DB Row
+/**
+ * Strip view-model fields that exist on Match (populated by transformMatch from match_rounds)
+ * but have no corresponding column on the matches table.
+ * score_player1/2 live on match_rounds; score_roundN_* and winner_roundN are computed joins.
+ */
 function toDbMatch(match: Partial<Match> | MatchInsert): Record<string, unknown> {
-  const dbMatch: Record<string, unknown> = { ...match }
-
-  // Map fields
-  // if ('round' in match) {
-  //   dbMatch.round_number = match.round
-  //   delete dbMatch.round
-  // }
-  // NOTE: The DB columns score_player1 and score_player2 DO NOT EXIST on the matches table.
-  // Scores are stored in match_rounds. We must remove them from the insert payload.
-  if ('score_player1' in match) {
-    delete dbMatch.score_player1
-  }
-  if ('score_player2' in match) {
-    delete dbMatch.score_player2
-  }
-
-  // Remove fields that don't exist in matches table
-  const nonDbFields = [
-    'score_round1_player1', 'score_round1_player2', 'winner_round1',
-    'score_round2_player1', 'score_round2_player2', 'winner_round2',
-    'score_round3_player1', 'score_round3_player2', 'winner_round3'
-  ]
-
-  nonDbFields.forEach(field => delete dbMatch[field])
-
+  const {
+    score_player1, score_player2,
+    score_round1_player1, score_round1_player2, winner_round1,
+    score_round2_player1, score_round2_player2, winner_round2,
+    score_round3_player1, score_round3_player2, winner_round3,
+    ...dbMatch
+  } = match as Record<string, unknown>
+  // suppress unused-var warnings — these are intentionally excluded
+  void score_player1; void score_player2
+  void score_round1_player1; void score_round1_player2; void winner_round1
+  void score_round2_player1; void score_round2_player2; void winner_round2
+  void score_round3_player1; void score_round3_player2; void winner_round3
   return dbMatch
 }
 
@@ -107,7 +99,7 @@ export async function saveBracket(tournamentId: string, matches: MatchInsert[]):
     if (deleteError) {
       // Non-fatal: new bracket is live, old matches are stale duplicates.
       // Log for manual cleanup but do not throw.
-      console.error('Failed to delete old bracket matches (non-fatal):', deleteError)
+      logger.error({ error: deleteError }, 'Failed to delete old bracket matches (non-fatal)')
     }
   }
 }
@@ -235,7 +227,7 @@ export async function getMatchById(id: string): Promise<Match | null> {
     .maybeSingle()
 
   if (error) {
-    console.error(`Failed to fetch match ${id}:`, error)
+    logger.error({ error, matchId: id }, 'Failed to fetch match')
     return null
   }
 
@@ -313,7 +305,7 @@ export async function findActiveMatchForParticipant(
     .maybeSingle()
 
   if (error && error.code !== 'PGRST116') { // Ignore "Row not found"
-    console.error(`Error finding active match for player ${playerId}:`, error)
+    logger.error({ error, playerId }, 'Error finding active match for player')
     return null
   }
 
@@ -343,7 +335,7 @@ export async function forfeitMatch(matchId: string, disqualifiedPlayerId: string
   const winnerId = typedMatch.player1_id === disqualifiedPlayerId ? typedMatch.player2_id : typedMatch.player1_id
 
   if (!winnerId) {
-    // If there is no opponent (e.g. empty bracket slot), just complete the match? 
+    // If there is no opponent (e.g. empty bracket slot), just complete the match?
     // Or just leave it. Assuming actual match context here.
     return
   }

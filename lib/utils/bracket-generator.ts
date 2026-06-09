@@ -1,5 +1,6 @@
 import { Match, MatchInsert } from '@/types/models'
 import crypto from 'crypto'
+import { logger } from '@/lib/logger'
 
 interface Participant {
   id: string
@@ -152,7 +153,7 @@ function calculateSwapScore(
   // We want to minimize Seed Difference deviation (keep fair seeding)
   // But also maximize Position Distance? No, minimizing score implies we WANT
   // the candidate that is 'best'.
-  // Actually, we want a candidate that is somewhat close in seed (fairness) 
+  // Actually, we want a candidate that is somewhat close in seed (fairness)
   // but resolves the conflict.
 
   // The provided reference used: score = seedDiff - positionDistance * 0.1
@@ -266,7 +267,7 @@ function assignParticipantsToSeeds(
         // Score the move
         const candidateSeed = participants.findIndex(p => p.id === candidate.id) + 1
 
-        // Relax deviation for small brackets? 
+        // Relax deviation for small brackets?
         // If bracketSize is small, deviation > 6 is impossible.
         // Let's make deviation relative to size.
         const maxDev = Math.max(bracketSize * 0.5, 4)
@@ -306,7 +307,7 @@ function assignParticipantsToSeeds(
     }
   }
   if (remaining > 0) {
-    console.warn(`[BracketGenerator] ${remaining} same-team conflict(s) could not be resolved after 3 passes`)
+    logger.warn({ remaining }, 'Bracket generation: same-team conflicts could not be fully resolved')
   }
 
   return slots
@@ -342,11 +343,6 @@ export function generateBracket(
       status: 'completed',
       lifecycle_state: 'AUTO_ADVANCE',
       division_id: undefined, category_id: undefined,
-      score_player1: 0, score_player2: 0,
-      score_round1_player1: 0, score_round1_player2: 0,
-      score_round2_player1: 0, score_round2_player2: 0,
-      score_round3_player1: 0, score_round3_player2: 0,
-      winner_round1: null, winner_round2: null, winner_round3: null,
       source_match_ids: [],
       next_match_id: null, source_match_id: null,
       court_number: null,
@@ -415,11 +411,6 @@ export function generateBracket(
         status: 'scheduled', // Use scheduled/pending based on readiness? Actually contest logic handles this
         lifecycle_state: 'CONTEST', // Both players known
 
-        score_player1: 0, score_player2: 0,
-        score_round1_player1: 0, score_round1_player2: 0,
-        score_round2_player1: 0, score_round2_player2: 0,
-        score_round3_player1: 0, score_round3_player2: 0,
-        winner_round1: null, winner_round2: null, winner_round3: null,
         source_match_ids: [],
         next_match_id: null, source_match_id: null,
         court_number: null,
@@ -501,11 +492,6 @@ export function generateBracket(
         lifecycle_state: lifecycle,
         source_match_ids: sourceMatches,
 
-        score_player1: 0, score_player2: 0,
-        score_round1_player1: 0, score_round1_player2: 0,
-        score_round2_player1: 0, score_round2_player2: 0,
-        score_round3_player1: 0, score_round3_player2: 0,
-        winner_round1: null, winner_round2: null, winner_round3: null,
         next_match_id: null, source_match_id: null,
         court_number: null,
         scheduled_start_time: null, scheduled_end_time: null,
@@ -649,7 +635,7 @@ function validateSingleEliminationBracket(matches: Partial<Match>[], participant
 
   if (matches.length !== expectedMatches) {
     const errorMsg = `[BracketValidation] Match Count Mismatch! Expected ${expectedMatches} matches for ${participantCount} participants, but generated ${matches.length}.`
-    console.error(errorMsg)
+    logger.error({ error: errorMsg }, 'Unexpected error')
     // We throw to prevent bad data from being saved
     throw new Error(errorMsg)
   }

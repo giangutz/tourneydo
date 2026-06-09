@@ -1,8 +1,8 @@
 /**
  * API Route: POST /api/participants/add
- * 
+ *
  * Add a player to a tournament
- * 
+ *
  * Security:
  * - Requires authentication (Clerk JWT)
  * - Requires authorization (user must be team owner/coach)
@@ -24,6 +24,7 @@ import { addParticipantSchema } from '@/lib/validations/participants'
 import { invalidateTournamentCache } from '@/lib/cache/result-cache'
 import { ajStrict } from '@/lib/arcjet'
 import * as Sentry from '@sentry/nextjs'
+import { logger } from '@/lib/logger'
 
 export async function POST(request: NextRequest) {
   // Rate limit: 60 requests / 60 s per IP
@@ -203,20 +204,14 @@ export async function POST(request: NextRequest) {
     invalidateTournamentCache(tournamentId)
     revalidatePath(routes.organizer.tournamentParticipants(tournamentId))
 
-    // 6. LOG SUCCESS
-    console.log('Participant added', {
-      userId,
-      teamId,
-      playerId: finalPlayerId,
-      tournamentId,
-    })
+    logger.info({ userId, teamId, playerId: finalPlayerId, tournamentId }, 'Participant added')
 
     return successResponse(
       { playerId: finalPlayerId, status: 'verified' },
       HTTP_STATUS.CREATED
     )
   } catch (error) {
-    console.error('Failed to add participant:', error)
+    logger.error({ error: error }, 'Failed to add participant')
     Sentry.captureException(error, {
       tags: { action: 'add_participant' },
     })

@@ -57,14 +57,6 @@ export function BracketView({
   }
 
   // Court assignment removed - use Court Manager page instead
-  
-  // DEBUG: Inspect match structure
-  useMemo(() => {
-    if (matches.length > 0) {
-      console.log('BracketView matches[0]:', matches[0])
-      console.log('Has tournament_divisions?', 'tournament_divisions' in matches[0])
-    }
-  }, [matches])
 
   // Group matches by division and category, THEN by connected component (bracket island)
   const divisionGroups = useMemo(() => {

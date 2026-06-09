@@ -346,17 +346,20 @@ export interface Match {
   player1_id: string | null
   player2_id: string | null
   winner_id: string | null
-  score_player1: number
-  score_player2: number
-  score_round1_player1: number
-  score_round1_player2: number
-  score_round2_player1: number
-  score_round2_player2: number
-  score_round3_player1: number
-  score_round3_player2: number
-  winner_round1: string | null
-  winner_round2: string | null
-  winner_round3: string | null
+  // Aggregate totals — present only on matches fetched with transformMatch().
+  score_player1?: number
+  score_player2?: number
+  // Per-round data — populated by transformMatch() from the match_rounds join.
+  // Not stored on the matches table; absent on newly-created Match objects.
+  score_round1_player1?: number
+  score_round1_player2?: number
+  score_round2_player1?: number
+  score_round2_player2?: number
+  score_round3_player1?: number
+  score_round3_player2?: number
+  winner_round1?: string | null
+  winner_round2?: string | null
+  winner_round3?: string | null
   court_number: number | null
   status: MatchStatus
 

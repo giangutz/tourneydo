@@ -128,7 +128,6 @@ export function PaymentDialog({
         })
       }
     } catch (error) {
-      console.error("Error submitting payment:", error)
       toast.error("Submission Failed", {
         description: "An error occurred while submitting your payment.",
       })

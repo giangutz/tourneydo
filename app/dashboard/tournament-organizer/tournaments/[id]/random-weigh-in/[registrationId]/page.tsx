@@ -50,7 +50,6 @@ export default async function RandomWeighInParticipantPage({
       </div>
     )
   } catch (error) {
-    console.error('Error loading random weigh-in page:', error)
     return <div>Error loading participant data: {(error as Error).message}</div>
   }
 }

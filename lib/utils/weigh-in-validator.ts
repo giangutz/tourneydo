@@ -36,7 +36,6 @@ export function validateWeightHeight(
 
   // Determine if this is height-based (age < 12) or weight-based (age >= 12)
   const isHeightBased = age < 12
-  console.log('[VALIDATOR DEBUG]', { age, isHeightBased, actualWeight, actualHeight })
 
   // For height-based categories (Gradeschool - under 12)
   if (isHeightBased && (registeredCategory.minHeight !== undefined || registeredCategory.maxHeight !== undefined)) {
@@ -49,12 +48,10 @@ export function validateWeightHeight(
     const maxHeight = registeredCategory.maxHeight !== null && registeredCategory.maxHeight !== undefined ? Number(registeredCategory.maxHeight) : Infinity
 
     if (actualHeight > maxHeight) {
-      console.log(`[VALIDATOR FAIL] Height ${actualHeight} > ${maxHeight}`)
       result.valid = false
       result.outOfRange = 'above'
       result.exceededLimit = 'height'
     } else if (actualHeight < minHeight) {
-      console.log(`[VALIDATOR FAIL] Height ${actualHeight} < ${minHeight}`)
       result.valid = false
       result.outOfRange = 'below'
       result.exceededLimit = 'height'
@@ -71,15 +68,11 @@ export function validateWeightHeight(
     const minWeight = registeredCategory.minWeight !== null && registeredCategory.minWeight !== undefined ? Number(registeredCategory.minWeight) : 0
     const maxWeight = registeredCategory.maxWeight !== null && registeredCategory.maxWeight !== undefined ? Number(registeredCategory.maxWeight) : Infinity
 
-    console.log('[VALIDATOR CHECK WEIGHT]', { actualWeight, minWeight, maxWeight })
-
     if (actualWeight > maxWeight) {
-      console.log(`[VALIDATOR FAIL] Weight ${actualWeight} > ${maxWeight}`)
       result.valid = false
       result.outOfRange = 'above'
       result.exceededLimit = 'weight'
     } else if (actualWeight < minWeight) {
-      console.log(`[VALIDATOR FAIL] Weight ${actualWeight} < ${minWeight}`)
       result.valid = false
       result.outOfRange = 'below'
       result.exceededLimit = 'weight'

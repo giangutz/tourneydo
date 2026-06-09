@@ -3,6 +3,7 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { invalidateMatchesCache } from '@/lib/cache/result-cache'
+import { logger } from '@/lib/logger'
 
 export interface WeighInGenerationResult {
   success: boolean
@@ -47,7 +48,7 @@ export async function generateWeighInList(tournamentId: string): Promise<WeighIn
     .eq('weigh_in_selected', true)
 
   if (resetError) {
-    console.error('Failed to reset previous selections:', resetError)
+    logger.error({ error: resetError }, 'Failed to reset previous selections')
     // Don't fail the whole operation, just log it
   }
 
@@ -193,7 +194,7 @@ export async function submitWeighInResult(
     maxHeight: category.max_height
   }
 
-  // Validate with 5% tolerance for surprise weigh-ins? 
+  // Validate with 5% tolerance for surprise weigh-ins?
   // For now, let's stick to the official validation logic but include tolerance calculation if that's the rule
   const validation = validateWeightHeight(weight, height ?? null, categoryConfig, age)
 
@@ -257,12 +258,12 @@ export async function submitWeighInResult(
         const activeMatch = await findActiveMatchForParticipant(registration.player_id, tournamentId)
 
         if (activeMatch) {
-          console.log(`[WEIGH-IN FAILURE] Auto-forfeiting match ${activeMatch.id} for player ${registration.player_id}`)
+          logger.info(`[WEIGH-IN FAILURE] Auto-forfeiting match ${activeMatch.id} for player ${registration.player_id}`)
           await forfeitMatch(activeMatch.id, registration.player_id)
         }
       }
     } catch (err) {
-      console.error('[WEIGH-IN FAILURE] Failed to auto-forfeit match:', err)
+      logger.error({ error: err }, '[WEIGH-IN FAILURE] Failed to auto-forfeit match')
       // Non-fatal — participant is already DQ'd in registration.
     }
 

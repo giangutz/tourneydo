@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache"
 import { SupabaseClient } from "@supabase/supabase-js"
 import { TournamentStaff, TournamentRole } from "@/types/models"
 import { sendStaffInvitationEmail } from "@/lib/email"
+import { logger } from '@/lib/logger'
 
 /**
  * Authorization guard for staff-management operations.
@@ -255,7 +256,7 @@ export async function getTournamentStaff(
   const { data, error, count } = await query
 
   if (error) {
-    console.error("Error fetching staff:", error.message, error.code)
+    logger.error({ message: error.message, code: error.code }, 'Error fetching staff')
     return { data: [], total: 0, totalPages: 0 }
   }
 

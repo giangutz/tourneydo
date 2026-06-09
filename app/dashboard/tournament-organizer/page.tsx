@@ -28,7 +28,6 @@ export default async function TournamentOrganizerDashboard() {
   try {
     recentActivity = await getRecentRegistrationsByOrganizerId(userId)
   } catch (err) {
-    console.error('Failed to load recent activity:', err)
   }
 
   const stats = {

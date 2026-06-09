@@ -50,7 +50,6 @@ export function AddParticipantDialog({ tournamentId, teams }: AddParticipantDial
         setSearchResults([])
       }
     } catch (error) {
-      console.error('Search failed', error)
       toast.error('Failed to search players')
     } finally {
       setIsSearching(false)

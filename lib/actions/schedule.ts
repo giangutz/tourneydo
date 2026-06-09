@@ -19,6 +19,7 @@ import { getTournamentMatches } from '@/lib/db/queries/matches'
 import { assignMatchNumbers } from '@/lib/utils/match-scheduler'
 import { getTournamentById, updateTournament } from '@/lib/db/queries/tournaments'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { logger } from '@/lib/logger'
 
 /**
  * Save tournament schedule config and run feasibility check
@@ -98,7 +99,7 @@ export async function saveTournamentScheduleConfig(
 
     return { success: true, data: { feasible, validation } }
   } catch (error) {
-    console.error(error)
+    logger.error({ error: error }, 'Unexpected error')
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to save schedule config'

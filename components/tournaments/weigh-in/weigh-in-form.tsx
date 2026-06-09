@@ -8,7 +8,8 @@ import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Loader2, AlertTriangle, Scale, Info, ArrowLeft, Ruler } from 'lucide-react'
-import { weighInParticipant, getPredictedDivision, allowAtStatedWeight, disqualifyParticipant } from '@/lib/actions/participants'
+import { allowAtStatedWeight, disqualifyParticipant } from '@/lib/actions/participants'
+import { weighInParticipant, getPredictedDivision } from '@/lib/actions/participants-weigh-in'
 import { toast } from 'sonner'
 import { DivisionMoveDialog } from '@/components/tournaments/division-move-dialog'
 import { DisqualificationDialog } from '@/components/tournaments/disqualification-dialog'
@@ -154,7 +155,6 @@ export function WeighInForm({
         })
         setInitialPrediction(result)
       } catch (err) {
-        console.error('Initial prediction failed', err)
       }
     }
     fetchInitialPrediction()
@@ -199,7 +199,6 @@ export function WeighInForm({
         })
         setPrediction(result)
       } catch (err) {
-        console.error(err)
       } finally {
         setIsPredicting(false)
       }
@@ -213,14 +212,6 @@ export function WeighInForm({
       return
     }
 
-    console.log('[CLIENT] Starting weigh-in:', {
-      participantId: participant.id,
-      tournamentId,
-      actualWeight,
-      actualHeight,
-      hasDivision: !!participant.division_id,
-      hasCategory: !!participant.category_id
-    })
 
     setIsSubmitting(true)
     try {
@@ -231,7 +222,6 @@ export function WeighInForm({
         actualHeight ? parseFloat(actualHeight) : null
       )
 
-      console.log('[CLIENT] Weigh-in result:', result)
 
       if (!result.success) {
         toast.error(result.error || 'Failed to record weigh-in')
@@ -239,7 +229,6 @@ export function WeighInForm({
       }
 
       if (result.data?.needsAction) {
-        console.log('[CLIENT] Needs action - showing dialog')
         // Store the actual measurements with the validation result
         setValidationResult({
           ...result.data,
@@ -248,12 +237,10 @@ export function WeighInForm({
         })
         // Dialog will be triggered by validationResult state being set
       } else {
-        console.log('[CLIENT] Success - redirecting')
         toast.success('Weigh-in recorded successfully')
         router.push(routes.organizer.tournamentParticipants(tournamentId))
       }
     } catch (error: any) {
-      console.error('[CLIENT] Error:', error)
       toast.error(error.message || 'Failed to record weigh-in')
     } finally {
       setIsSubmitting(false)

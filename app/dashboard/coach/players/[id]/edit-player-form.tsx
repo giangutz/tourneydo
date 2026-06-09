@@ -173,7 +173,6 @@ export function EditPlayerForm({ player, availableTeams, currentAssignments }: E
       toast.success("Player updated successfully")
       router.push("/dashboard/coach/players")
     } catch (error) {
-      console.error("Error updating player:", error)
       toast.error("Failed to update player")
     } finally {
       setIsLoading(false)

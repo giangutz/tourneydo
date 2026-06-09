@@ -1,6 +1,7 @@
 'use server'
 
 import { registerTeamForTournament } from "@/lib/db/queries/registrations"
+import { logger } from '@/lib/logger'
 import { updatePlayer } from "@/lib/db/queries/players"
 import { auth } from "@clerk/nextjs/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
@@ -133,7 +134,7 @@ export async function manageTournamentRegistrations(
 
     return { success: true }
   } catch (error) {
-    console.error("Manage registration error:", error)
+    logger.error({ error }, 'Manage registration error')
     return { success: false, error: error instanceof Error ? error.message : "Failed to update registrations" }
   }
 }

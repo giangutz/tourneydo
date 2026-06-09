@@ -56,7 +56,6 @@ export function PublicTournamentClient({ tournament, matches: initialMatches, pa
 
   // 3. Realtime Reducer
   const handleMatchUpdate = (payload: any) => {
-    console.log('[Realtime] Match Update:', payload.eventType)
     
     if (payload.eventType === 'INSERT') {
        setMatches(prev => [...prev, payload.new as Match])

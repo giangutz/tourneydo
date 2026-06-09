@@ -45,7 +45,6 @@ export function MatchDetailsDialog({ match, open, onOpenChange, participants, hi
       const roundsData = await fetchMatchRounds(match.id)
       setRounds(roundsData)
     } catch (error) {
-      console.error('Failed to load rounds:', error)
     } finally {
       setLoading(false)
     }

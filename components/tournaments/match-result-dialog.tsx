@@ -107,7 +107,6 @@ export function MatchResultDialog({ match, open, onOpenChange, participants }: M
         }
       })
     } catch (error) {
-      console.error('Failed to load rounds:', error)
     } finally {
       setLoading(false)
     }

@@ -11,6 +11,7 @@
  */
 
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { logger } from '@/lib/logger'
 
 export interface DedupCandidate {
   normFirst: string
@@ -185,7 +186,7 @@ export async function mergePlayersIntoGlobalAthlete(
 
   if (logError) {
     // Non-fatal — log but don't throw
-    console.error('Failed to insert merge log entries:', logError.message)
+    logger.error({ details: logError.message }, 'Failed to insert merge log entries')
   }
 
   return {

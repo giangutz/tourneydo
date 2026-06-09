@@ -19,7 +19,6 @@ export function useRealtimeBracket(tournamentId: string) {
       tournamentId,
       (payload: any) => {
         // Handle bracket update
-        console.log('[useRealtimeBracket] Received update:', payload);
 
         // Debounce refresh
         const timeoutId = setTimeout(() => {
@@ -42,7 +41,6 @@ export function useRealtimeBracket(tournamentId: string) {
   useEffect(() => {
     const onVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        console.log('[useRealtimeBracket] Tab visible, refreshing data...');
         router.refresh();
       }
     };

@@ -202,7 +202,6 @@ export function ConcludedView({ tournamentId }: ConcludedViewProps) {
         setIsExpenseModalOpen(false)
         fetchData()
       } else {
-        console.error('Failed to update expense:', error)
         toast.error('Failed to update expense: ' + error.message)
       }
     } else {
@@ -219,7 +218,6 @@ export function ConcludedView({ tournamentId }: ConcludedViewProps) {
         setIsExpenseModalOpen(false)
         fetchData()
       } else {
-        console.error('Failed to add expense:', error)
         toast.error('Failed to add expense: ' + error.message)
       }
     }

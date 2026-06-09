@@ -238,7 +238,6 @@ export function PaymentClient({ tournament, teams, registrations, coachId, divis
         })
       }
     } catch (error) {
-      console.error("Payment submission error:", error)
       toast.error("Submission Failed", {
         description: "An unexpected error occurred."
       })

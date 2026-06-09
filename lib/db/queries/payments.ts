@@ -1,12 +1,13 @@
 
 /**
  * Payment database queries
- * 
+ *
  * Centralized data access layer for payment operations.
  */
 
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { Payment, PaymentInsert, PaymentUpdate } from '@/types/models'
+import { logger } from '@/lib/logger'
 
 /**
  * Create a new payment
@@ -39,7 +40,7 @@ export async function createBulkPayments(
   // Execute all payment creations in parallel
   // Note: If one fails, Promise.all will reject. This is acceptable for now to ensure data integrity
   // or we could use allSettled to allow partial success, but atomic all-or-nothing is often safer for "submit all".
-  // However, Supabase calls are individual HTTP requests. 
+  // However, Supabase calls are individual HTTP requests.
   // Let's stick to Promise.all for speed.
 
   const results = await Promise.all(
@@ -96,7 +97,7 @@ export async function createPaymentWithPlayers(
       .in('status', ['pending', 'verified']) // Only update if not already paid
 
     if (regError) {
-      console.error('Failed to update registration status:', regError)
+      logger.error({ error: regError }, 'Failed to update registration status')
       // Don't throw - payment is created, just log the error
     }
   }

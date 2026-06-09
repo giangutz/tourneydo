@@ -55,7 +55,6 @@ export default function NewTeamPage() {
       router.push("/dashboard/coach/teams")
       router.refresh()
     } catch (error) {
-      console.error("Error creating team:", error)
     } finally {
       setIsLoading(false)
     }

@@ -65,7 +65,7 @@ const aj = arcjet({
   ],
 })
 
-const isPublicRoute = createRouteMatcher(['/sign-in(.*)', '/sign-up(.*)', '/tournaments(.*)', '/tournament(.*)', '/api/verify-import'])
+const isPublicRoute = createRouteMatcher(['/sign-in(.*)', '/sign-up(.*)', '/tournaments(.*)', '/tournament(.*)', '/api/health', '/api/ready'])
 
 const isOnboardingRoute = createRouteMatcher(['/onboarding'])
 
@@ -113,15 +113,18 @@ export default clerkMiddleware(async (auth, req) => {
     }
   }
 
-  // Protect dashboard routes - ensure users can only access their role's dashboard
+  // Coarse role-routing for dashboards. This middleware only does role-LEVEL gating;
+  // per-resource ownership ("does this user own/staff THIS tournament?") is enforced
+  // in server actions/queries via lib/auth/tournament-access.ts (see B6/R-2 in the
+  // production-readiness plan). Do not rely on this block for data authorization.
   if (req.nextUrl.pathname.startsWith('/dashboard/')) {
+    // Non-coaches cannot view coach-only dashboards.
     if (req.nextUrl.pathname.startsWith('/dashboard/coach') && role !== 'coach') {
       return NextResponse.redirect(new URL('/dashboard/tournament-organizer', req.url))
     }
-    // Allow coaches to access organizer routes (as they might be staff)
-    // if (req.nextUrl.pathname.startsWith('/dashboard/tournament-organizer') && role !== 'tournament-organizer') {
-    //   return NextResponse.redirect(new URL('/dashboard/coach', req.url))
-    // }
+    // Intentional: organizer routes are NOT role-gated here, because coaches can also
+    // act as staff on an organizer's tournament. Access to specific organizer resources
+    // is authorized per-tournament in the data layer, not by route prefix.
   }
 
   return NextResponse.next()

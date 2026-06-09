@@ -1,4 +1,5 @@
 import { Resend } from 'resend'
+import { logger } from '@/lib/logger'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -11,7 +12,7 @@ const FROM = process.env.RESEND_FROM_EMAIL || 'TourneyDo <notifications@tourneyd
 export async function sendEmail(to: string | string[], subject: string, html: string): Promise<{ success: boolean; error?: string }> {
   if (!process.env.RESEND_API_KEY) {
     if (process.env.NODE_ENV !== 'production') {
-      console.log('[email:dev]', { to, subject })
+      logger.info({ to, subject }, '[email:dev] Sending via mock')
       return { success: true }
     }
     return { success: false, error: 'RESEND_API_KEY not configured' }
@@ -21,7 +22,7 @@ export async function sendEmail(to: string | string[], subject: string, html: st
     const { error } = await resend.emails.send({ from: FROM, to, subject, html })
     if (error) {
       if (process.env.NODE_ENV !== 'production') {
-        console.warn('[email:dev] Resend error (falling back):', error.message, { to, subject })
+        logger.warn({ error: error.message, to, subject }, '[email:dev] Resend error — falling back to dev mode')
         return { success: true }
       }
       return { success: false, error: error.message }
@@ -48,7 +49,7 @@ export async function sendStaffInvitationEmail({
   inviterName = 'The Organizer',
 }: SendStaffInvitationParams) {
   if (!process.env.RESEND_API_KEY) {
-    console.warn('RESEND_API_KEY is not set. Skipping email.')
+    logger.warn('Email skipped: RESEND_API_KEY is not set')
     return { success: false, error: 'Missing API Key' }
   }
 
@@ -77,13 +78,7 @@ export async function sendStaffInvitationEmail({
     if (error) {
       // Dev Mode Fallback
       if (process.env.NODE_ENV !== 'production') {
-        console.log('--- DEV MODE EMAIL FALLBACK ---')
-        console.log(`To: ${email}`)
-        console.log(`Subject: ${subject}`)
-        console.log('--- HTML CONTENT ---')
-        console.log(html)
-        console.log('--- END EMAIL CONTENT ---')
-        console.warn(`Original Resend Error: ${error.message}`)
+        logger.info({ to: email, subject, htmlLength: html.length, originalError: error.message }, '[email:dev] Fallback — email not sent, logged instead')
 
         return {
           success: true,
@@ -92,13 +87,13 @@ export async function sendStaffInvitationEmail({
         }
       }
 
-      console.error('Resend Error:', error)
+      logger.error({ error }, 'Resend error')
       return { success: false, error: error.message }
     }
 
     return { success: true, data }
   } catch (error: any) {
-    console.error('Failed to send email:', error)
+    logger.error({ error }, 'Failed to send email')
     return { success: false, error: error.message || 'Failed to send email' }
   }
 }
@@ -121,7 +116,7 @@ export async function sendPaymentApprovalEmail({
   referenceNumber,
 }: SendPaymentApprovalParams) {
   if (!process.env.RESEND_API_KEY) {
-    console.warn('RESEND_API_KEY is not set. Skipping email.')
+    logger.warn('Email skipped: RESEND_API_KEY is not set')
     return { success: false, error: 'Missing API Key' }
   }
 
@@ -155,22 +150,16 @@ export async function sendPaymentApprovalEmail({
 
     if (error) {
       if (process.env.NODE_ENV !== 'production') {
-        console.log('--- DEV MODE EMAIL FALLBACK ---')
-        console.log(`To: ${email}`)
-        console.log(`Subject: ${subject}`)
-        console.log('--- HTML CONTENT ---')
-        console.log(html)
-        console.log('--- END EMAIL CONTENT ---')
-        console.warn(`Original Resend Error: ${error.message}`)
+        logger.info({ to: email, subject, htmlLength: html.length, originalError: error.message }, '[email:dev] Fallback — email not sent, logged instead')
         return { success: true, data: { id: 'dev-mode-fallback' }, warning: 'Dev Mode: Email logged to console.' }
       }
-      console.error('Resend Error:', error)
+      logger.error({ error }, 'Resend error')
       return { success: false, error: error.message }
     }
 
     return { success: true, data }
   } catch (error: any) {
-    console.error('Failed to send email:', error)
+    logger.error({ error }, 'Failed to send email')
     return { success: false, error: error.message || 'Failed to send email' }
   }
 }
@@ -195,7 +184,7 @@ export async function sendPaymentRejectionEmail({
   rejectionReason,
 }: SendPaymentRejectionParams) {
   if (!process.env.RESEND_API_KEY) {
-    console.warn('RESEND_API_KEY is not set. Skipping email.')
+    logger.warn('Email skipped: RESEND_API_KEY is not set')
     return { success: false, error: 'Missing API Key' }
   }
 
@@ -234,22 +223,16 @@ export async function sendPaymentRejectionEmail({
 
     if (error) {
       if (process.env.NODE_ENV !== 'production') {
-        console.log('--- DEV MODE EMAIL FALLBACK ---')
-        console.log(`To: ${email}`)
-        console.log(`Subject: ${subject}`)
-        console.log('--- HTML CONTENT ---')
-        console.log(html)
-        console.log('--- END EMAIL CONTENT ---')
-        console.warn(`Original Resend Error: ${error.message}`)
+        logger.info({ to: email, subject, htmlLength: html.length, originalError: error.message }, '[email:dev] Fallback — email not sent, logged instead')
         return { success: true, data: { id: 'dev-mode-fallback' }, warning: 'Dev Mode: Email logged to console.' }
       }
-      console.error('Resend Error:', error)
+      logger.error({ error }, 'Resend error')
       return { success: false, error: error.message }
     }
 
     return { success: true, data }
   } catch (error: any) {
-    console.error('Failed to send email:', error)
+    logger.error({ error }, 'Failed to send email')
     return { success: false, error: error.message || 'Failed to send email' }
   }
 }

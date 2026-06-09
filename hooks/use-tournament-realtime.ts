@@ -65,9 +65,7 @@ export function useTournamentRealtime(
         )
         .subscribe((status) => {
           if (status === 'SUBSCRIBED') {
-            console.log(`[Tournament Realtime] Connected to ${tournamentId}`)
           } else if (status === 'CLOSED') {
-            console.log(`[Tournament Realtime] Disconnected from ${tournamentId}`)
           }
         })
     }

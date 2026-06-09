@@ -30,7 +30,6 @@ export default async function TournamentEditPage({ params }: TournamentEditPageP
        enabledDivisions = allDivs.filter(d => d.enabled).map(d => d.name)
      }
   } catch (e) {
-    console.error('Failed to fetch divisions for settings page', e)
   }
 
   if (!tournament) {

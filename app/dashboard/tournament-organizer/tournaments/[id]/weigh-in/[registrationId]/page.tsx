@@ -14,13 +14,6 @@ export default async function WeighInParticipantPage({
     const { id, registrationId } = await params
     const registration = await getRegistrationById(registrationId)
     
-    console.log('[SERVER] Registration data:', {
-      id: registration.id,
-      division_id: registration.division_id,
-      category_id: registration.category_id,
-      hasPlayer: !!registration.player,
-      hasTeam: !!registration.team
-    })
     
     if (!registration) {
       notFound()
@@ -65,7 +58,6 @@ export default async function WeighInParticipantPage({
       </div>
     )
   } catch (error) {
-    console.error('Error loading weigh-in page:', error)
     return <div>Error loading participant data: {(error as Error).message} <br/>Stack: {(error as Error).stack}</div>
   }
 }

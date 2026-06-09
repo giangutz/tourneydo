@@ -9,6 +9,7 @@
  */
 
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { logger } from '@/lib/logger'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -70,10 +71,10 @@ export async function createAuditEntry(params: CreateAuditEntryParams): Promise<
     })
 
     if (error) {
-      console.error('[audit] Failed to write audit entry:', error.message, params)
+      logger.error({ details: error.message, params }, '[audit] Failed to write audit entry')
     }
   } catch (err) {
-    console.error('[audit] Unexpected error writing audit entry:', err, params)
+    logger.error({ details: err, params }, '[audit] Unexpected error writing audit entry')
   }
 }
 

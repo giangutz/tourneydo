@@ -1,8 +1,8 @@
 /**
  * API Route: PUT /api/participants/update
- * 
+ *
  * Update a participant's information in a tournament
- * 
+ *
  * Security:
  * - Requires authentication (Clerk JWT)
  * - Requires authorization (user must be team owner/coach)
@@ -21,6 +21,7 @@ import { successResponse, errorResponse, ERROR_CODE, HTTP_STATUS } from '@/lib/u
 import { updateParticipantSchema } from '@/lib/validations/participants'
 import { ajStrict } from '@/lib/arcjet'
 import * as Sentry from '@sentry/nextjs'
+import { logger } from '@/lib/logger'
 
 export async function PUT(request: NextRequest) {
   // Rate limit: 60 requests / 60 s per IP
@@ -71,7 +72,7 @@ export async function PUT(request: NextRequest) {
 
     // 3. AUTHORIZE - Verify user access
     const supabase = await createServerSupabaseClient()
-    
+
     // Get registration and verify user owns the team
     const { data: registration, error: regError } = await supabase
       .from('tournament_registrations')
@@ -127,18 +128,13 @@ export async function PUT(request: NextRequest) {
       throw error
     }
 
-    // 5. LOG SUCCESS
-    console.log('Participant updated', {
-      userId,
-      registrationId,
-      status,
-    })
+    logger.info({ userId, registrationId, status }, 'Participant updated')
 
     revalidatePath(routes.organizer.tournamentParticipants(registration.tournament_id))
 
     return successResponse({ success: true }, HTTP_STATUS.OK)
   } catch (error) {
-    console.error('Failed to update participant:', error)
+    logger.error({ error: error }, 'Failed to update participant')
     Sentry.captureException(error, {
       tags: { action: 'update_participant' },
     })

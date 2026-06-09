@@ -156,7 +156,6 @@ export async function NotificationsNav() {
        .slice(0, 20) // Increased limit since we have more sources
 
   } catch (err) {
-     console.error('Error fetching notifications:', err)
      activities = []
   }
 

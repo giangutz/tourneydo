@@ -85,7 +85,6 @@ export function useOfflineSync(): OfflineSyncState {
         toast.error(`${failCount} score${failCount > 1 ? 's' : ''} failed to sync — they will retry on next reconnect.`)
       }
     } catch (err) {
-      console.error('[offline-sync] Failed to flush queue:', err)
     } finally {
       syncInProgress.current = false
       setIsSyncing(false)

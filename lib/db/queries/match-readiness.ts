@@ -1,6 +1,6 @@
 /**
  * Athlete Readiness Database Queries
- * 
+ *
  * Manages the operational gate for match start confirmation.
  * Does NOT affect scheduling, numbering, or dependencies.
  */
@@ -15,6 +15,7 @@ import {
 import { transformMatch } from './matches'
 import { CourtStatus } from '@/lib/utils/match-lifecycle'
 import { resultCache } from '@/lib/cache/result-cache'
+import { logger } from '@/lib/logger'
 
 // OPTIMIZATION: 30-second TTL — short enough for live tournaments, long enough to cut load
 const MATCHES_CACHE_TTL = 30 * 1000
@@ -33,7 +34,7 @@ export async function getMatchReadiness(matchId: string): Promise<{
     .single()
 
   if (error) {
-    console.error('Failed to get match readiness:', error)
+    logger.error({ error: error }, 'Failed to get match readiness')
     return { athlete1Called: false, athlete2Called: false }
   }
 
@@ -161,7 +162,7 @@ async function fetchMatchesWithReadiness(
     // Check if this is a Supabase/Cloudflare infrastructure error
     const errorMsg = matchesError.message || ''
     if (errorMsg.includes('<!DOCTYPE html>') || errorMsg.includes('Internal server error')) {
-      console.error('Supabase infrastructure error, returning empty matches array')
+      logger.error('Supabase infrastructure error, returning empty matches array')
       return []
     }
     throw new Error(`Failed to get matches: ${matchesError.message}`)
@@ -185,7 +186,7 @@ async function fetchMatchesWithReadiness(
       .in('match_id', chunk)
 
     if (error) {
-      console.error(`Failed to get readiness records for chunk ${i / CHUNK_SIZE + 1}:`, error)
+      logger.error({ error, chunk: i / CHUNK_SIZE + 1 }, 'Failed to get readiness records for chunk')
     } else if (data) {
       readinessRecords.push(...data)
     }
@@ -228,7 +229,7 @@ export async function initializeMatchReadiness(matchId: string): Promise<void> {
   const supabase = createServerSupabaseClient()
 
   if (!matchId) {
-    console.error('Cannot initialize match readiness: matchId is required')
+    logger.error('Cannot initialize match readiness: matchId is required')
     return
   }
 
@@ -237,7 +238,7 @@ export async function initializeMatchReadiness(matchId: string): Promise<void> {
   })
 
   if (error) {
-    console.error('Failed to initialize match readiness:', error)
+    logger.error({ error: error }, 'Failed to initialize match readiness')
   }
 }
 

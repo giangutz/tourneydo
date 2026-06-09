@@ -43,7 +43,6 @@ export class SubscriptionManager {
   private setStatus(newStatus: ConnectionStatus) {
     if (this.status !== newStatus) {
       this.status = newStatus;
-      console.log(`[SubscriptionManager] Status changed: ${newStatus}`);
       this.notifyListeners();
     }
   }
@@ -122,7 +121,6 @@ export class SubscriptionManager {
     // Only set timer if tab is visible and we are not already idle
     if (!document.hidden) {
       this.inactivityTimer = setTimeout(() => {
-        console.log('[SubscriptionManager] User inactive, disconnecting...');
         this.setStatus('DISCONNECTED_IDLE');
         this.disconnect();
       }, INACTIVITY_TIMEOUT);

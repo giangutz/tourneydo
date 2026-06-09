@@ -159,7 +159,6 @@ export function PlayerFormDialog({
       onOpenChange(false)
       form.reset()
     } catch (error) {
-      console.error("Error submitting form:", error)
     } finally {
       setIsLoading(false)
     }

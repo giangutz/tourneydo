@@ -1,6 +1,6 @@
 /**
  * Tournament database queries
- * 
+ *
  * Centralized data access layer for tournament operations.
  * All queries are properly typed and handle errors consistently.
  */
@@ -8,16 +8,17 @@
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { resultCache, invalidateTournamentCache } from '@/lib/cache/result-cache'
 import type { Tournament, TournamentInsert, TournamentUpdate } from '@/types/models'
+import { logger } from '@/lib/logger'
 
 /**
  * Get all tournaments for a specific organizer
- * 
+ *
  * @param organizerId - Organizer's user ID
  * @returns Array of tournaments
  */
 /**
  * Get all tournaments for a specific user (organized + staff access)
- * 
+ *
  * @param userId - User ID
  * @returns Array of tournaments
  */
@@ -62,7 +63,7 @@ export async function getTournamentsByOrganizerId(userId: string): Promise<Tourn
     .eq('status', 'active')
 
   if (staffError) {
-    console.error(`Failed to fetch staff tournaments: ${staffError.message}`)
+    logger.error(`Failed to fetch staff tournaments: ${staffError.message}`)
   }
 
   const staffTournaments = staffAssignments?.map((s) => ({
@@ -84,10 +85,10 @@ export async function getTournamentsByOrganizerId(userId: string): Promise<Tourn
 
 /**
  * Get a single tournament by ID (with caching)
- * 
+ *
  * OPTIMIZATION: Results are cached for 5 minutes to reduce database queries
  * Cache is invalidated on write operations
- * 
+ *
  * @param id - Tournament ID
  * @returns Tournament object or null if not found
  */
@@ -124,7 +125,7 @@ export async function getTournamentById(id: string): Promise<Tournament | null> 
 
 /**
  * Create a new tournament
- * 
+ *
  * @param tournamentData - Tournament data to insert
  * @returns Created tournament object
  */
@@ -177,7 +178,7 @@ export async function updateTournament(id: string, tournamentData: TournamentUpd
  * Delete a tournament
 /**
  * Delete a tournament
- * 
+ *
  * @param id - Tournament ID to delete
  */
 export async function deleteTournament(id: string): Promise<void> {
@@ -197,7 +198,7 @@ export async function deleteTournament(id: string): Promise<void> {
 }
 /**
  * Get all available tournaments (for coaches)
- * 
+ *
  * @returns Array of tournaments
  */
 export async function getTournaments(): Promise<Tournament[]> {
@@ -284,7 +285,7 @@ async function checkAndUpdateStatus(tournament: Tournament): Promise<void> {
   const weighInStart = tournament.weigh_in_start ? new Date(tournament.weigh_in_start) : null
 
   // Ensure end date covers the full day if needed (though usually timestamps handle this)
-  // Logic: 
+  // Logic:
   // - Completed: End date passed
   // - Ongoing: Weigh-in started OR Start date passed (active phase)
   // - Upcoming: Before weigh-in/start
@@ -301,10 +302,10 @@ async function checkAndUpdateStatus(tournament: Tournament): Promise<void> {
   }
 
   // Only update if status is different and not cancelled
-  // And avoid reverting 'completed' if logic says 'ongoing' but admin marked completed? 
+  // And avoid reverting 'completed' if logic says 'ongoing' but admin marked completed?
   // Actually, dates should differ. But let's respect manual 'cancelled'.
   // Only update if status is different and not cancelled
-  // And avoid reverting 'completed' if logic says 'ongoing' but admin marked completed? 
+  // And avoid reverting 'completed' if logic says 'ongoing' but admin marked completed?
   // Actually, dates should differ. But let's respect manual 'cancelled'.
   if (
     tournament.status !== 'cancelled' &&
@@ -316,7 +317,7 @@ async function checkAndUpdateStatus(tournament: Tournament): Promise<void> {
     try {
       await updateTournament(tournament.id, { status: newStatus })
     } catch (e) {
-      console.error(`Failed to auto-update tournament ${tournament.id} status to ${newStatus}`, e)
+      logger.error({ error: e, tournamentId: tournament.id, newStatus }, 'Failed to auto-update tournament status')
       // We don't revert local change because we want the UI to reflect the calculated status based on dates
       // even if the DB persistence failed temporarily.
     }
@@ -325,7 +326,7 @@ async function checkAndUpdateStatus(tournament: Tournament): Promise<void> {
 
 /**
  * Get tournament division move policy
- * 
+ *
  * @param tournamentId - Tournament ID
  * @returns Division move policy ('allow_move' | 'disqualify_only')
  */

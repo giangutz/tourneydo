@@ -13,6 +13,14 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
   ]),
+  {
+    rules: {
+      // All production logging must go through lib/logger (Pino) on the server,
+      // or be removed from client components. console.* leaks PII in structured
+      // log aggregators and violates the project's observability contract.
+      "no-console": "error",
+    },
+  },
 ]);
 
 export default eslintConfig;

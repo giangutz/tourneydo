@@ -16,7 +16,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { authorizeForTournament } from '@/lib/auth/authorize'
+import { checkTournamentAccess } from '@/lib/auth/tournament-access'
 import { aj } from '@/lib/arcjet'
 import { matchResultsToCsv, participantsToCsv, type MatchResultRow, type ParticipantRow } from '@/lib/export/csv-export'
 import { matchResultsToPdf, participantsToPdf } from '@/lib/export/pdf-export'
@@ -42,10 +42,10 @@ export async function GET(
 
     const { id: tournamentId } = await params
 
-    // 2. AUTHORIZE
-    const authResult = await authorizeForTournament(userId, tournamentId)
-    if (!authResult.authorized) {
-      return errorResponse('FORBIDDEN', authResult.error, HTTP_STATUS.FORBIDDEN)
+    // 2. AUTHORIZE (organizer or any active staff may export)
+    const { hasAccess } = await checkTournamentAccess(tournamentId)
+    if (!hasAccess) {
+      return errorResponse('FORBIDDEN', 'Not authorized to export this tournament', HTTP_STATUS.FORBIDDEN)
     }
 
     // 3. VALIDATE QUERY PARAMS

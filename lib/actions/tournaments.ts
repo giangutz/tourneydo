@@ -13,6 +13,7 @@ import {
 } from '@/lib/db/queries/tournaments'
 
 import { tournamentFormSchema } from '@/lib/validations/tournament'
+import { logger } from '@/lib/logger'
 
 // Removed duplicate schema definition
 
@@ -130,11 +131,11 @@ export async function createTournament(prevState: any, formData: FormData): Prom
           }
         }
       } catch (e) {
-        console.error('Failed to parse selected divisions:', e)
+        logger.error({ error: e }, 'Failed to parse selected divisions')
       }
     }
   } catch (error) {
-    console.error('Failed to setup initial divisions:', error)
+    logger.error({ error: error }, 'Failed to setup initial divisions')
     // Don't fail the whole creation, just log it
   }
 
@@ -253,7 +254,7 @@ export async function updateTournament(id: string, prevState: any, formData: For
           }
         }
       } catch (e) {
-        console.error('Failed to parse selected divisions during update:', e)
+        logger.error({ error: e }, 'Failed to parse selected divisions during update')
       }
     }
 

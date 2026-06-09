@@ -217,7 +217,6 @@ export function WeighInList({ participants, divisions, tournamentId, page, total
         toast.error(result.error || "Failed to delete checklist")
       }
     } catch (error) {
-       console.error("Delete error:", error)
        toast.error("An unexpected error occurred")
     } finally {
       setIsDeleting(false)

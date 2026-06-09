@@ -1,5 +1,6 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import type { DivisionConfig, CategoryConfig } from '@/lib/constants/divisions'
+import { logger } from '@/lib/logger'
 
 /**
  * Create default divisions for a tournament
@@ -150,7 +151,7 @@ export async function ensureTournamentDivisionsAndCategories(
           })
 
         if (error) {
-          console.error(`Failed to create category ${defaultCat.name} for division ${defaultDiv.name}:`, error)
+          logger.error({ error, category: defaultCat.name, division: defaultDiv.name }, 'Failed to create division category')
         }
       } else {
         // Update category if weight/height limits differ
@@ -187,7 +188,7 @@ export async function ensureTournamentDivisionsAndCategories(
 
     if (categoriesToDelete.length > 0) {
       const idsToDelete = categoriesToDelete.map((c: any) => c.id)
-      console.log(`Cleaning up ${idsToDelete.length} obsolete categories for division ${defaultDiv.name}`)
+      logger.info(`Cleaning up ${idsToDelete.length} obsolete categories for division ${defaultDiv.name}`)
 
       const { error: delError } = await supabase
         .from('tournament_categories')
@@ -195,7 +196,7 @@ export async function ensureTournamentDivisionsAndCategories(
         .in('id', idsToDelete)
 
       if (delError) {
-        console.error('Failed to cleanup obsolete categories:', delError)
+        logger.error({ error: delError }, 'Failed to cleanup obsolete categories')
       }
     }
   }
@@ -246,7 +247,7 @@ export async function restoreDefaultCategoriesSafely(
             })
 
           if (error) {
-            console.error(`Failed to restore category ${defaultCat.name} for division ${defaultDiv.name}:`, error)
+            logger.error({ error, category: defaultCat.name, division: defaultDiv.name }, 'Failed to restore division category')
           }
         }
         // Do NOT update existing categories - preserve custom limits
@@ -298,12 +299,12 @@ export async function batchAssignParticipantDivisions(
     chunks.push(assignments.slice(i, i + CHUNK_SIZE))
   }
 
-  console.log(`[BATCH_ASSIGN] Processing ${assignments.length} assignments in ${chunks.length} chunks of ${CHUNK_SIZE}`)
+  logger.info(`[BATCH_ASSIGN] Processing ${assignments.length} assignments in ${chunks.length} chunks of ${CHUNK_SIZE}`)
 
   // Process each chunk sequentially with delay
   for (let i = 0; i < chunks.length; i++) {
     const chunk = chunks[i]
-    console.log(`[BATCH_ASSIGN] Processing chunk ${i + 1}/${chunks.length} (${chunk.length} assignments)`)
+    logger.info(`[BATCH_ASSIGN] Processing chunk ${i + 1}/${chunks.length} (${chunk.length} assignments)`)
 
     // Execute all updates in this chunk in parallel
     const updatePromises = chunk.map(({ registrationId, divisionId, categoryId }) =>
@@ -321,7 +322,7 @@ export async function batchAssignParticipantDivisions(
     // Check for any errors in this chunk
     const errors = results.filter(r => r.error)
     if (errors.length > 0) {
-      console.error(`[BATCH_ASSIGN] Errors in chunk ${i + 1}:`, errors.map(e => e.error?.message))
+      logger.error({ chunk: i + 1, errors: errors.map(e => e.error?.message) }, 'Batch assign: errors in chunk')
       throw new Error(`Failed to batch assign divisions (chunk ${i + 1}): ${errors[0].error?.message}`)
     }
 
@@ -331,7 +332,7 @@ export async function batchAssignParticipantDivisions(
     }
   }
 
-  console.log(`[BATCH_ASSIGN] Successfully assigned ${assignments.length} participants`)
+  logger.info(`[BATCH_ASSIGN] Successfully assigned ${assignments.length} participants`)
 }
 
 /**

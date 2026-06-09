@@ -29,7 +29,6 @@ export function useAdminChannel(tournamentId: string) {
       clearTimeout(refreshTimeout.current);
     }
     refreshTimeout.current = setTimeout(() => {
-      console.log('[AdminChannel] Debounced refresh triggering...');
       startTransition(() => {
         router.refresh();
       });
@@ -58,7 +57,6 @@ export function useAdminChannel(tournamentId: string) {
             filter: `tournament_id=eq.${tournamentId}`
           },
           () => {
-            console.log('[AdminChannel] Match update received, scheduling refresh...');
             debouncedRefresh();
           }
         )
@@ -71,7 +69,6 @@ export function useAdminChannel(tournamentId: string) {
             filter: `tournament_id=eq.${tournamentId}`
           },
           () => {
-            console.log('[AdminChannel] Registration update received, scheduling refresh...');
             debouncedRefresh();
           }
         )
@@ -96,12 +93,10 @@ export function useAdminChannel(tournamentId: string) {
     // Handle visibility to save costs (disconnect when tab hidden)
     const handleVisibilityChange = async () => {
       if (document.hidden) {
-        console.log('[AdminChannel] Tab hidden, disconnecting...');
         await cleanupConnection();
         // Also disconnect the socket to be sure
         client.realtime.disconnect();
       } else {
-        console.log('[AdminChannel] Tab visible, reconnecting...');
         // Client.realtime.connect() is automatic when subscribing,
         // but since we might have disconnected the socket:
         client.realtime.connect();

@@ -153,7 +153,6 @@ export function NewPlayerForm({ availableTeams }: NewPlayerFormProps) {
 
       router.push("/dashboard/coach/players")
     } catch (error) {
-      console.error("Error creating player:", error)
     } finally {
       setIsLoading(false)
     }
