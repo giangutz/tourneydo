@@ -312,14 +312,29 @@ export type MatchLifecycleState =
 
 /**
  * How the match was decided.
- * SCORE:      Normal best-of-3 rounds by point total (default)
- * KO:         Knock-out — opponent cannot continue
- * TKO:        Technical knock-out — referee stops the contest
- * DQ:         Disqualification
- * WITHDRAWAL: Athlete withdraws before/during the match
- * FORFEIT:    Coach/team forfeits on behalf of the athlete
+ *
+ * WT codes (current):
+ *   PTF: Win by final score          PTG: Win by point gap
+ *   GDP: Win by golden point         SUP: Win by superiority (tie-break)
+ *   RSC: Referee stops contest       WDR: Win by withdrawal
+ *   DSQ: Win by disqualification     PUN: Win by punitive declaration (gam-jeom limit)
+ *
+ * Legacy values (kept for back-compat with matches recorded before the WT
+ * extension): SCORE/KO/TKO/DQ/WITHDRAWAL/FORFEIT.
+ *
+ * See lib/constants/wt-rules.ts for labels and explicit-winner classification.
  */
 export type WinMethod =
+  // WT
+  | 'PTF'
+  | 'PTG'
+  | 'GDP'
+  | 'SUP'
+  | 'RSC'
+  | 'WDR'
+  | 'DSQ'
+  | 'PUN'
+  // legacy
   | 'SCORE'
   | 'KO'
   | 'TKO'

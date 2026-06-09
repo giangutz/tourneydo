@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Match, WinMethod } from '@/types/models'
+import { WIN_METHOD_LABELS } from '@/lib/constants/wt-rules'
 import { saveMatchScores } from '@/lib/actions/save-match-scores'
 import { rescoreMatch } from '@/lib/actions/rescore-match'
 import { enqueue as enqueueOffline } from '@/lib/offline/score-queue'
@@ -31,16 +32,9 @@ interface RoundData {
   status: string | null
 }
 
-const WIN_METHOD_LABELS: Record<WinMethod, string> = {
-  SCORE:      'Score',
-  KO:         'KO',
-  TKO:        'TKO',
-  DQ:         'DQ',
-  WITHDRAWAL: 'Withdrawal',
-  FORFEIT:    'Forfeit',
-}
-
-const EARLY_TERMINATION_METHODS: WinMethod[] = ['KO', 'TKO', 'DQ', 'WITHDRAWAL', 'FORFEIT']
+// WT explicit early-termination methods (winner declared directly, not by score).
+// Round-derived methods (PTF/PTG/GDP/SUP) flow through the normal scoring path.
+const EARLY_TERMINATION_METHODS: WinMethod[] = ['RSC', 'WDR', 'DSQ', 'PUN']
 
 export function MatchResultDialog({ match, open, onOpenChange, participants }: MatchResultDialogProps) {
   const router = useRouter()
@@ -61,7 +55,7 @@ export function MatchResultDialog({ match, open, onOpenChange, participants }: M
   const [manualWinner3, setManualWinner3] = useState<string | null>(null)
 
   // Win method state
-  const [winMethod, setWinMethod] = useState<WinMethod>('SCORE')
+  const [winMethod, setWinMethod] = useState<WinMethod>('PTF')
   const [earlyWinnerId, setEarlyWinnerId] = useState<string | null>(null)
   const [earlyRound, setEarlyRound] = useState<number | null>(null)
 
@@ -77,7 +71,7 @@ export function MatchResultDialog({ match, open, onOpenChange, participants }: M
       setManualWinner1(null)
       setManualWinner2(null)
       setManualWinner3(null)
-      setWinMethod('SCORE')
+      setWinMethod('PTF')
       setEarlyWinnerId(null)
       setEarlyRound(null)
       setIsRescore(false)
@@ -542,7 +536,7 @@ export function MatchResultDialog({ match, open, onOpenChange, participants }: M
               <Trophy className="h-10 w-10 text-amber-500" />
               <p className="text-lg font-semibold">{dbWinnerName ?? 'No winner recorded'}</p>
               <p className="text-sm text-muted-foreground">This match has been completed.</p>
-              {match.win_method && match.win_method !== 'SCORE' && (
+              {match.win_method && match.win_method !== 'SCORE' && match.win_method !== 'PTF' && (
                 <p className="text-sm text-destructive font-medium">
                   Won by {WIN_METHOD_LABELS[match.win_method as WinMethod]}
                   {match.winning_round ? ` (Round ${match.winning_round})` : ''}

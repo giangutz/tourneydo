@@ -1,5 +1,6 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import type { WinMethod } from '@/types/models'
+import { isExplicitWinnerMethod } from '@/lib/constants/wt-rules'
 import { logger } from '@/lib/logger'
 
 export interface MatchRound {
@@ -85,18 +86,25 @@ export async function updateRoundScore(
 }
 
 /**
- * Check if match has a winner (2 round wins for SCORE, or explicit winner for
- * KO/TKO/DQ/WITHDRAWAL/FORFEIT) and advance them to the next bracket slot.
+ * Determine the match winner and advance them to the next bracket slot.
+ *
+ * Two paths:
+ *   - Round-derived (PTF/PTG/GDP/SUP, legacy SCORE): count per-round winners
+ *     from match_rounds (best-of-3; a golden-point round 4 decides a 1–1 match).
+ *     The round winner_ids already reflect tie-break overrides and the gam-jeom
+ *     round-loss rule (applied upstream when the rounds are saved).
+ *   - Explicit (RSC/WDR/DSQ/PUN, legacy KO/TKO/DQ/WITHDRAWAL/FORFEIT): winner is
+ *     supplied directly; no round counting.
  *
  * @param matchId         - Match to evaluate
- * @param explicitWinnerId - Pre-determined winner (for non-SCORE methods)
- * @param winMethod       - How the match was decided (defaults to 'SCORE')
+ * @param explicitWinnerId - Pre-determined winner (for explicit win methods)
+ * @param winMethod       - How the match was decided (defaults to 'PTF')
  * @param winningRound    - Round in which the match ended early (if applicable)
  */
 export async function checkAndUpdateMatchWinner(
   matchId: string,
   explicitWinnerId?: string | null,
-  winMethod: WinMethod = 'SCORE',
+  winMethod: WinMethod = 'PTF',
   winningRound?: number
 ): Promise<{
   hasWinner: boolean
@@ -122,14 +130,14 @@ export async function checkAndUpdateMatchWinner(
   let winnerId: string | null = null
   let hasWinner = false
 
-  if (winMethod !== 'SCORE' && explicitWinnerId) {
-    // Non-score win: winner is explicitly provided — no round counting needed
+  if (isExplicitWinnerMethod(winMethod) && explicitWinnerId) {
+    // Explicit early-termination win: winner provided — no round counting needed
     winnerId = explicitWinnerId
     hasWinner = true
     player1Wins = winnerId === match.player1_id ? 1 : 0
     player2Wins = winnerId === match.player2_id ? 1 : 0
   } else {
-    // Normal SCORE: count round wins (best-of-3)
+    // Round-derived win: count round wins (best-of-3, incl. golden-point round 4)
     const rounds = await getMatchRounds(matchId)
 
     for (const round of rounds) {

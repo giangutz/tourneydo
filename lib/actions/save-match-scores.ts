@@ -4,57 +4,65 @@ import { revalidatePath } from 'next/cache'
 import { auth } from '@clerk/nextjs/server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { checkAndUpdateMatchWinner } from '@/lib/db/queries/match-rounds'
-import { getTournamentById } from '@/lib/db/queries/tournaments'
+import { checkTournamentAccess } from '@/lib/auth/tournament-access'
 import { routes } from '@/config/routes'
 import { invalidateMatchesCache } from '@/lib/cache/result-cache'
-import { matchScoresSchema, type MatchScoresInput } from '@/lib/validations/match-scores'
+import {
+  saveMatchScoresInputSchema,
+  type MatchScoresInput,
+  type GamJeomInput,
+  type TechniqueStatInput,
+} from '@/lib/validations/match-scores'
 import { createAuditEntry } from '@/lib/db/queries/audit-trail'
+import { isExplicitWinnerMethod, DEFAULT_WT_RULES } from '@/lib/constants/wt-rules'
 import { logger } from '@/lib/logger'
 import type { WinMethod } from '@/types/models'
 
-// Re-export the type so callers can use it without a direct dep on validations
 type RoundScores = MatchScoresInput
 
 /**
- * Save all round scores at once and determine match winner.
+ * Save a transcribed match result: per-round scores (incl. optional golden-point
+ * round 4), typed gam-jeoms, and optional technique stats; then determine and
+ * advance the winner. The final round score is authoritative (it already
+ * includes gam-jeom points) — gam-jeoms are recorded for the round-loss rule and
+ * player statistics only.
  *
- * @param matchId      - The match being scored
- * @param scores       - Per-round point totals and optional manual winner override
- * @param winMethod    - How the match was decided (default: 'SCORE')
- * @param winningRound - Which round ended the match early (KO/TKO/DQ/etc.)
- *                       Omit for normal SCORE decisions.
- * @param winnerId        - Explicit winner for non-score decisions (KO/TKO/DQ/etc.)
- *                         Required when winMethod is not 'SCORE'.
- * @param expectedVersion - The `updated_at` ISO string read when the dialog opened.
- *                         If provided and the DB row has since changed, the save is
- *                         rejected with a CONFLICT error (optimistic locking).
+ * Authorization: organizer OR staff with the `matches` capability.
  */
 export async function saveMatchScores(
   matchId: string,
   scores: RoundScores,
-  winMethod: WinMethod = 'SCORE',
+  winMethod: WinMethod = 'PTF',
   winningRound?: number,
   winnerId?: string,
-  expectedVersion?: string
+  expectedVersion?: string,
+  gamJeoms: GamJeomInput[] = [],
+  techniques: TechniqueStatInput[] = [],
 ) {
   const { userId } = await auth()
-
   if (!userId) {
     throw new Error('Unauthorized')
   }
 
-  // Validate scores before touching the database
-  const parsedScores = matchScoresSchema.safeParse(scores)
-  if (!parsedScores.success) {
-    const firstIssue = parsedScores.error.issues[0]
+  // Validate the full payload (scores + gam-jeoms + techniques + method rules)
+  const parsed = saveMatchScoresInputSchema.safeParse({
+    scores,
+    winMethod,
+    winningRound,
+    winnerId,
+    gamJeoms,
+    techniques,
+  })
+  if (!parsed.success) {
+    const firstIssue = parsed.error.issues[0]
     return {
       success: false,
       error: firstIssue
         ? `${firstIssue.path.join('.')}: ${firstIssue.message}`
-        : 'Invalid score data'
+        : 'Invalid score data',
     }
   }
-  const validScores = parsedScores.data
+  const input = parsed.data
 
   try {
     const supabase = createServerSupabaseClient()
@@ -79,53 +87,97 @@ export async function saveMatchScores(
       }
     }
 
-    // Verify the calling user is the tournament organizer
-    const tournament = await getTournamentById(match.tournament_id)
-    if (!tournament || tournament.organizer_id !== userId) {
-      throw new Error('Not authorized to modify this match')
+    // Authorize: organizer or staff with the `matches` capability (officials record results)
+    const access = await checkTournamentAccess(match.tournament_id, 'matches')
+    if (!access.hasAccess) {
+      throw new Error('Not authorized to record results for this match')
     }
 
-    // Derive round winners from scores or manual override
-    function deriveWinnerId(
+    const limit = DEFAULT_WT_RULES.gamJeomRoundLossLimit
+
+    /** Count gam-jeoms committed by a player in a given round. */
+    const gamJeomCount = (roundNumber: number, playerId: string | null): number => {
+      if (!playerId) return 0
+      return input.gamJeoms?.filter(
+        (g) => g.roundNumber === roundNumber && g.playerId === playerId,
+      ).length ?? 0
+    }
+
+    /**
+     * Derive the winner of a round. Order of precedence:
+     *   1. Gam-jeom round-loss: a player with ≥ limit gam-jeoms loses the round.
+     *   2. Manual override (tie-break / superiority).
+     *   3. Higher score.
+     * Returns null for a true draw (→ golden point).
+     */
+    const deriveWinnerId = (
+      roundNumber: number,
       player1Score: number,
       player2Score: number,
-      manualWinnerId: string | null | undefined
-    ): string | null {
+      manualWinnerId: string | null | undefined,
+    ): string | null => {
+      const p1Over = gamJeomCount(roundNumber, match.player1_id) >= limit
+      const p2Over = gamJeomCount(roundNumber, match.player2_id) >= limit
+      if (p1Over && !p2Over) return match.player2_id ?? null
+      if (p2Over && !p1Over) return match.player1_id ?? null
       if (manualWinnerId) return manualWinnerId
-      const m = match!
-      if (player1Score > player2Score) return m.player1_id ?? null
-      if (player2Score > player1Score) return m.player2_id ?? null
+      if (player1Score > player2Score) return match.player1_id ?? null
+      if (player2Score > player1Score) return match.player2_id ?? null
       return null
     }
 
-    const round1WinnerId = deriveWinnerId(validScores.round1.player1, validScores.round1.player2, validScores.round1.winnerId)
-    const round2WinnerId = deriveWinnerId(validScores.round2.player1, validScores.round2.player2, validScores.round2.winnerId)
-    const round3WinnerId = deriveWinnerId(validScores.round3.player1, validScores.round3.player2, validScores.round3.winnerId)
+    // Build the rounds payload (round 4 = optional golden point)
+    const roundInputs: Array<{ n: number; data: typeof input.scores.round1 }> = [
+      { n: 1, data: input.scores.round1 },
+      { n: 2, data: input.scores.round2 },
+      { n: 3, data: input.scores.round3 },
+    ]
+    if (input.scores.round4) roundInputs.push({ n: 4, data: input.scores.round4 })
 
-    // Atomically update all round rows + sync denormalized scores to matches table
+    const pRounds = roundInputs.map(({ n, data }) => ({
+      round_number: n,
+      score_player1: data.player1,
+      score_player2: data.player2,
+      winner_id: deriveWinnerId(n, data.player1, data.player2, data.winnerId),
+    }))
+
+    const pGamJeoms = (input.gamJeoms ?? []).map((g) => ({
+      round_number: g.roundNumber,
+      player_id: g.playerId,
+      gam_jeom_type: g.type,
+    }))
+
+    const pTechniques = (input.techniques ?? []).map((t) => ({
+      round_number: t.roundNumber,
+      player_id: t.playerId,
+      punch: t.punch,
+      body_kick: t.body_kick,
+      head_kick: t.head_kick,
+      spin_body_kick: t.spin_body_kick,
+      spin_head_kick: t.spin_head_kick,
+    }))
+
+    // Atomically write rounds + gam-jeoms + technique stats
     const { error: rpcError } = await supabase.rpc('save_match_scores_atomic', {
       p_match_id: matchId,
-      p_rounds: [
-        { round_number: 1, score_player1: validScores.round1.player1, score_player2: validScores.round1.player2, winner_id: round1WinnerId },
-        { round_number: 2, score_player1: validScores.round2.player1, score_player2: validScores.round2.player2, winner_id: round2WinnerId },
-        { round_number: 3, score_player1: validScores.round3.player1, score_player2: validScores.round3.player2, winner_id: round3WinnerId },
-      ]
+      p_rounds: pRounds,
+      p_gam_jeoms: pGamJeoms,
+      p_techniques: pTechniques,
     })
 
     if (rpcError) {
       throw new Error(`Failed to save scores: ${rpcError.message}`)
     }
 
-    // Check if match has a winner and advance them
-    // For non-SCORE methods the winner is explicit; pass it directly to skip round counting
+    // Determine + advance the winner. Explicit methods pass the winner directly;
+    // round-derived methods (PTF/PTG/GDP/SUP) let the round winner_ids decide.
     const result = await checkAndUpdateMatchWinner(
       matchId,
-      winMethod !== 'SCORE' ? winnerId ?? null : undefined,
-      winMethod,
-      winningRound
+      isExplicitWinnerMethod(input.winMethod) ? input.winnerId ?? null : undefined,
+      input.winMethod,
+      input.winningRound,
     )
 
-    // Record actual_end_time when the match has a winner (lifecycle: COMPLETED)
     if (result.hasWinner) {
       await supabase
         .from('matches')
@@ -133,7 +185,7 @@ export async function saveMatchScores(
         .eq('id', matchId)
     }
 
-    // Write audit entry (non-blocking — failure must not break the save)
+    // Audit (non-blocking)
     await createAuditEntry({
       tournamentId: match.tournament_id,
       entityType: 'match',
@@ -141,19 +193,18 @@ export async function saveMatchScores(
       action: 'SCORE_SAVED',
       actorId: userId,
       newState: {
-        round1: { player1: validScores.round1.player1, player2: validScores.round1.player2, winner: round1WinnerId },
-        round2: { player1: validScores.round2.player1, player2: validScores.round2.player2, winner: round2WinnerId },
-        round3: { player1: validScores.round3.player1, player2: validScores.round3.player2, winner: round3WinnerId },
+        rounds: pRounds,
+        gamJeoms: pGamJeoms,
       },
       metadata: {
-        winMethod,
-        winningRound: winningRound ?? null,
+        winMethod: input.winMethod,
+        winningRound: input.winningRound ?? null,
         hasWinner: result.hasWinner,
         winnerId: result.winnerId,
+        gamJeomCount: pGamJeoms.length,
       },
     })
 
-    // Invalidate in-memory match cache and revalidate Next.js Data Cache paths
     invalidateMatchesCache(match.tournament_id)
     revalidatePath(routes.organizer.tournamentBracket(match.tournament_id))
     revalidatePath(routes.organizer.tournamentDetail(match.tournament_id))
@@ -163,13 +214,13 @@ export async function saveMatchScores(
       hasWinner: result.hasWinner,
       winnerId: result.winnerId,
       player1Wins: result.player1Wins,
-      player2Wins: result.player2Wins
+      player2Wins: result.player2Wins,
     }
   } catch (error) {
     logger.error({ error, matchId }, 'Failed to save match scores')
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to save match scores'
+      error: error instanceof Error ? error.message : 'Failed to save match scores',
     }
   }
 }

@@ -7,6 +7,11 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "13.0.5"
+  }
   graphql_public: {
     Tables: {
       [_ in never]: never
@@ -34,44 +39,94 @@ export type Database = {
   }
   public: {
     Tables: {
-      audit_trail: {
+      athlete_merge_log: {
         Row: {
+          global_athlete_id: string
           id: string
-          tournament_id: string
-          entity_type: string
-          entity_id: string
-          action: string
-          actor_id: string
-          previous_state: Json | null
-          new_state: Json | null
-          metadata: Json | null
-          created_at: string
+          merged_at: string
+          merged_by: string | null
+          notes: string | null
+          player_id: string
         }
         Insert: {
+          global_athlete_id: string
           id?: string
-          tournament_id: string
-          entity_type: string
-          entity_id: string
-          action: string
-          actor_id: string
-          previous_state?: Json | null
-          new_state?: Json | null
-          metadata?: Json | null
-          created_at?: string
+          merged_at?: string
+          merged_by?: string | null
+          notes?: string | null
+          player_id: string
         }
         Update: {
+          global_athlete_id?: string
           id?: string
-          tournament_id?: string
-          entity_type?: string
-          entity_id?: string
+          merged_at?: string
+          merged_by?: string | null
+          notes?: string | null
+          player_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "athlete_merge_log_global_athlete_id_fkey"
+            columns: ["global_athlete_id"]
+            isOneToOne: false
+            referencedRelation: "global_athletes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "athlete_merge_log_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      audit_trail: {
+        Row: {
+          action: string
+          actor_id: string
+          created_at: string
+          entity_id: string
+          entity_type: string
+          id: string
+          metadata: Json | null
+          new_state: Json | null
+          previous_state: Json | null
+          tournament_id: string
+        }
+        Insert: {
+          action: string
+          actor_id: string
+          created_at?: string
+          entity_id: string
+          entity_type: string
+          id?: string
+          metadata?: Json | null
+          new_state?: Json | null
+          previous_state?: Json | null
+          tournament_id: string
+        }
+        Update: {
           action?: string
           actor_id?: string
-          previous_state?: Json | null
-          new_state?: Json | null
-          metadata?: Json | null
           created_at?: string
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          metadata?: Json | null
+          new_state?: Json | null
+          previous_state?: Json | null
+          tournament_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "audit_trail_tournament_id_fkey"
+            columns: ["tournament_id"]
+            isOneToOne: false
+            referencedRelation: "tournaments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       division_schedule_config: {
         Row: {
@@ -143,6 +198,51 @@ export type Database = {
           },
         ]
       }
+      global_athletes: {
+        Row: {
+          canonical_first_name: string
+          canonical_last_name: string
+          created_at: string
+          created_by: string | null
+          dob: string | null
+          gender: string | null
+          id: string
+          total_bronze: number
+          total_gold: number
+          total_silver: number
+          total_tournaments: number
+          updated_at: string
+        }
+        Insert: {
+          canonical_first_name: string
+          canonical_last_name: string
+          created_at?: string
+          created_by?: string | null
+          dob?: string | null
+          gender?: string | null
+          id?: string
+          total_bronze?: number
+          total_gold?: number
+          total_silver?: number
+          total_tournaments?: number
+          updated_at?: string
+        }
+        Update: {
+          canonical_first_name?: string
+          canonical_last_name?: string
+          created_at?: string
+          created_by?: string | null
+          dob?: string | null
+          gender?: string | null
+          id?: string
+          total_bronze?: number
+          total_gold?: number
+          total_silver?: number
+          total_tournaments?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       match_athlete_readiness: {
         Row: {
           athlete_id: string
@@ -187,6 +287,105 @@ export type Database = {
             columns: ["match_id"]
             isOneToOne: false
             referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      match_gam_jeoms: {
+        Row: {
+          created_at: string
+          gam_jeom_type: string
+          id: string
+          match_id: string
+          player_id: string
+          round_number: number
+        }
+        Insert: {
+          created_at?: string
+          gam_jeom_type: string
+          id?: string
+          match_id: string
+          player_id: string
+          round_number: number
+        }
+        Update: {
+          created_at?: string
+          gam_jeom_type?: string
+          id?: string
+          match_id?: string
+          player_id?: string
+          round_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "match_gam_jeoms_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_gam_jeoms_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      match_player_round_stats: {
+        Row: {
+          body_kick: number
+          created_at: string
+          head_kick: number
+          id: string
+          match_id: string
+          player_id: string
+          punch: number
+          round_number: number
+          spin_body_kick: number
+          spin_head_kick: number
+          updated_at: string
+        }
+        Insert: {
+          body_kick?: number
+          created_at?: string
+          head_kick?: number
+          id?: string
+          match_id: string
+          player_id: string
+          punch?: number
+          round_number: number
+          spin_body_kick?: number
+          spin_head_kick?: number
+          updated_at?: string
+        }
+        Update: {
+          body_kick?: number
+          created_at?: string
+          head_kick?: number
+          id?: string
+          match_id?: string
+          player_id?: string
+          punch?: number
+          round_number?: number
+          spin_body_kick?: number
+          spin_head_kick?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "match_player_round_stats_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_player_round_stats_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
             referencedColumns: ["id"]
           },
         ]
@@ -248,6 +447,7 @@ export type Database = {
           actual_start_time: string | null
           athlete1_available_at: string | null
           athlete2_available_at: string | null
+          bracket_position: string | null
           category_id: string | null
           court_number: number | null
           created_at: string
@@ -265,6 +465,8 @@ export type Database = {
           player1_id: string | null
           player2_id: string | null
           round: number
+          round_name: string | null
+          round_order: number | null
           scheduled_end_time: string | null
           scheduled_start_time: string | null
           score_player1: number | null
@@ -275,16 +477,18 @@ export type Database = {
           score_round2_player2: number
           score_round3_player1: number
           score_round3_player2: number
+          skill_level: string | null
           source_match_id: string | null
           source_match_ids: string[] | null
           status: string
+          structural_match_number: number | null
           tournament_id: string
           updated_at: string
+          win_method: Database["public"]["Enums"]["win_method"] | null
           winner_id: string | null
           winner_round1: string | null
           winner_round2: string | null
           winner_round3: string | null
-          win_method: string | null
           winning_round: number | null
         }
         Insert: {
@@ -292,6 +496,7 @@ export type Database = {
           actual_start_time?: string | null
           athlete1_available_at?: string | null
           athlete2_available_at?: string | null
+          bracket_position?: string | null
           category_id?: string | null
           court_number?: number | null
           created_at?: string
@@ -309,6 +514,8 @@ export type Database = {
           player1_id?: string | null
           player2_id?: string | null
           round: number
+          round_name?: string | null
+          round_order?: number | null
           scheduled_end_time?: string | null
           scheduled_start_time?: string | null
           score_player1?: number | null
@@ -319,16 +526,18 @@ export type Database = {
           score_round2_player2?: number
           score_round3_player1?: number
           score_round3_player2?: number
+          skill_level?: string | null
           source_match_id?: string | null
           source_match_ids?: string[] | null
           status?: string
+          structural_match_number?: number | null
           tournament_id: string
           updated_at?: string
+          win_method?: Database["public"]["Enums"]["win_method"] | null
           winner_id?: string | null
           winner_round1?: string | null
           winner_round2?: string | null
           winner_round3?: string | null
-          win_method?: string | null
           winning_round?: number | null
         }
         Update: {
@@ -336,6 +545,7 @@ export type Database = {
           actual_start_time?: string | null
           athlete1_available_at?: string | null
           athlete2_available_at?: string | null
+          bracket_position?: string | null
           category_id?: string | null
           court_number?: number | null
           created_at?: string
@@ -353,6 +563,8 @@ export type Database = {
           player1_id?: string | null
           player2_id?: string | null
           round?: number
+          round_name?: string | null
+          round_order?: number | null
           scheduled_end_time?: string | null
           scheduled_start_time?: string | null
           score_player1?: number | null
@@ -363,16 +575,18 @@ export type Database = {
           score_round2_player2?: number
           score_round3_player1?: number
           score_round3_player2?: number
+          skill_level?: string | null
           source_match_id?: string | null
           source_match_ids?: string[] | null
           status?: string
+          structural_match_number?: number | null
           tournament_id?: string
           updated_at?: string
+          win_method?: Database["public"]["Enums"]["win_method"] | null
           winner_id?: string | null
           winner_round1?: string | null
           winner_round2?: string | null
           winner_round3?: string | null
-          win_method?: string | null
           winning_round?: number | null
         }
         Relationships: [
@@ -455,6 +669,90 @@ export type Database = {
           },
         ]
       }
+      payment_players: {
+        Row: {
+          created_at: string
+          payment_id: string
+          player_id: string
+        }
+        Insert: {
+          created_at?: string
+          payment_id: string
+          player_id: string
+        }
+        Update: {
+          created_at?: string
+          payment_id?: string
+          player_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_players_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_players_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payments: {
+        Row: {
+          amount: number
+          coach_id: string
+          created_at: string | null
+          id: string
+          reference_number: string
+          rejection_reason: string | null
+          status: string | null
+          team_id: string
+          tournament_id: string
+        }
+        Insert: {
+          amount: number
+          coach_id: string
+          created_at?: string | null
+          id?: string
+          reference_number: string
+          rejection_reason?: string | null
+          status?: string | null
+          team_id: string
+          tournament_id: string
+        }
+        Update: {
+          amount?: number
+          coach_id?: string
+          created_at?: string | null
+          id?: string
+          reference_number?: string
+          rejection_reason?: string | null
+          status?: string | null
+          team_id?: string
+          tournament_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_tournament_id_fkey"
+            columns: ["tournament_id"]
+            isOneToOne: false
+            referencedRelation: "tournaments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       players: {
         Row: {
           belt_level: string | null
@@ -464,6 +762,7 @@ export type Database = {
           email: string | null
           first_name: string
           gender: string | null
+          global_athlete_id: string | null
           height: number | null
           id: string
           last_name: string
@@ -478,6 +777,7 @@ export type Database = {
           email?: string | null
           first_name: string
           gender?: string | null
+          global_athlete_id?: string | null
           height?: number | null
           id?: string
           last_name: string
@@ -492,6 +792,7 @@ export type Database = {
           email?: string | null
           first_name?: string
           gender?: string | null
+          global_athlete_id?: string | null
           height?: number | null
           id?: string
           last_name?: string
@@ -505,6 +806,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "players_global_athlete_id_fkey"
+            columns: ["global_athlete_id"]
+            isOneToOne: false
+            referencedRelation: "global_athletes"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -661,6 +969,44 @@ export type Database = {
           },
         ]
       }
+      tournament_expenses: {
+        Row: {
+          amount: number
+          category: string
+          created_at: string | null
+          description: string | null
+          id: string
+          tournament_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          amount?: number
+          category: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          tournament_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number
+          category?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          tournament_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tournament_expenses_tournament_id_fkey"
+            columns: ["tournament_id"]
+            isOneToOne: false
+            referencedRelation: "tournaments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tournament_registrations: {
         Row: {
           actual_height: number | null
@@ -673,17 +1019,17 @@ export type Database = {
           division_id: string | null
           id: string
           player_id: string
+          random_weigh_in_at: string | null
+          random_weigh_in_by: string | null
+          random_weigh_in_passed: boolean | null
+          random_weigh_in_weight: number | null
           status: string
           team_id: string
           tournament_id: string
           updated_at: string
-          weigh_in_selected: boolean
+          weigh_in_selected: boolean | null
           weighed_in_at: string | null
           weighed_in_by: string | null
-          random_weigh_in_weight: number | null
-          random_weigh_in_at: string | null
-          random_weigh_in_passed: boolean | null
-          random_weigh_in_by: string | null
         }
         Insert: {
           actual_height?: number | null
@@ -696,17 +1042,17 @@ export type Database = {
           division_id?: string | null
           id?: string
           player_id: string
+          random_weigh_in_at?: string | null
+          random_weigh_in_by?: string | null
+          random_weigh_in_passed?: boolean | null
+          random_weigh_in_weight?: number | null
           status?: string
           team_id: string
           tournament_id: string
           updated_at?: string
-          weigh_in_selected?: boolean
+          weigh_in_selected?: boolean | null
           weighed_in_at?: string | null
           weighed_in_by?: string | null
-          random_weigh_in_weight?: number | null
-          random_weigh_in_at?: string | null
-          random_weigh_in_passed?: boolean | null
-          random_weigh_in_by?: string | null
         }
         Update: {
           actual_height?: number | null
@@ -719,17 +1065,17 @@ export type Database = {
           division_id?: string | null
           id?: string
           player_id?: string
+          random_weigh_in_at?: string | null
+          random_weigh_in_by?: string | null
+          random_weigh_in_passed?: boolean | null
+          random_weigh_in_weight?: number | null
           status?: string
           team_id?: string
           tournament_id?: string
           updated_at?: string
-          weigh_in_selected?: boolean
+          weigh_in_selected?: boolean | null
           weighed_in_at?: string | null
           weighed_in_by?: string | null
-          random_weigh_in_weight?: number | null
-          random_weigh_in_at?: string | null
-          random_weigh_in_passed?: boolean | null
-          random_weigh_in_by?: string | null
         }
         Relationships: [
           {
@@ -773,6 +1119,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "tournaments"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tournament_registrations_weighed_in_by_fkey"
+            columns: ["weighed_in_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["user_id"]
           },
         ]
       }
@@ -873,36 +1226,36 @@ export type Database = {
       }
       tournament_staff: {
         Row: {
-          created_at: string | null
+          created_at: string
           email: string
           id: string
           last_invited_at: string | null
           roles: string[]
           status: string
           tournament_id: string
-          updated_at: string | null
+          updated_at: string
           user_id: string | null
         }
         Insert: {
-          created_at?: string | null
+          created_at?: string
           email: string
           id?: string
           last_invited_at?: string | null
-          roles: string[]
+          roles?: string[]
           status?: string
           tournament_id: string
-          updated_at?: string | null
+          updated_at?: string
           user_id?: string | null
         }
         Update: {
-          created_at?: string | null
+          created_at?: string
           email?: string
           id?: string
           last_invited_at?: string | null
           roles?: string[]
           status?: string
           tournament_id?: string
-          updated_at?: string | null
+          updated_at?: string
           user_id?: string | null
         }
         Relationships: [
@@ -924,7 +1277,7 @@ export type Database = {
       }
       tournaments: {
         Row: {
-          allowed_belt_groups: string[] | null
+          allowed_belt_groups: Json | null
           courts: number | null
           created_at: string
           description: string | null
@@ -948,7 +1301,7 @@ export type Database = {
           weigh_in_start: string | null
         }
         Insert: {
-          allowed_belt_groups?: string[] | null
+          allowed_belt_groups?: Json | null
           courts?: number | null
           created_at?: string
           description?: string | null
@@ -972,7 +1325,7 @@ export type Database = {
           weigh_in_start?: string | null
         }
         Update: {
-          allowed_belt_groups?: string[] | null
+          allowed_belt_groups?: Json | null
           courts?: number | null
           created_at?: string
           description?: string | null
@@ -1037,18 +1390,39 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      dedup_candidates: {
+        Row: {
+          dob: string | null
+          norm_first: string | null
+          norm_last: string | null
+          player_count: number | null
+          player_ids: string[] | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
-      advance_match_winner: {
-        Args: {
-          p_match_id: string
-          p_winner_id: string
-          p_player1_wins: number
-          p_player2_wins: number
-        }
-        Returns: Json
-      }
+      advance_match_winner:
+        | {
+            Args: {
+              p_match_id: string
+              p_player1_wins: number
+              p_player2_wins: number
+              p_winner_id: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_match_id: string
+              p_player1_wins: number
+              p_player2_wins: number
+              p_win_method?: Database["public"]["Enums"]["win_method"]
+              p_winner_id: string
+              p_winning_round?: number
+            }
+            Returns: Json
+          }
       archive_match_numbers: {
         Args: { p_tournament_id: string }
         Returns: undefined
@@ -1068,39 +1442,65 @@ export type Database = {
         Args: { p_match_id: string }
         Returns: undefined
       }
-      reverse_match_advancement: {
-        Args: { p_match_id: string }
-        Returns: undefined
-      }
-      save_match_scores_atomic: {
-        Args: {
-          p_match_id: string
-          p_rounds: Json
-        }
-        Returns: undefined
-      }
       insert_audit_entry: {
         Args: {
-          p_tournament_id: string
-          p_entity_type: string
-          p_entity_id: string
           p_action: string
           p_actor_id: string
-          p_previous_state?: Json
-          p_new_state?: Json
+          p_entity_id: string
+          p_entity_type: string
           p_metadata?: Json
+          p_new_state?: Json
+          p_previous_state?: Json
+          p_tournament_id: string
         }
         Returns: undefined
       }
+      reverse_match_advancement: { Args: { p_match_id: string }; Returns: Json }
+      save_match_scores_atomic:
+        | { Args: { p_match_id: string; p_rounds: Json }; Returns: Json }
+        | {
+            Args: {
+              p_gam_jeoms?: Json
+              p_match_id: string
+              p_rounds: Json
+              p_techniques?: Json
+            }
+            Returns: Json
+          }
     }
     Enums: {
+      belt_level: "white" | "yellow" | "green" | "blue" | "red" | "black"
       division_move_policy: "allow_move" | "disqualify_only"
+      gender: "male" | "female"
       match_lifecycle_state:
         | "AUTO_ADVANCE"
         | "WAITING"
         | "CONTEST"
         | "IN_PROGRESS"
         | "COMPLETED"
+      match_status: "pending" | "in_progress" | "completed"
+      payment_status: "pending" | "verified" | "rejected"
+      tournament_status:
+        | "upcoming"
+        | "registration_open"
+        | "registration_closed"
+        | "live"
+        | "completed"
+      win_method:
+        | "SCORE"
+        | "KO"
+        | "TKO"
+        | "DQ"
+        | "WITHDRAWAL"
+        | "FORFEIT"
+        | "PTF"
+        | "PTG"
+        | "GDP"
+        | "SUP"
+        | "RSC"
+        | "WDR"
+        | "DSQ"
+        | "PUN"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1231,7 +1631,9 @@ export const Constants = {
   },
   public: {
     Enums: {
+      belt_level: ["white", "yellow", "green", "blue", "red", "black"],
       division_move_policy: ["allow_move", "disqualify_only"],
+      gender: ["male", "female"],
       match_lifecycle_state: [
         "AUTO_ADVANCE",
         "WAITING",
@@ -1239,7 +1641,31 @@ export const Constants = {
         "IN_PROGRESS",
         "COMPLETED",
       ],
+      match_status: ["pending", "in_progress", "completed"],
+      payment_status: ["pending", "verified", "rejected"],
+      tournament_status: [
+        "upcoming",
+        "registration_open",
+        "registration_closed",
+        "live",
+        "completed",
+      ],
+      win_method: [
+        "SCORE",
+        "KO",
+        "TKO",
+        "DQ",
+        "WITHDRAWAL",
+        "FORFEIT",
+        "PTF",
+        "PTG",
+        "GDP",
+        "SUP",
+        "RSC",
+        "WDR",
+        "DSQ",
+        "PUN",
+      ],
     },
   },
 } as const
-

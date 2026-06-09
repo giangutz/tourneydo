@@ -18,6 +18,7 @@ import { revalidatePath } from 'next/cache'
 import { auth } from '@clerk/nextjs/server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { checkAndUpdateMatchWinner } from '@/lib/db/queries/match-rounds'
+import { isExplicitWinnerMethod } from '@/lib/constants/wt-rules'
 import { getTournamentById } from '@/lib/db/queries/tournaments'
 import { matchScoresSchema, type MatchScoresInput } from '@/lib/validations/match-scores'
 import { createAuditEntry } from '@/lib/db/queries/audit-trail'
@@ -67,7 +68,7 @@ export async function rescoreMatch(
     }
   }
   const validScores = parsedScores.data
-  const winMethod: WinMethod = input.winMethod ?? 'SCORE'
+  const winMethod: WinMethod = input.winMethod ?? 'PTF'
 
   try {
     const supabase = createServerSupabaseClient()
@@ -137,7 +138,7 @@ export async function rescoreMatch(
     // Step 4: Re-run winner determination and bracket advancement
     const result = await checkAndUpdateMatchWinner(
       matchId,
-      winMethod !== 'SCORE' ? (input.winnerId ?? null) : undefined,
+      isExplicitWinnerMethod(winMethod) ? (input.winnerId ?? null) : undefined,
       winMethod,
       input.winningRound
     )
