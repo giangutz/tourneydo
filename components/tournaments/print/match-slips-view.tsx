@@ -51,37 +51,16 @@ function TallyBoxes() {
 }
 
 export function MatchSlipsView({ matches, participants, tournament }: MatchSlipsViewProps) {
-  // Build a lookup: match.id → match_number (for showing "W of Match #X" on TBD slots)
-  const matchNumById = new Map(matches.map(m => [m.id, m.match_number]))
-
-  // Only include matches that are meaningful to print:
-  //   • At least one player is known (named), OR
-  //   • Both slots have source match context (so we can show "W of Match #X vs W of Match #Y")
-  // Skip pure placeholder nodes with no context.
+  // Only print slips where BOTH players are confirmed — skip TBD vs TBD and Known vs TBD.
+  // Later rounds get printed progressively as results come in and bracket positions fill.
   const eligibleMatches = matches
-    .filter(m => {
-      const p1Known = !!m.player1_id
-      const p2Known = !!m.player2_id
-      const sources: string[] = (m as any).source_match_ids ?? []
-      const hasSources = sources.length >= 2 || (sources.length === 1 && (p1Known || p2Known))
-      return p1Known || p2Known || hasSources
-    })
+    .filter(m => !!m.player1_id && !!m.player2_id)
     .sort((a, b) => (a.match_number || 0) - (b.match_number || 0))
 
-  const getPlayerName = (id: string | null, slotIndex: 0 | 1, match: Match) => {
-    if (id) {
-      const p = participants.find(part => part.player_id === id)
-      if (!p) return 'Unknown'
-      return `${p.player.first_name} ${p.player.last_name}`
-    }
-    // TBD — show source match context if available
-    const sources: string[] = (match as any).source_match_ids ?? []
-    const sourceId = sources[slotIndex]
-    if (sourceId) {
-      const srcNum = matchNumById.get(sourceId)
-      return srcNum ? `Winner of Match #${srcNum}` : 'TBD'
-    }
-    return 'TBD'
+  const getPlayerName = (id: string) => {
+    const p = participants.find(part => part.player_id === id)
+    if (!p) return 'Unknown'
+    return `${p.player.first_name} ${p.player.last_name}`
   }
 
   const getTeamName = (id: string | null) => {
@@ -139,17 +118,17 @@ export function MatchSlipsView({ matches, participants, tournament }: MatchSlips
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
             <div style={{ background: '#fff1f2', borderLeft: '4px solid #dc2626', borderRadius: '0 4px 4px 0', padding: '5px 7px' }}>
               <div style={{ fontSize: '9px', fontWeight: 'bold', color: '#dc2626', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Red Corner</div>
-              <div style={{ fontWeight: 'bold', fontSize: match.player1_id ? '13px' : '10px', marginTop: '1px', fontStyle: match.player1_id ? 'normal' : 'italic', color: match.player1_id ? 'inherit' : '#888' }}>
-                {getPlayerName(match.player1_id, 0, match)}
+              <div style={{ fontWeight: 'bold', fontSize: '13px', marginTop: '1px' }}>
+                {getPlayerName(match.player1_id!)}
               </div>
-              {match.player1_id && <div style={{ color: '#666', fontSize: '9px' }}>{getTeamName(match.player1_id)}</div>}
+              <div style={{ color: '#666', fontSize: '9px' }}>{getTeamName(match.player1_id)}</div>
             </div>
             <div style={{ background: '#eff6ff', borderLeft: '4px solid #2563eb', borderRadius: '0 4px 4px 0', padding: '5px 7px' }}>
               <div style={{ fontSize: '9px', fontWeight: 'bold', color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Blue Corner</div>
-              <div style={{ fontWeight: 'bold', fontSize: match.player2_id ? '13px' : '10px', marginTop: '1px', fontStyle: match.player2_id ? 'normal' : 'italic', color: match.player2_id ? 'inherit' : '#888' }}>
-                {getPlayerName(match.player2_id, 1, match)}
+              <div style={{ fontWeight: 'bold', fontSize: '13px', marginTop: '1px' }}>
+                {getPlayerName(match.player2_id!)}
               </div>
-              {match.player2_id && <div style={{ color: '#666', fontSize: '9px' }}>{getTeamName(match.player2_id)}</div>}
+              <div style={{ color: '#666', fontSize: '9px' }}>{getTeamName(match.player2_id)}</div>
             </div>
           </div>
 
