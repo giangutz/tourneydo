@@ -53,7 +53,11 @@ describe('Strict WT Scheduler Upgraded', () => {
     divisionId: divId,
     categoryId: catId,
     round,
-    status: 'pending',
+    // The scheduler only schedules CONTEST-ready matches (it skips 'pending' and
+    // 'completed') and buckets them by round_name. The bracket generator always
+    // sets these; the fixture must too, or nothing schedules.
+    round_name: 'Finals',
+    status: 'scheduled',
     winner_id: null,
     belt_level: belt,
     gender,

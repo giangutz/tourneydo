@@ -4,9 +4,10 @@ import { useEffect, useState } from 'react'
 import { useSession } from '@clerk/nextjs'
 import { createClerkSupabaseClient } from '@/lib/supabase/client'
 import { KPICard } from '../kpi-card'
-import { Activity, Clock, Users, Zap } from 'lucide-react'
+import { Activity, Clock, Users, Zap, LineChart as LineChartIcon } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { ChartEmptyState } from '@/components/tournaments/shared/chart-empty-state'
 import type { Database } from '@/lib/supabase/types'
 import { OngoingViewSkeleton } from './skeletons'
 
@@ -119,9 +120,7 @@ export function OngoingView({ tournamentId }: OngoingViewProps) {
           }
         })
         
-        setPaceData(finalPaceData.length > 0 ? finalPaceData : [
-          { time: '09:00', scheduled: 0, actual: 0 }
-        ])
+        setPaceData(finalPaceData)
       }
       setLoading(false)
     }
@@ -167,6 +166,13 @@ export function OngoingView({ tournamentId }: OngoingViewProps) {
           <CardTitle>Schedule Pace</CardTitle>
         </CardHeader>
         <CardContent className="h-[300px]">
+          {paceData.length === 0 ? (
+            <ChartEmptyState
+              icon={LineChartIcon}
+              message="No scheduled matches yet. Schedule pace will appear once the bracket is generated and matches are timed."
+              className="h-full"
+            />
+          ) : (
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={paceData}>
               <CartesianGrid strokeDasharray="3 3" />
@@ -178,6 +184,7 @@ export function OngoingView({ tournamentId }: OngoingViewProps) {
               <Line type="monotone" dataKey="actual" stroke="#82ca9d" name="Actual Completed" strokeWidth={2} />
             </LineChart>
           </ResponsiveContainer>
+          )}
         </CardContent>
       </Card>
     </div>

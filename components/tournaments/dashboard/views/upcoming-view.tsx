@@ -4,8 +4,9 @@ import { useEffect, useState } from 'react'
 import { useSession } from '@clerk/nextjs'
 import { createClerkSupabaseClient } from '@/lib/supabase/client'
 import { KPICard } from '../kpi-card'
-import { Users, AlertCircle, Shield, CreditCard } from 'lucide-react'
+import { Users, AlertCircle, Shield, CreditCard, BarChart3 } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
+import { ChartEmptyState } from '@/components/tournaments/shared/chart-empty-state'
 
 
 
@@ -169,19 +170,26 @@ export function UpcomingView({ tournamentId, userId }: UpcomingViewProps) {
             <CardTitle>Division Health</CardTitle>
           </CardHeader>
           <CardContent className="h-[300px]">
+            {divisionData.length === 0 ? (
+              <ChartEmptyState
+                icon={BarChart3}
+                message="No registrations yet. Division health will appear here as athletes register."
+                className="h-full"
+              />
+            ) : (
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={divisionData} margin={{ bottom: 40 }}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis 
-                  dataKey="name" 
-                  angle={-45} 
-                  textAnchor="end" 
-                  height={60} 
+                <XAxis
+                  dataKey="name"
+                  angle={-45}
+                  textAnchor="end"
+                  height={60}
                   interval={0}
                   fontSize={12}
                 />
                 <YAxis allowDecimals={false} />
-                <Tooltip 
+                <Tooltip
                   contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', color: 'hsl(var(--foreground))' }}
                 />
                 <Bar dataKey="value" name="Athletes" radius={[4, 4, 0, 0]}>
@@ -191,6 +199,7 @@ export function UpcomingView({ tournamentId, userId }: UpcomingViewProps) {
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
 
@@ -209,7 +218,13 @@ export function UpcomingView({ tournamentId, userId }: UpcomingViewProps) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {teamData.map((team, i) => (
+                  {teamData.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">
+                        No teams registered yet.
+                      </TableCell>
+                    </TableRow>
+                  ) : teamData.map((team, i) => (
                     <TableRow key={i}>
                       <TableCell className="font-medium">
                         <div className="truncate max-w-[120px] sm:max-w-[200px]" title={team.name}>

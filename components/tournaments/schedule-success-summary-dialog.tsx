@@ -13,6 +13,8 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
+import { AthleteClashWarning } from '@/components/tournaments/athlete-clash-warning'
+import type { AthleteClash } from '@/types/models'
 
 interface ScheduleSuccessSummaryDialogProps {
   open: boolean
@@ -26,6 +28,7 @@ interface ScheduleSuccessSummaryDialogProps {
     matchesPerDay: Record<number, number>
     earliestStart?: string
     latestEnd?: string
+    athleteClashes?: AthleteClash[]
   } | null
 }
 
@@ -60,6 +63,11 @@ export function ScheduleSuccessSummaryDialog({
         </DialogHeader>
 
         <div className="space-y-6 mt-4">
+          {/* Athlete clash warning (non-blocking) */}
+          {summary.athleteClashes && summary.athleteClashes.length > 0 && (
+            <AthleteClashWarning clashes={summary.athleteClashes} />
+          )}
+
           {/* Key Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Card>

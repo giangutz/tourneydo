@@ -14,11 +14,7 @@ import {
 } from '@/types/models'
 import { transformMatch } from './matches'
 import { CourtStatus } from '@/lib/utils/match-lifecycle'
-import { resultCache } from '@/lib/cache/result-cache'
 import { logger } from '@/lib/logger'
-
-// OPTIMIZATION: 30-second TTL — short enough for live tournaments, long enough to cut load
-const MATCHES_CACHE_TTL = 30 * 1000
 
 /**
  * Get readiness status for a specific match
@@ -98,21 +94,10 @@ export async function getMatchReadinessRecords(
   return data || []
 }
 
-/**
- * Get matches with readiness status for bracket display
- *
- * OPTIMIZATION: Cached for 30 seconds to reduce DB load on bracket page renders.
- * Short TTL keeps initial SSR state fresh while realtime subscription handles live updates.
- * Cache invalidated by save-match-scores, brackets, and match-readiness actions.
- */
 export async function getMatchesWithReadiness(
   tournamentId: string
 ): Promise<MatchWithReadiness[]> {
-  return resultCache.get(
-    `matches-readiness:${tournamentId}`,
-    () => fetchMatchesWithReadiness(tournamentId),
-    MATCHES_CACHE_TTL
-  )
+  return fetchMatchesWithReadiness(tournamentId)
 }
 
 async function fetchMatchesWithReadiness(

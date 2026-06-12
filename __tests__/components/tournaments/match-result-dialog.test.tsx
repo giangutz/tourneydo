@@ -8,36 +8,40 @@ describe('MatchResultDialog', () => {
 
   it('renders dialog with match details', async () => {
     const match = mockMatch()
-    
+
     renderWithProviders(
-      <MatchResultDialog 
-        match={match as any} 
-        open={true} 
+      <MatchResultDialog
+        match={match as any}
+        open={true}
         onOpenChange={mockOnClose}
         participants={[]}
       />
     )
-    
+
     expect(screen.getByRole('heading', { name: /Match Result/i })).toBeInTheDocument()
     expect(await screen.findByText(/Round 1/i)).toBeInTheDocument()
   })
 
   it('allows score input', async () => {
     const match = mockMatch()
-    
+
     renderWithProviders(
-      <MatchResultDialog 
-        match={match as any} 
-        open={true} 
+      <MatchResultDialog
+        match={match as any}
+        open={true}
         onOpenChange={mockOnClose}
         participants={[]}
       />
     )
-    
-    const inputs = await screen.findAllByRole('spinbutton')
-    expect(inputs).toHaveLength(2) // 1 round * 2 players displayed a time
-    
-    fireEvent.change(inputs[0], { target: { value: '5' } })
-    expect(inputs[0]).toHaveValue(5)
+
+    // Target the two main round score inputs specifically (not technique panel inputs)
+    const p1Input = await screen.findByTestId('round-score-p1')
+    const p2Input = await screen.findByTestId('round-score-p2')
+
+    expect(p1Input).toBeInTheDocument()
+    expect(p2Input).toBeInTheDocument()
+
+    fireEvent.change(p1Input, { target: { value: '5' } })
+    expect(p1Input).toHaveValue(5)
   })
 })

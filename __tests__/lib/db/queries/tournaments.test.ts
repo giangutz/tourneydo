@@ -8,7 +8,7 @@ import {
   getPublicTournaments,
 } from '@/lib/db/queries/tournaments'
 import { mockTournament } from '@/__tests__/utils/test-utils'
-import { mockSuccessQuery, mockErrorQuery, clearMockQueryResponse } from '@/__mocks__/@supabase/supabase-js'
+import { mockSuccessQuery, mockErrorQuery, mockQueueSuccess, clearMockQueryResponse } from '@/__mocks__/@supabase/supabase-js'
 
 describe('Tournament Queries', () => {
   beforeEach(() => {
@@ -18,7 +18,13 @@ describe('Tournament Queries', () => {
   describe('getTournamentsByOrganizerId', () => {
     it('should return tournaments for organizer', async () => {
       const tournaments = [mockTournament(), mockTournament({ id: '2' })]
-      mockSuccessQuery(tournaments)
+      // This query now performs several sequential reads (organized tournaments
+      // → user email → staff assignments). Queue them so the staff merge sees no
+      // extra rows; otherwise the persistent mock echoes the tournaments array
+      // back as fake staff entries and inflates the count.
+      mockQueueSuccess(tournaments)     // organized tournaments
+      mockQueueSuccess({ email: null }) // user email lookup (null skips staff sync)
+      mockQueueSuccess([])              // staff assignments
 
       const result = await getTournamentsByOrganizerId('organizer-1')
       expect(result).toHaveLength(2)
@@ -32,7 +38,7 @@ describe('Tournament Queries', () => {
 
     it('should throw error on failure', async () => {
       mockErrorQuery('Database error')
-      await expect(getTournamentsByOrganizerId('organizer-1')).rejects.toThrow('Failed to fetch tournaments')
+      await expect(getTournamentsByOrganizerId('organizer-1')).rejects.toThrow('Failed to fetch organized tournaments')
     })
   })
 
@@ -106,7 +112,11 @@ describe('Tournament Queries', () => {
 
   describe('getTournaments', () => {
     it('should return upcoming tournaments', async () => {
-      const tournaments = [mockTournament({ status: 'upcoming' })]
+      // Use future dates: getTournaments derives status from dates via
+      // checkAndUpdateStatus, so a past-dated fixture would be coerced to 'completed'.
+      const tournaments = [
+        mockTournament({ status: 'upcoming', start_date: '2027-01-01', end_date: '2027-01-02' }),
+      ]
       mockSuccessQuery(tournaments)
 
       const result = await getTournaments()

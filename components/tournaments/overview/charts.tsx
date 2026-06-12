@@ -4,7 +4,8 @@ import { useMemo } from "react"
 import { Bar, BarChart, LabelList, XAxis, YAxis, CartesianGrid, Label, Pie, PieChart } from "recharts"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
-import { Trophy } from "lucide-react"
+import { Users, Award, VenetianMask } from "lucide-react"
+import { ChartEmptyState } from "@/components/tournaments/shared/chart-empty-state"
 
 // --- TYPES ---
 interface Participant {
@@ -52,6 +53,12 @@ export function TeamDelegationsChart({ participants }: ChartsProps) {
         <CardDescription>Top 5 teams by number of athletes</CardDescription>
       </CardHeader>
       <CardContent>
+        {data.length === 0 ? (
+          <ChartEmptyState
+            icon={Users}
+            message="No confirmed athletes yet. Team delegations will appear here once registrations are approved."
+          />
+        ) : (
         <ChartContainer config={delegationsConfig}>
           <BarChart
             accessibilityLayer
@@ -83,6 +90,7 @@ export function TeamDelegationsChart({ participants }: ChartsProps) {
             </Bar>
           </BarChart>
         </ChartContainer>
+        )}
       </CardContent>
     </Card>
   )
@@ -131,6 +139,12 @@ export function BeltDistributionChart({ participants }: ChartsProps) {
         <CardDescription>Athletes by skill level</CardDescription>
       </CardHeader>
       <CardContent className="flex-1 pb-0">
+        {total === 0 ? (
+          <ChartEmptyState
+            icon={Award}
+            message="No confirmed athletes yet. Belt distribution will appear once registrations are approved."
+          />
+        ) : (
         <ChartContainer
           config={beltConfig}
           className="mx-auto aspect-square max-h-[250px]"
@@ -179,6 +193,7 @@ export function BeltDistributionChart({ participants }: ChartsProps) {
             </Pie>
           </PieChart>
         </ChartContainer>
+        )}
       </CardContent>
     </Card>
   )
@@ -214,6 +229,12 @@ export function GenderSplitChart({ participants }: ChartsProps) {
         <CardDescription>Participant demographics</CardDescription>
       </CardHeader>
       <CardContent className="flex-1 pb-0">
+        {data.length === 0 ? (
+          <ChartEmptyState
+            icon={VenetianMask}
+            message="No confirmed athletes yet. The gender split will appear once registrations are approved."
+          />
+        ) : (
         <ChartContainer
           config={genderConfig}
           className="mx-auto aspect-square max-h-[250px]"
@@ -232,6 +253,7 @@ export function GenderSplitChart({ participants }: ChartsProps) {
              <ChartTooltip content={<ChartTooltipContent />} />
           </PieChart>
         </ChartContainer>
+        )}
       </CardContent>
     </Card>
   )

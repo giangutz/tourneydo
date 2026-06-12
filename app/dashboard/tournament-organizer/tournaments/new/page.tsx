@@ -1,8 +1,6 @@
 import { DashboardShell } from '@/components/layouts/dashboard-shell'
 import { PageHeader } from '@/components/ui/page-header'
-import { TournamentForm } from '@/components/tournaments/tournament-form'
-
-import { TournamentBreadcrumbs } from '@/components/tournaments/tournament-breadcrumbs'
+import { TournamentCreateWizard } from '@/components/tournaments/tournament-create-wizard'
 
 export default function NewTournamentPage() {
   return (
@@ -12,7 +10,7 @@ export default function NewTournamentPage() {
         description="Set up a new tournament event."
       />
       <div className="max-w-2xl mx-auto">
-        <TournamentForm />
+        <TournamentCreateWizard />
       </div>
     </DashboardShell>
   )

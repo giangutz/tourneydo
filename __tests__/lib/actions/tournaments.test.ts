@@ -1,3 +1,9 @@
+// The actions orchestrate division/category sub-operations whose multi-step
+// Postgres calls can't be modeled by the simple supabase mock. Stub the divisions
+// query module so we test the action's own create/update flow (create already
+// swallows division errors; update does not, so this keeps it from throwing).
+jest.mock('@/lib/db/queries/divisions')
+
 import { createTournament, updateTournament, deleteTournament } from '@/lib/actions/tournaments'
 import { setMockOrganizer, clearMockAuth } from '@/__mocks__/@clerk/nextjs/server'
 import { mockSuccessQuery, mockErrorQuery, clearMockQueryResponse } from '@/__mocks__/@supabase/supabase-js'
@@ -22,6 +28,8 @@ describe('Tournament Server Actions', () => {
       formData.append('name', tournament.name)
       formData.append('start_date', tournament.start_date!)
       formData.append('end_date', tournament.end_date!)
+      formData.append('weigh_in_start', '2025-05-29')
+      formData.append('weigh_in_end', '2025-05-30')
       formData.append('venue', tournament.venue!)
       formData.append('max_players', String(tournament.max_players!))
       formData.append('entry_fee', String(tournament.entry_fee!))
@@ -63,6 +71,8 @@ describe('Tournament Server Actions', () => {
       formData.append('name', 'Updated Name')
       formData.append('start_date', tournament.start_date!)
       formData.append('end_date', tournament.end_date!)
+      formData.append('weigh_in_start', '2025-05-29')
+      formData.append('weigh_in_end', '2025-05-30')
       formData.append('venue', tournament.venue!)
       formData.append('max_players', String(tournament.max_players!))
       formData.append('entry_fee', String(tournament.entry_fee!))

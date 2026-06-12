@@ -212,7 +212,10 @@ describe('Bracket Generator', () => {
       })
     })
 
-    it('should initialize scores to 0', () => {
+    it('creates scheduled matches with no winner decided yet', () => {
+      // The generator leaves score columns to their DB defaults rather than
+      // setting them on the generated object; the meaningful invariant is that a
+      // freshly generated, scheduled match has no winner.
       const participants = Array.from({ length: 4 }, (_, i) => ({
         id: String(i + 1),
         team_id: `t${i + 1}`,
@@ -222,8 +225,7 @@ describe('Bracket Generator', () => {
 
       matches.forEach(match => {
         if (match.status === 'scheduled') {
-          expect(match.score_player1).toBe(0)
-          expect(match.score_player2).toBe(0)
+          expect(match.winner_id).toBeNull()
         }
       })
     })

@@ -214,6 +214,9 @@ export interface ScheduleValidationResult {
   canProceedWithOverride: boolean
   overflowCount?: number
   overflowMinutes?: number
+  /** Athletes scheduled in two overlapping matches (cross-division double-booking) */
+  athleteClashes?: AthleteClash[]
+  athleteClashCount?: number
 }
 
 export interface ScheduleValidationError {
@@ -266,6 +269,26 @@ export interface MatchAssignment {
   scheduledEndTime: string // ISO timestamp
   divisionId: string
   categoryId: string
+}
+
+// Athlete Clash Detection (cross-division double-booking)
+// A clash occurs when one athlete's two scheduled matches overlap in time,
+// which is physically impossible since they cannot fight on two courts at once.
+export interface ClashMatchRef {
+  matchId: string
+  matchNumber: string
+  court: number
+  day: number
+  scheduledStartTime: string // ISO timestamp
+  scheduledEndTime: string // ISO timestamp
+}
+
+export interface AthleteClash {
+  playerId: string
+  playerName?: string
+  day: number
+  overlapMinutes: number
+  matches: [ClashMatchRef, ClashMatchRef]
 }
 
 // Daily Schedule Summary (for dashboard card)

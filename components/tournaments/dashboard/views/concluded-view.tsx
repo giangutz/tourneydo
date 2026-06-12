@@ -356,7 +356,13 @@ export function ConcludedView({ tournamentId }: ConcludedViewProps) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {teamLeaderboard.map((team, i) => (
+                  {teamLeaderboard.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                        No medal results yet. Standings appear once finals and semi-finals are completed.
+                      </TableCell>
+                    </TableRow>
+                  ) : teamLeaderboard.map((team, i) => (
                     <TableRow key={i}>
                       <TableCell>{i + 1}</TableCell>
                       <TableCell className="font-medium">{team.name}</TableCell>

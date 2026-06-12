@@ -9,6 +9,10 @@ import { setMockOrganizer, clearMockAuth } from '@/__mocks__/@clerk/nextjs/serve
 import { mockSuccessQuery, mockErrorQuery, clearMockQueryResponse } from '@/__mocks__/@supabase/supabase-js'
 import { mockTournament, mockMatch, mockRegistration } from '@/__tests__/utils/test-utils'
 
+// updateTournament orchestrates division sub-operations whose multi-step queries
+// the simple supabase mock can't model; stub them so the action's own flow runs.
+jest.mock('@/lib/db/queries/divisions')
+
 // Import the functions we're testing
 import { createTournament, updateTournament, deleteTournament } from '@/lib/actions/tournaments'
 import { getTournamentParticipants, updateRegistrationStatus } from '@/lib/db/queries/registrations'
@@ -33,8 +37,11 @@ describe('Tournament Organizer Authorization', () => {
 
       const formData = new FormData()
       formData.append('name', tournament.name)
+      formData.append('tournament_type', 'standard')
       formData.append('start_date', tournament.start_date!)
       formData.append('end_date', tournament.end_date!)
+      formData.append('weigh_in_start', '2025-05-29')
+      formData.append('weigh_in_end', '2025-05-30')
       formData.append('venue', tournament.venue!)
       formData.append('max_players', String(tournament.max_players!))
       formData.append('entry_fee', String(tournament.entry_fee!))
@@ -51,8 +58,11 @@ describe('Tournament Organizer Authorization', () => {
 
       const formData = new FormData()
       formData.append('name', 'Updated Tournament Name')
+      formData.append('tournament_type', 'standard')
       formData.append('start_date', tournament.start_date!)
       formData.append('end_date', tournament.end_date!)
+      formData.append('weigh_in_start', '2025-05-29')
+      formData.append('weigh_in_end', '2025-05-30')
       formData.append('venue', tournament.venue!)
       formData.append('max_players', String(tournament.max_players!))
       formData.append('entry_fee', String(tournament.entry_fee!))
@@ -75,8 +85,11 @@ describe('Tournament Organizer Authorization', () => {
 
       const formData = new FormData()
       formData.append('name', 'Hacked Tournament')
+      formData.append('tournament_type', 'standard')
       formData.append('start_date', '2024-01-01')
       formData.append('end_date', '2024-01-02')
+      formData.append('weigh_in_start', '2023-12-30')
+      formData.append('weigh_in_end', '2023-12-31')
       formData.append('venue', 'Test Venue')
       formData.append('max_players', '32')
       formData.append('entry_fee', '50')

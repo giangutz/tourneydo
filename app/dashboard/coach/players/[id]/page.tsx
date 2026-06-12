@@ -3,6 +3,8 @@ import { auth } from "@clerk/nextjs/server"
 import { notFound } from "next/navigation"
 import { EditPlayerForm } from "./edit-player-form"
 import { Tag } from "@/components/ui/tags-selector"
+import { getPlayerCareerStats } from "@/lib/db/queries/player-stats"
+import { PlayerStatsCard } from "@/components/players/player-stats-card"
 
 export default async function PlayerDetailsPage({
   params,
@@ -15,45 +17,33 @@ export default async function PlayerDetailsPage({
   const { id } = await params
   const supabase = createServerSupabaseClient()
 
-  // Fetch player details
-  const { data: player } = await (supabase as any)
-    .from("players")
-    .select("*")
-    .eq("id", id)
-    .eq("coach_id", userId)
-    .single()
+  const [playerRes, teamsRes, assignmentsRes, stats] = await Promise.all([
+    (supabase as any).from("players").select("*").eq("id", id).eq("coach_id", userId).single(),
+    (supabase as any).from("teams").select("id, name").eq("user_id", userId),
+    (supabase as any).from("team_players").select("team_id, teams(name)").eq("player_id", id),
+    getPlayerCareerStats(id),
+  ])
 
-  if (!player) {
-    notFound()
-  }
+  if (!playerRes.data) notFound()
 
-  // Fetch coach's teams
-  const { data: teams } = await (supabase as any)
-    .from("teams")
-    .select("id, name")
-    .eq("user_id", userId)
-
-  // Fetch current team assignments
-  const { data: assignments } = await (supabase as any)
-    .from("team_players")
-    .select("team_id, teams(name)")
-    .eq("player_id", player.id)
-
-  const formattedTeams: Tag[] = teams?.map((team: any) => ({
+  const formattedTeams: Tag[] = (teamsRes.data ?? []).map((team: any) => ({
     id: team.id,
-    label: team.name
-  })) || []
+    label: team.name,
+  }))
 
-  const currentAssignments: Tag[] = assignments?.map((a: any) => ({
+  const currentAssignments: Tag[] = (assignmentsRes.data ?? []).map((a: any) => ({
     id: a.team_id,
-    label: a.teams.name
-  })) || []
+    label: a.teams.name,
+  }))
 
   return (
-    <EditPlayerForm 
-      player={player} 
-      availableTeams={formattedTeams} 
-      currentAssignments={currentAssignments} 
-    />
+    <div className="space-y-6 p-6">
+      <EditPlayerForm
+        player={playerRes.data}
+        availableTeams={formattedTeams}
+        currentAssignments={currentAssignments}
+      />
+      <PlayerStatsCard stats={stats} label="Career Stats" />
+    </div>
   )
 }

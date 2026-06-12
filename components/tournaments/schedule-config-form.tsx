@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import { toast } from 'sonner'
-import { Loader2, AlertTriangle, CheckCircle2, Info, Clock, Save } from 'lucide-react'
+import { Loader2, AlertTriangle, CheckCircle2, Info, Clock, Save, CalendarRange } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 import { Button } from '@/components/ui/button'
@@ -27,6 +27,7 @@ import { Switch } from '@/components/ui/switch'
 
 import { saveTournamentScheduleConfig, generateSchedule } from '@/lib/actions/schedule'
 import { TournamentScheduleConfig } from '@/types/models'
+import { SchedulePreviewDialog } from '@/components/tournaments/schedule-preview-dialog'
 
 const scheduleFormSchema = z.object({
   daily_start_time: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Invalid time format (HH:MM)'),
@@ -70,6 +71,12 @@ export function ScheduleConfigForm({ tournamentId, initialConfig, tournamentCour
   const [validationResult, setValidationResult] = useState<any>(null)
   const [isFeasible, setIsFeasible] = useState<boolean | null>(null)
   const [isPublishing, setIsPublishing] = useState(false)
+  const [previewOpen, setPreviewOpen] = useState(false)
+
+  async function handlePublishFromPreview() {
+    await onPublish()
+    setPreviewOpen(false)
+  }
 
   async function onPublish() {
     setIsPublishing(true)
@@ -261,6 +268,18 @@ export function ScheduleConfigForm({ tournamentId, initialConfig, tournamentCour
                 Overflow: {(validationResult.overflowMinutes / 60).toFixed(1)} hours ({validationResult.overflowCount} match{validationResult.overflowCount !== 1 ? 'es' : ''})
               </p>
             )}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={(e) => {
+                e.preventDefault()
+                setPreviewOpen(true)
+              }}
+              className="mt-3 border-orange-300 bg-white text-orange-800 hover:bg-orange-50 dark:bg-transparent dark:text-orange-200"
+            >
+              <CalendarRange className="mr-2 h-3.5 w-3.5" />
+              Preview Day
+            </Button>
           </AlertDescription>
         </Alert>
       )}
@@ -271,22 +290,36 @@ export function ScheduleConfigForm({ tournamentId, initialConfig, tournamentCour
           <AlertTitle>Schedule Feasible</AlertTitle>
           <AlertDescription className="mt-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <p>All matches fit within the configured time constraints.</p>
-            <Button 
-              size="sm" 
-              onClick={(e) => {
-                e.preventDefault();
-                onPublish();
-              }}
-              disabled={isPublishing}
-              className="bg-green-600 hover:bg-green-700 text-white border-transparent shadow-sm"
-            >
-              {isPublishing ? (
-                 <>
-                   <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-                   Publishing...
-                 </>
-              ) : 'Publish Schedule'}
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={(e) => {
+                  e.preventDefault()
+                  setPreviewOpen(true)
+                }}
+                className="border-green-300 bg-white text-green-800 hover:bg-green-50 dark:bg-transparent dark:text-green-200"
+              >
+                <CalendarRange className="mr-2 h-3.5 w-3.5" />
+                Preview Day
+              </Button>
+              <Button
+                size="sm"
+                onClick={(e) => {
+                  e.preventDefault();
+                  onPublish();
+                }}
+                disabled={isPublishing}
+                className="bg-green-600 hover:bg-green-700 text-white border-transparent shadow-sm"
+              >
+                {isPublishing ? (
+                   <>
+                     <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                     Publishing...
+                   </>
+                ) : 'Publish Schedule'}
+              </Button>
+            </div>
           </AlertDescription>
         </Alert>
       )}
@@ -463,6 +496,14 @@ export function ScheduleConfigForm({ tournamentId, initialConfig, tournamentCour
           </div>
         </form>
       </Form>
+
+      <SchedulePreviewDialog
+        tournamentId={tournamentId}
+        open={previewOpen}
+        onOpenChange={setPreviewOpen}
+        onPublish={isFeasible ? handlePublishFromPreview : undefined}
+        isPublishing={isPublishing}
+      />
     </div>
   )
 }

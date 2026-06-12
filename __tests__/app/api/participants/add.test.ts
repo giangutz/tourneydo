@@ -15,6 +15,7 @@ jest.mock('@clerk/nextjs/server')
 jest.mock('@/lib/db/queries/teams')
 jest.mock('@/lib/db/queries/players')
 jest.mock('@/lib/db/queries/registrations')
+jest.mock('@/lib/db/queries/tournaments')
 jest.mock('next/cache')
 jest.mock('@sentry/nextjs')
 jest.mock('next/server', () => {
@@ -42,9 +43,11 @@ jest.mock('next/server', () => {
 import { getTeamById, addPlayerToTeam } from '@/lib/db/queries/teams'
 import { createPlayer, updatePlayer } from '@/lib/db/queries/players'
 import { createRegistration } from '@/lib/db/queries/registrations'
+import { getTournamentById } from '@/lib/db/queries/tournaments'
 
 const mockAuth = auth as jest.MockedFunction<typeof auth>
 const mockGetTeamById = getTeamById as jest.MockedFunction<typeof getTeamById>
+const mockGetTournamentById = getTournamentById as jest.MockedFunction<typeof getTournamentById>
 const mockCreatePlayer = createPlayer as jest.MockedFunction<typeof createPlayer>
 const mockAddPlayerToTeam = addPlayerToTeam as jest.MockedFunction<
   typeof addPlayerToTeam
@@ -56,6 +59,13 @@ const mockCreateRegistration = createRegistration as jest.MockedFunction<
 describe('POST /api/participants/add', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    // The route now fetches the tournament (404 if missing) and enforces the
+    // registration deadline. Default to an existing, open tournament so the
+    // auth/business-logic tests reach their assertions.
+    mockGetTournamentById.mockResolvedValue({
+      id: 'tournament-1',
+      registration_deadline: null,
+    } as any)
   })
 
   describe('Authentication', () => {

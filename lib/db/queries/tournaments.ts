@@ -5,8 +5,8 @@
  * All queries are properly typed and handle errors consistently.
  */
 
+import { unstable_cache, revalidateTag } from 'next/cache'
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
-import { resultCache, invalidateTournamentCache } from '@/lib/cache/result-cache'
 import type { Tournament, TournamentInsert, TournamentUpdate } from '@/types/models'
 import { logger } from '@/lib/logger'
 
@@ -83,44 +83,38 @@ export async function getTournamentsByOrganizerId(userId: string): Promise<Tourn
   return allTournaments
 }
 
-/**
- * Get a single tournament by ID (with caching)
- *
- * OPTIMIZATION: Results are cached for 5 minutes to reduce database queries
- * Cache is invalidated on write operations
- *
- * @param id - Tournament ID
- * @returns Tournament object or null if not found
- */
+// Uses service-role client (no auth() call) so this is safe inside unstable_cache.
+// Next.js 15+ forbids dynamic APIs (headers/cookies/auth) inside the cache boundary;
+// auth-dependent clients would throw on every cache miss (new tournament visit).
+// Access control is enforced separately by checkTournamentAccess in the page layer.
+const fetchTournamentById = unstable_cache(
+  async (id: string): Promise<Tournament | null> => {
+    const supabase = createServiceRoleSupabaseClient()
+
+    const { data, error } = await supabase
+      .from('tournaments')
+      .select('*')
+      .eq('id', id)
+      .single()
+
+    if (error) {
+      if (error.code === 'PGRST116') return null
+      throw new Error(`Failed to fetch tournament: ${error.message}`)
+    }
+
+    return data as unknown as Tournament
+  },
+  ['tournament-by-id'],
+  { tags: ['tournament'], revalidate: 3600 }
+)
+
 export async function getTournamentById(id: string): Promise<Tournament | null> {
-  // OPTIMIZATION: Use cache to reduce database queries by 60-70%
-  return resultCache.get(
-    `tournament:${id}`,
-    async () => {
-      const supabase = createServerSupabaseClient()
-
-      const { data, error } = await supabase
-        .from('tournaments')
-        .select('*')
-        .eq('id', id)
-        .single()
-
-      if (error) {
-        if (error.code === 'PGRST116') {
-          return null
-        }
-        throw new Error(`Failed to fetch tournament: ${error.message}`)
-      }
-
-      const tournament = data as unknown as Tournament
-
-      // Check and update status
-      await checkAndUpdateStatus(tournament)
-
-      return tournament
-    },
-    5 * 60 * 1000 // 5 minute TTL
-  )
+  const tournament = await fetchTournamentById(id)
+  if (tournament) {
+    // Run outside the cache boundary so auth() is available in the request context.
+    await checkAndUpdateStatus(tournament)
+  }
+  return tournament
 }
 
 /**
@@ -170,8 +164,7 @@ export async function updateTournament(id: string, tournamentData: TournamentUpd
     throw new Error(`Failed to update tournament: ${error.message}`)
   }
 
-  // Invalidate cache so the next read reflects the update
-  invalidateTournamentCache(id)
+  revalidateTag('tournament', 'default')
 }
 
 /**
@@ -193,8 +186,7 @@ export async function deleteTournament(id: string): Promise<void> {
     throw new Error(`Failed to delete tournament: ${error.message}`)
   }
 
-  // OPTIMIZATION: Invalidate cache after delete
-  invalidateTournamentCache(id)
+  revalidateTag('tournament', 'default')
 }
 /**
  * Get all available tournaments (for coaches)

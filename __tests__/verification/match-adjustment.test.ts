@@ -1,7 +1,7 @@
 import { updateMatchParticipants } from '@/lib/actions/matches'
 import { updateMatch } from '@/lib/db/queries/matches'
 import { setMockOrganizer, clearMockAuth } from '@/__mocks__/@clerk/nextjs/server'
-import { mockSuccessQuery } from '@/__mocks__/@supabase/supabase-js'
+import { mockQueueSuccess, clearMockQueryResponse } from '@/__mocks__/@supabase/supabase-js'
 
 jest.mock('@/lib/db/queries/matches', () => ({
   updateMatch: jest.fn(),
@@ -20,7 +20,20 @@ describe('Manual Match Adjustment', () => {
   beforeEach(() => {
     setMockOrganizer(organizerId)
     jest.clearAllMocks()
+    clearMockQueryResponse()
   })
+
+  // updateMatchParticipants reads the current match + its sibling division matches
+  // from Supabase before delegating to updateMatch. Queue those two reads.
+  function queueMatchReads() {
+    mockQueueSuccess({
+      player1_id: 'old-1',
+      player2_id: 'old-2',
+      division_id: 'div-1',
+      category_id: 'cat-1',
+    }) // current match (.single)
+    mockQueueSuccess([]) // sibling division matches
+  }
 
   afterEach(() => {
     clearMockAuth()
@@ -30,6 +43,7 @@ describe('Manual Match Adjustment', () => {
     const player1Id = 'player-1'
     const player2Id = 'player-2'
 
+    queueMatchReads()
       // Mock successful update
       ; (updateMatch as jest.Mock).mockResolvedValue({
         id: matchId,
@@ -50,6 +64,7 @@ describe('Manual Match Adjustment', () => {
     const player1Id = 'player-1'
     const player2Id = null
 
+    queueMatchReads()
       // Mock successful update
       ; (updateMatch as jest.Mock).mockResolvedValue({
         id: matchId,

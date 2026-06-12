@@ -70,10 +70,10 @@ export type UpdateTournamentInput = z.infer<typeof updateTournamentSchema>
 
 export const tournamentFormSchema = z.object({
   name: z.string().min(3, 'Tournament name is required'),
-  start_date: z.string().optional().or(z.literal('')),
-  end_date: z.string().optional().or(z.literal('')),
-  weigh_in_start: z.string().optional().or(z.literal('')),
-  weigh_in_end: z.string().optional().or(z.literal('')),
+  start_date: z.string().min(1, 'Start date is required'),
+  end_date: z.string().min(1, 'End date is required'),
+  weigh_in_start: z.string().min(1, 'Weigh-in start date is required'),
+  weigh_in_end: z.string().min(1, 'Weigh-in end date is required'),
   tournament_type: z.enum(['standard', 'open-belt']),
   description: z.string().optional(),
   entry_fee: z.preprocess(

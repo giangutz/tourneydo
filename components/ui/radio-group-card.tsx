@@ -35,6 +35,7 @@ const RadioCard = React.forwardRef<
       className
     )}
     {...props}
+    type="button"
   >
     <div className="flex items-center gap-3">
       {icon && <span className="text-primary">{icon}</span>}

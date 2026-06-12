@@ -63,10 +63,12 @@ describe('Registration Queries', () => {
       }]
       mockSuccessQuery(rawData)
 
+      // getTournamentParticipants returns a paginated envelope and maps the
+      // joined `players`/`teams` rows to singular `player`/`team`.
       const result = await getTournamentParticipants('tournament-1')
-      expect(result).toHaveLength(1)
-      expect((result as any)[0].player).toBeDefined()
-      expect((result as any)[0].team).toBeDefined()
+      expect(result.data).toHaveLength(1)
+      expect((result.data as any)[0].player).toBeDefined()
+      expect((result.data as any)[0].team).toBeDefined()
     })
   })
 

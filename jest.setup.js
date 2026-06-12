@@ -49,6 +49,8 @@ jest.mock('@clerk/nextjs', () => ({
 
 jest.mock('next/cache', () => ({
   revalidatePath: jest.fn(),
+  revalidateTag: jest.fn(),
+  unstable_cache: jest.fn((fn) => fn),
 }))
 
 // Mock window.matchMedia
@@ -66,6 +68,16 @@ if (typeof window !== 'undefined') {
       dispatchEvent: jest.fn(),
     })),
   })
+}
+
+// Polyfill ResizeObserver (used by Radix UI primitives like RadioGroup/Checkbox).
+// jsdom does not implement it, so components relying on useSize throw on mount.
+if (typeof global.ResizeObserver === 'undefined') {
+  global.ResizeObserver = class ResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
 }
 
 // Polyfill TextEncoder/TextDecoder

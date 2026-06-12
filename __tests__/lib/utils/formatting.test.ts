@@ -71,12 +71,12 @@ describe('Utility Functions', () => {
       expect(age).toBeGreaterThanOrEqual(14)
     })
 
-    it('should account for birthday not yet passed this year', () => {
-      const futureDate = new Date()
-      futureDate.setFullYear(futureDate.getFullYear() - 10)
-      futureDate.setMonth(futureDate.getMonth() + 1) // Next month
-      const age = calculateAge(futureDate)
-      expect(age).toBe(9) // Should be 9, not 10
+    it('uses World Taekwondo year-based age (current year minus birth year)', () => {
+      // WT rule (lib/utils.ts): age = currentYear - birthYear, regardless of
+      // whether the birthday has passed yet this calendar year.
+      const now = new Date()
+      const tenYearsAgo = new Date(now.getFullYear() - 10, now.getMonth(), now.getDate())
+      expect(calculateAge(tenYearsAgo)).toBe(10)
     })
   })
 

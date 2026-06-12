@@ -69,22 +69,37 @@ export function AddParticipantDialog({ tournamentId, teams }: AddParticipantDial
   }
 
   async function handleSubmit(data: PlayerFormData) {
+    if (!data.team_id) {
+      toast.error('Please select a team for this participant')
+      throw new Error('Team is required')
+    }
+
     try {
+      // Map the form's snake_case fields to the API's camelCase schema
+      // (addParticipantSchema). Omit empty optional values rather than sending
+      // null, since the schema's optional numbers/strings reject null.
       const response = await fetch('/api/participants/add', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tournamentId,
-          player_id: selectedPlayer?.id, // Pass ID if updating existing
-          ...data,
-          weight: data.weight ? parseFloat(data.weight) : null,
-          height: data.height ? parseFloat(data.height) : null,
+          teamId: data.team_id,
+          playerId: selectedPlayer?.id, // Pass ID if updating existing
+          firstName: data.first_name,
+          lastName: data.last_name,
+          email: data.email || undefined,
+          dob: data.dob || undefined,
+          gender: data.gender || undefined,
+          beltLevel: data.belt_level,
+          weight: data.weight ? parseFloat(data.weight) : undefined,
+          height: data.height ? parseFloat(data.height) : undefined,
         }),
       })
 
       if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.message || 'Failed to add participant')
+        const json = await response.json().catch(() => null)
+        // errorResponse envelope: { success: false, error: { code, message } }
+        throw new Error(json?.error?.message || 'Failed to add participant')
       }
 
       toast.success(selectedPlayer ? 'Participant added and updated' : 'New participant created and added')

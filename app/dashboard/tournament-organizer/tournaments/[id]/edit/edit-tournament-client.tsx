@@ -1,14 +1,7 @@
 'use client'
 
-import { TournamentForm } from '@/components/tournaments/tournament-form'
+import { TournamentCreateWizard } from '@/components/tournaments/tournament-create-wizard'
 import { Tournament } from '@/types/models'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
 
 interface EditTournamentClientProps {
   tournament: Tournament
@@ -16,22 +9,11 @@ interface EditTournamentClientProps {
   availableDivisions: { name: string }[]
 }
 
-export function EditTournamentClient({ tournament, enabledDivisions, availableDivisions }: EditTournamentClientProps) {
+export function EditTournamentClient({ tournament, enabledDivisions }: EditTournamentClientProps) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Edit Tournament</CardTitle>
-        <CardDescription>
-          Update the settings for {tournament.name}.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <TournamentForm 
-          tournament={tournament} 
-          initialEnabledDivisions={enabledDivisions}
-          availableDivisions={availableDivisions} 
-        />
-      </CardContent>
-    </Card>
+    <TournamentCreateWizard
+      tournament={tournament}
+      initialEnabledDivisions={enabledDivisions}
+    />
   )
 }

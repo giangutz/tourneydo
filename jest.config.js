@@ -17,6 +17,14 @@ const customJestConfig = {
     '**/__tests__/**/*.test.[jt]s?(x)',
     '**/?(*.)+(spec|test).[jt]s?(x)',
   ],
+  // Playwright specs (e2e/) and standalone perf scripts run under their own
+  // runners, not Jest — keep them out of `npm test` so the unit/integration lane
+  // stays green and fast.
+  testPathIgnorePatterns: [
+    '<rootDir>/node_modules/',
+    '<rootDir>/e2e/',
+    '<rootDir>/scripts/performance/',
+  ],
   collectCoverageFrom: [
     'lib/**/*.{js,jsx,ts,tsx}',
     'components/**/*.{js,jsx,ts,tsx}',
@@ -27,12 +35,16 @@ const customJestConfig = {
     '!**/coverage/**',
     '!**/jest.config.js',
   ],
-  coverageThresholds: {
+  // NOTE: the key is `coverageThreshold` (singular). It was previously misspelled
+  // `coverageThresholds`, so Jest ignored it and the gate never ran. Thresholds are
+  // set at the current floor (~20%) so the gate actually enforces — preventing
+  // regressions — and can be ratcheted up toward the 70% target in CLAUDE.md.
+  coverageThreshold: {
     global: {
-      branches: 70,
-      functions: 70,
-      lines: 70,
-      statements: 70,
+      branches: 13,
+      functions: 14,
+      lines: 19,
+      statements: 19,
     },
   },
 }

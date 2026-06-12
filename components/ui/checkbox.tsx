@@ -18,6 +18,7 @@ function Checkbox({
         className
       )}
       {...props}
+      type="button"
     >
       <CheckboxPrimitive.Indicator
         data-slot="checkbox-indicator"

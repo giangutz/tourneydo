@@ -424,6 +424,7 @@ export function MatchResultDialog({ match, open, onOpenChange, participants }: M
               onChange={(e) => setScore1(Math.max(0, Number(e.target.value)))}
               className="text-center text-3xl h-16 sm:text-7xl sm:h-32 md:text-6xl lg:h-52 font-bold bg-muted/30 border-2 border-primary/50 focus-visible:ring-primary/20"
               placeholder="0"
+              data-testid="round-score-p1"
             />
           </div>
           <div className="space-y-2 sm:space-y-4">
@@ -442,6 +443,7 @@ export function MatchResultDialog({ match, open, onOpenChange, participants }: M
               onChange={(e) => setScore2(Math.max(0, Number(e.target.value)))}
               className="text-center text-3xl h-16 sm:text-7xl sm:h-32 md:text-6xl lg:h-52 font-bold bg-muted/30 border-2 border-primary/50 focus-visible:ring-primary/20"
               placeholder="0"
+              data-testid="round-score-p2"
             />
           </div>
         </div>

@@ -52,7 +52,8 @@ describe('Player Queries', () => {
   describe('updatePlayer', () => {
     it('should update and return player', async () => {
       const player = mockPlayer({ first_name: 'Updated' })
-      mockSuccessQuery(player)
+      // updatePlayer uses `.select()` (no `.single()`), so it expects an array.
+      mockSuccessQuery([player])
 
       const result = await updatePlayer('player-1', { first_name: 'Updated' })
       expect(result.first_name).toBe('Updated')

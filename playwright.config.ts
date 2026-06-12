@@ -1,51 +1,82 @@
-import { defineConfig, devices } from '@playwright/test';
+import { defineConfig, devices } from '@playwright/test'
+import dotenv from 'dotenv'
+import path from 'path'
+import { ORGANIZER_STORAGE_STATE } from './e2e/constants'
 
 /**
- * See https://playwright.dev/docs/test-configuration.
+ * Playwright config for TourneyDo real-browser E2E.
+ *
+ * Auth model: Clerk blocks automated sign-in (bot protection), so we use the
+ * official @clerk/testing helpers. Two setup projects run first —
+ *   1. "clerk setup"      → fetches a Testing Token (global.setup.ts)
+ *   2. "organizer auth"   → signs in a test organizer, saves storage state
+ * — and the authenticated specs reuse that state. The whole authenticated lane
+ * only activates when organizer credentials are present, so the public lane
+ * still runs with zero setup.
+ *
+ * See e2e/README.md for the one-time setup (install + env + test account).
  */
+
+// Load local env, then allow .env.e2e to override with test-only values.
+dotenv.config({ path: path.resolve(__dirname, '.env.local') })
+dotenv.config({ path: path.resolve(__dirname, '.env.e2e'), override: true })
+
+const hasOrganizerCreds = Boolean(
+  process.env.E2E_CLERK_ORGANIZER_EMAIL && process.env.E2E_CLERK_ORGANIZER_PASSWORD
+)
+
 export default defineConfig({
   testDir: './e2e',
-  /* Run tests in files in parallel */
   fullyParallel: true,
-  /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!process.env.CI,
-  /* Retry on CI only */
   retries: process.env.CI ? 2 : 0,
-  /* Opt out of parallel tests on CI. */
   workers: process.env.CI ? 1 : undefined,
-  /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: 'html',
-  /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
-    /* Base URL to use in actions like `await page.goto('/')`. */
-    baseURL: 'http://localhost:3000',
-
-    /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
+    baseURL: process.env.BASE_URL || 'http://localhost:3000',
     trace: 'on-first-retry',
+    screenshot: 'only-on-failure',
+    video: 'retain-on-failure',
   },
 
-  /* Configure projects for major browsers */
   projects: [
+    // ── Public lane (no auth) — always runs ────────────────────────────────────
     {
-      name: 'chromium',
+      name: 'public',
+      testMatch: /spectator\.spec\.ts/,
       use: { ...devices['Desktop Chrome'] },
     },
 
-    {
-      name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
-    },
-
-    {
-      name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
-    },
+    // ── Authenticated organizer lane — only when credentials are configured ─────
+    ...(hasOrganizerCreds
+      ? [
+          {
+            name: 'clerk setup',
+            testMatch: /global\.setup\.ts/,
+          },
+          {
+            name: 'organizer auth',
+            testMatch: /auth\.setup\.ts/,
+            dependencies: ['clerk setup'],
+          },
+          {
+            name: 'organizer',
+            testMatch: /organizer-lifecycle\.spec\.ts/,
+            use: {
+              ...devices['Desktop Chrome'],
+              storageState: ORGANIZER_STORAGE_STATE,
+            },
+            dependencies: ['organizer auth'],
+          },
+        ]
+      : []),
   ],
 
-  /* Run your local dev server before starting the tests */
-  // webServer: {
-  //   command: 'npm run dev',
-  //   url: 'http://localhost:3000',
-  //   reuseExistingServer: !process.env.CI,
-  // },
-});
+  // Boot the app for the duration of the run (reuses an already-running dev server).
+  webServer: {
+    command: 'npm run dev',
+    url: process.env.BASE_URL || 'http://localhost:3000',
+    reuseExistingServer: !process.env.CI,
+    timeout: 120_000,
+  },
+})

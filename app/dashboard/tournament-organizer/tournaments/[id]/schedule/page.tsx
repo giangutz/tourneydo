@@ -10,6 +10,8 @@ import { Button } from '@/components/ui/button'
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { routes } from '@/config/routes'
+import { AthleteClashWarning } from '@/components/tournaments/athlete-clash-warning'
+import { detectClashesFromScheduledMatches } from '@/lib/utils/scheduling/clash-detector'
 
 interface SchedulePageProps {
   params: Promise<{
@@ -36,6 +38,31 @@ export default async function SchedulePage({ params }: SchedulePageProps) {
     max_divisions_per_day: null
   }
 
+  // Detect cross-division athlete double-booking from the persisted schedule.
+  const clashNameLookup = new Map<string, string>()
+  for (const m of matches) {
+    if (m.player1?.id) {
+      clashNameLookup.set(m.player1.id, `${m.player1.first_name ?? ''} ${m.player1.last_name ?? ''}`.trim())
+    }
+    if (m.player2?.id) {
+      clashNameLookup.set(m.player2.id, `${m.player2.first_name ?? ''} ${m.player2.last_name ?? ''}`.trim())
+    }
+  }
+  const athleteClashes = detectClashesFromScheduledMatches(
+    matches.map((m) => ({
+      id: m.id!,
+      match_number: m.match_number,
+      match_number_formatted: m.match_number_formatted,
+      court_number: m.court_number,
+      day_number: m.day_number,
+      scheduled_start_time: m.scheduled_start_time,
+      scheduled_end_time: m.scheduled_end_time,
+      player1_id: m.player1_id,
+      player2_id: m.player2_id,
+    })),
+    clashNameLookup
+  )
+
   return (
     <div className="space-y-6">
       <div className="mb-4">
@@ -54,7 +81,10 @@ export default async function SchedulePage({ params }: SchedulePageProps) {
       </div>
 
       <div className="space-y-8">
-        
+
+        {/* Athlete double-booking warning (computed from the live schedule) */}
+        <AthleteClashWarning clashes={athleteClashes} />
+
         {/* Daily Breakdown - Full width at top */}
         <div className="space-y-4">
           <h3 className="text-xl font-bold tracking-tight">Daily Schedule Breakdown</h3>

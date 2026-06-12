@@ -1,6 +1,21 @@
 import { Match } from '@/types/models';
 import { Game, Side, SideInfo } from '@/lib/types/bracket-models';
-import { getBracketRoundLabel } from './bracket-generator';
+
+function getBracketRoundLabel(currentRound: number, totalRounds: number): string {
+  const roundsFromEnd = totalRounds - currentRound + 1
+  const participants = Math.pow(2, roundsFromEnd)
+  switch (participants) {
+    case 256: return 'Round of 256'
+    case 128: return 'Round of 128'
+    case 64: return 'Round of 64'
+    case 32: return 'Round of 32'
+    case 16: return 'Round of 16'
+    case 8: return 'Quarter-finals'
+    case 4: return 'Semi-finals'
+    case 2: return 'Finals'
+    default: return `Round of ${participants}`
+  }
+}
 
 interface Participant {
   player_id: string;

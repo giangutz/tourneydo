@@ -1,7 +1,15 @@
 import { Resend } from 'resend'
 import { logger } from '@/lib/logger'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+// Lazily construct the Resend client. The constructor throws when the API key
+// is absent, so instantiating at module load crashes any import path that pulls
+// this module in an env without RESEND_API_KEY (e.g. tests). Every caller below
+// already guards on the key being present before reaching getResend().
+let _resend: Resend | null = null
+function getResend(): Resend {
+  if (!_resend) _resend = new Resend(process.env.RESEND_API_KEY)
+  return _resend
+}
 
 const FROM = process.env.RESEND_FROM_EMAIL || 'TourneyDo <notifications@tourneydo.com>'
 
@@ -19,7 +27,7 @@ export async function sendEmail(to: string | string[], subject: string, html: st
   }
 
   try {
-    const { error } = await resend.emails.send({ from: FROM, to, subject, html })
+    const { error } = await getResend().emails.send({ from: FROM, to, subject, html })
     if (error) {
       if (process.env.NODE_ENV !== 'production') {
         logger.warn({ error: error.message, to, subject }, '[email:dev] Resend error — falling back to dev mode')
@@ -68,7 +76,7 @@ export async function sendStaffInvitationEmail({
   `
 
   try {
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await getResend().emails.send({
       from: process.env.RESEND_FROM_EMAIL || 'Acme Tournaments <onboarding@resend.dev>',
       to: email,
       subject: subject,
@@ -141,7 +149,7 @@ export async function sendPaymentApprovalEmail({
   `
 
   try {
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await getResend().emails.send({
       from: process.env.RESEND_FROM_EMAIL || 'Acme Tournaments <onboarding@resend.dev>',
       to: email,
       subject: subject,
@@ -214,7 +222,7 @@ export async function sendPaymentRejectionEmail({
   `
 
   try {
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await getResend().emails.send({
       from: process.env.RESEND_FROM_EMAIL || 'Acme Tournaments <onboarding@resend.dev>',
       to: email,
       subject: subject,
