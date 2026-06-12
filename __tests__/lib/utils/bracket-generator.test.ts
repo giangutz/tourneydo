@@ -91,6 +91,50 @@ describe('Bracket Generator', () => {
       expect(round3).toHaveLength(1)
     })
 
+    // Scale guard for the O(n^3) -> O(n^2) seeding refactor: a large single
+    // division must still produce a valid single-elimination bracket.
+    it('should generate a valid bracket for a large 256-participant division', () => {
+      const participants = Array.from({ length: 256 }, (_, i) => ({
+        id: String(i + 1),
+        team_id: `t${i + 1}`, // all distinct teams -> no same-team conflicts
+        player_id: `p${i + 1}`,
+      }))
+      const matches = generateBracket(tournamentId, participants)
+
+      // Single elimination: N - 1 matches, 8 rounds (256 -> 1).
+      expect(matches).toHaveLength(255)
+      expect(matches.filter(m => m.round === 1)).toHaveLength(128)
+      expect(matches.filter(m => m.round === 8)).toHaveLength(1)
+
+      // No duplicate structural numbers within a round.
+      const r1Nums = matches.filter(m => m.round === 1).map(m => m.structural_match_number)
+      expect(new Set(r1Nums).size).toBe(r1Nums.length)
+
+      // Every participant appears exactly once in round 1 (256 players / 2 slots).
+      const r1Players = matches
+        .filter(m => m.round === 1)
+        .flatMap(m => [m.player1_id, m.player2_id])
+        .filter(Boolean)
+      expect(new Set(r1Players).size).toBe(256)
+    })
+
+    it('should avoid same-team round-1 clashes when teams have multiple athletes', () => {
+      // 64 athletes across 8 clubs (8 each). The conflict optimizer should keep
+      // clubmates apart in round 1.
+      const participants = Array.from({ length: 64 }, (_, i) => ({
+        id: String(i + 1),
+        team_id: `club${i % 8}`,
+        player_id: `p${i + 1}`,
+      }))
+      const matches = generateBracket(tournamentId, participants)
+
+      const playerTeam = new Map(participants.map(p => [p.player_id, p.team_id]))
+      const r1SameTeam = matches
+        .filter(m => m.round === 1 && m.player1_id && m.player2_id)
+        .filter(m => playerTeam.get(m.player1_id!) === playerTeam.get(m.player2_id!))
+      expect(r1SameTeam).toHaveLength(0)
+    })
+
     it('should handle odd number of participants with BYEs', () => {
       const participants = [
         { id: '1', team_id: 't1', player_id: 'p1' },

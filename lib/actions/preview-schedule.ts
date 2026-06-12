@@ -12,7 +12,7 @@ import { auth } from '@clerk/nextjs/server'
 import type { ActionResult } from '@/types/api'
 import { getTournamentById } from '@/lib/db/queries/tournaments'
 import { getTournamentScheduleConfig, getDivisionScheduleConfigs } from '@/lib/db/queries/schedule'
-import { getTournamentMatches } from '@/lib/db/queries/matches'
+import { getMatchesForScheduling } from '@/lib/db/queries/matches'
 import { assignMatchNumbers, validateSchedule } from '@/lib/utils/match-scheduler'
 import { reorderMatchesByStructure, buildSchedulerMatchInput } from '@/lib/utils/scheduling/schedule-input'
 import { detectAthleteClashes, buildPlayerLookup } from '@/lib/utils/scheduling/clash-detector'
@@ -45,7 +45,7 @@ export async function previewSchedule(
       return { success: false, error: 'Schedule config not found. Save the configuration first.' }
     }
 
-    const matches = await getTournamentMatches(tournamentId)
+    const matches = await getMatchesForScheduling(tournamentId)
     if (matches.length === 0) {
       return { success: false, error: 'No matches found. Generate brackets first.' }
     }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Match, Tournament, MatchWithReadiness } from '@/types/models'
@@ -85,11 +85,62 @@ export function CourtManager({ tournament, matches, participants }: CourtManager
 
   const courts = Array.from({ length: tournament.courts || 0 }, (_, i) => i + 1)
 
+  // --- Memoized lookups (computed once per data change instead of O(courts ×
+  //     matches) on every render) ---
+
+  // playerId -> participant, for O(1) name/team display.
+  const participantByPlayerId = useMemo(() => {
+    const map = new Map<string, CourtParticipant>()
+    for (const p of participants) map.set(p.player_id, p)
+    return map
+  }, [participants])
+
+  // matchId -> match, so isMatchReady() resolves source matches in O(sources)
+  // rather than scanning all matches on every readiness check.
+  const matchById = useMemo(() => {
+    const map = new Map<string, MatchWithReadiness>()
+    for (const m of typedMatches) map.set(m.id, m)
+    return map
+  }, [typedMatches])
+
+  // court -> { current match, sorted queue }. Built in one O(matches) pass.
+  const courtData = useMemo(() => {
+    const map = new Map<number, { current: MatchWithReadiness | null; queued: MatchWithReadiness[] }>()
+    for (const courtNumber of courts) map.set(courtNumber, { current: null, queued: [] })
+    for (const m of typedMatches) {
+      if (m.court_number == null) continue
+      const bucket = map.get(m.court_number)
+      if (!bucket) continue
+      if (m.status === 'in_progress') bucket.current = m
+      else if (m.status === 'scheduled') bucket.queued.push(m)
+    }
+    for (const bucket of map.values()) {
+      bucket.queued.sort((a, b) => (a.match_number || 0) - (b.match_number || 0))
+    }
+    return map
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [typedMatches, tournament.courts])
+
+  // Per-court availability summary for the Move dialog.
+  const availableCourts = useMemo(
+    () =>
+      courts.map((courtNum) => {
+        const bucket = courtData.get(courtNum)
+        return {
+          courtNum,
+          isOccupied: !!bucket?.current,
+          queueSize: bucket?.queued.length ?? 0,
+        }
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [courtData, tournament.courts]
+  )
+
   const getPlayerDisplay = (playerId: string | null) => {
     if (!playerId) return { name: 'BYE', team: null }
-    const p = participants.find(p => p.player_id === playerId)
+    const p = participantByPlayerId.get(playerId)
     if (!p) return { name: 'TBD', team: null }
-    
+
     return {
       name: `${p.player.first_name} ${p.player.last_name}`,
       team: p.team?.name || 'Unattached'
@@ -104,8 +155,8 @@ export function CourtManager({ tournament, matches, participants }: CourtManager
   const handleStartMatch = async (match: MatchWithReadiness) => {
     // Check readiness (operational gate)
     const readinessResult = isMatchReady(
-      match, 
-      typedMatches, 
+      match,
+      matchById,
       new Map(), // Empty court status for now
       { athlete1Called: match.athlete1_called || false, athlete2Called: match.athlete2_called || false }
     )
@@ -235,20 +286,6 @@ export function CourtManager({ tournament, matches, participants }: CourtManager
     }
   }
 
-  // Helper to check availability for the Move dialog
-  const getAvailableCourts = () => {
-    return courts.map(courtNum => {
-      const courtMatches = matches.filter(m => m.court_number === courtNum)
-      const isOccupied = courtMatches.some(m => m.status === 'in_progress')
-      const queueSize = courtMatches.filter(m => m.status === 'scheduled').length
-      return {
-        courtNum,
-        isOccupied,
-        queueSize
-      }
-    })
-  }
-
   if (!tournament.courts || tournament.courts === 0) {
     return (
       <Card>
@@ -292,11 +329,9 @@ export function CourtManager({ tournament, matches, participants }: CourtManager
 
       <div className="grid gap-4 md:grid-cols-2">
         {courts.map((courtNumber) => {
-          const courtMatches = typedMatches.filter(m => m.court_number === courtNumber)
-          const currentMatch = courtMatches.find(m => m.status === 'in_progress')
-          const queuedMatches = courtMatches
-            .filter(m => m.status === 'scheduled')
-            .sort((a, b) => (a.match_number || 0) - (b.match_number || 0))
+          const bucket = courtData.get(courtNumber)
+          const currentMatch = bucket?.current ?? null
+          const queuedMatches = bucket?.queued ?? []
 
           // Pagination logic
           const currentCourtPage = courtPage[courtNumber] || 1
@@ -495,7 +530,7 @@ export function CourtManager({ tournament, matches, participants }: CourtManager
                               // Check if this specific match is ready to start
                               const readinessResult = isMatchReady(
                                 match,
-                                typedMatches,
+                                matchById,
                                 new Map(), // Empty court status for now
                                 { 
                                   athlete1Called: match.athlete1_called || false, 
@@ -617,7 +652,7 @@ export function CourtManager({ tournament, matches, participants }: CourtManager
                 <SelectValue placeholder="Select target court" />
               </SelectTrigger>
               <SelectContent>
-                {getAvailableCourts().map(({ courtNum, isOccupied, queueSize }) => (
+                {availableCourts.map(({ courtNum, isOccupied, queueSize }) => (
                   <SelectItem 
                     key={courtNum} 
                     value={courtNum.toString()}

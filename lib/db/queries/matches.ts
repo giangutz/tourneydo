@@ -288,6 +288,58 @@ export async function getTournamentMatches(tournamentId: string) {
 }
 
 /**
+ * Lighter variant of getTournamentMatches for scheduling / clash-detection /
+ * preview / timeline paths that never read per-round scores.
+ *
+ * Drops the `match_rounds` join (3 nested rows per match — ~22.5k rows for a
+ * 7.5k-match tournament) while keeping the player/division/category joins the
+ * scheduler and clash detector need. Returns the same Match[] shape; scores
+ * default to 0 via transformMatch (harmless for these callers). Benefits from
+ * idx_matches_tournament_round_number for the ORDER BY.
+ */
+export async function getMatchesForScheduling(tournamentId: string): Promise<Match[]> {
+  const supabase = createServerSupabaseClient()
+
+  const { data, error } = await supabase
+    .from('matches')
+    .select(`
+      *,
+      tournament_divisions (
+        id,
+        name,
+        min_age,
+        max_age
+      ),
+      tournament_categories (
+        id,
+        name,
+        gender
+      ),
+      player1:players!player1_id (
+        id,
+        first_name,
+        last_name,
+        belt_level
+      ),
+      player2:players!player2_id (
+        id,
+        first_name,
+        last_name,
+        belt_level
+      )
+    `)
+    .eq('tournament_id', tournamentId)
+    .order('round', { ascending: true })
+    .order('match_number', { ascending: true })
+
+  if (error) {
+    throw new Error(`Failed to fetch matches: ${error.message}`)
+  }
+
+  return data?.map(m => transformMatch(m)) || []
+}
+
+/**
  * Find active match for a participant (where they are player1 or player2)
  */
 export async function findActiveMatchForParticipant(

@@ -437,6 +437,31 @@ export function calculateSchedule(input: ScheduleInput): {
     'Finals'
   ]
 
+  // Precompute, per block, its matches grouped by round name and pre-sorted by
+  // bracket position. The original loop re-filtered+re-sorted block.matches for
+  // every (belt × round × block) combination (O(8·m) of repeated filters per
+  // run). Building this index once is O(m) and makes the inner lookup O(1) while
+  // producing identical ordering (V8 sort is stable).
+  const sortByBracketPosition = (a: SchedulerMatch, b: SchedulerMatch): number => {
+    if (a.structural_match_number && b.structural_match_number) {
+      return a.structural_match_number - b.structural_match_number
+    }
+    if (a.match_number && b.match_number) return a.match_number - b.match_number
+    return a.sourceIndex - b.sourceIndex
+  }
+  const matchesByBlockRound = new Map<string, Map<string, SchedulerMatch[]>>()
+  for (const block of blocksMap.values()) {
+    const byRound = new Map<string, SchedulerMatch[]>()
+    for (const m of block.matches) {
+      const rn = m.round_name || ''
+      const arr = byRound.get(rn)
+      if (arr) arr.push(m)
+      else byRound.set(rn, [m])
+    }
+    for (const arr of byRound.values()) arr.sort(sortByBracketPosition)
+    matchesByBlockRound.set(block.id, byRound)
+  }
+
   for (const belt of beltLevels) {
     const beltBlocks = blocksByBelt.get(belt) || []
     if (beltBlocks.length === 0) continue
@@ -457,23 +482,10 @@ export function calculateSchedule(input: ScheduleInput): {
       const competedThisRound = new Set<string>()
 
       for (const block of orderedBlocks) {
-        // Get matches for this specific round.
-        // round_name is always set by the bracket generator.
-        const roundMatches = block.matches.filter(m => m.round_name === standardRound)
+        // Matches for this round, pre-filtered and pre-sorted by bracket position.
+        const roundMatches = matchesByBlockRound.get(block.id)?.get(standardRound)
 
-        if (roundMatches.length === 0) continue
-
-        // Sort matches by Structural Bracket Position (guaranteed correct order)
-        roundMatches.sort((a, b) => {
-          // Use structural number if available
-          if (a.structural_match_number && b.structural_match_number) {
-            return a.structural_match_number - b.structural_match_number
-          }
-          // Fallback to match_number
-          if (a.match_number && b.match_number) return a.match_number - b.match_number
-
-          return a.sourceIndex - b.sourceIndex
-        })
+        if (!roundMatches || roundMatches.length === 0) continue
 
         // Distribute to courts IMMEDIATELY (round-robin)
         for (const match of roundMatches) {

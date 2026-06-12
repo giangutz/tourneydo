@@ -4,7 +4,7 @@ import { DailyScheduleCard } from '@/components/tournaments/daily-schedule-card'
 import { ScheduleSummaryStats } from '@/components/tournaments/schedule-summary-stats'
 import { getTournamentScheduleConfig, getDailyScheduleSummary } from '@/lib/db/queries/schedule'
 import { getTournamentById } from '@/lib/db/queries/tournaments'
-import { getTournamentMatches } from '@/lib/db/queries/matches'
+import { getMatchesForScheduling } from '@/lib/db/queries/matches'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
@@ -29,7 +29,7 @@ export default async function SchedulePage({ params }: SchedulePageProps) {
     getTournamentScheduleConfig(tournamentId),
     getDailyScheduleSummary(tournamentId),
     getTournamentById(tournamentId),
-    getTournamentMatches(tournamentId)
+    getMatchesForScheduling(tournamentId)
   ])
   
   // Default for cards if no config yet

@@ -4,7 +4,7 @@ import { auth } from '@clerk/nextjs/server'
 import { revalidatePath } from 'next/cache'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getTournamentById } from '@/lib/db/queries/tournaments'
-import { getTournamentMatches } from '@/lib/db/queries/matches'
+import { getMatchesForScheduling } from '@/lib/db/queries/matches'
 import {
   getTournamentScheduleConfig,
   getDivisionScheduleConfigs,
@@ -58,7 +58,7 @@ export async function recalculateRemainingSchedule(
     // Derive per-court availability from actual/scheduled end times of active matches
     const courtInitialTimes = await deriveCourtAvailability(tournamentId, scheduleConfig.courts, currentDayNumber)
 
-    const allMatches = await getTournamentMatches(tournamentId)
+    const allMatches = await getMatchesForScheduling(tournamentId)
 
     // Only reschedule CONTEST/WAITING matches (immutable: IN_PROGRESS, COMPLETED, AUTO_ADVANCE)
     const rescheduleable = allMatches.filter(m => {

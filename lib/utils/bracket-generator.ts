@@ -197,6 +197,14 @@ function assignParticipantsToSeeds(
   // 2. Scored Conflict Optimization
   const maxConflictDepth = Math.log2(bracketSize) - 2
 
+  // Precompute participant -> seed number once (O(n)). The original code called
+  // participants.findIndex(...) inside the conflict-resolution scan, making the
+  // candidate search O(n) per candidate per conflict → O(n³) overall. An index
+  // map turns each lookup into O(1), dropping the pass to O(n²) with no change
+  // in output (the seed numbers are identical to findIndex + 1).
+  const seedIndexById = new Map<string, number>()
+  participants.forEach((p, i) => seedIndexById.set(p.id, i + 1))
+
   // Loop a few times to resolve conflicts (Multi-pass)
   // Limited iterations to avoid infinite loops if unresolvable
   for (let pass = 0; pass < 3; pass++) {
@@ -236,7 +244,7 @@ function assignParticipantsToSeeds(
 
       const targetPos = posB
       const target = slots[targetPos]!
-      const targetSeed = participants.findIndex(p => p.id === target.id) + 1
+      const targetSeed = seedIndexById.get(target.id)!
 
       let bestCandidatePos = -1
       let bestScore = Infinity
@@ -265,7 +273,7 @@ function assignParticipantsToSeeds(
         if (slots[kNeighbor] && slots[kNeighbor]!.team_id === target.team_id) continue
 
         // Score the move
-        const candidateSeed = participants.findIndex(p => p.id === candidate.id) + 1
+        const candidateSeed = seedIndexById.get(candidate.id)!
 
         // Relax deviation for small brackets?
         // If bracketSize is small, deviation > 6 is impossible.
@@ -316,6 +324,18 @@ function assignParticipantsToSeeds(
 // ============================================================================
 // MAIN GENERATOR
 // ============================================================================
+
+/**
+ * Per-round stride used to pack (round, position) into a single
+ * structural_match_number = round * ROUND_STRIDE + position.
+ *
+ * Must exceed the maximum number of matches in any single round so numbers stay
+ * globally unique. Round 1 of a bracket has bracketSize/2 matches, so the old
+ * stride of 100 collided for divisions >= 256 (round 1 = 128 matches -> 101..228
+ * overlapping round 2's 201..264, which threw in validateSingleEliminationBracket).
+ * 1000 supports up to 999 matches per round (divisions up to 1024 athletes).
+ */
+const ROUND_STRIDE = 1000
 
 export function generateBracket(
   tournamentId: string,
@@ -391,7 +411,7 @@ export function generateBracket(
     if (slotA && slotB) {
       // Create Match
       const matchId = getMatchId(1, structuralMatchNum)
-      const structuralNumFull = 100 + structuralMatchNum
+      const structuralNumFull = ROUND_STRIDE + structuralMatchNum
 
       matches.push({
         id: matchId,
@@ -471,7 +491,7 @@ export function generateBracket(
       // OR User considers 'scheduled' == 'pending'?
       // I should stick to DB enum 'scheduled' but rely on lifecycle_state 'WAITING'.
 
-      const structuralNumFull = r * 100 + m
+      const structuralNumFull = r * ROUND_STRIDE + m
 
       matches.push({
         id: matchId,
@@ -608,7 +628,7 @@ export function generateBracket(
 
       // Assign structural numbers sequentially (1, 2, 3, 4...)
       sortedMatches.forEach((match, idx) => {
-        match.structural_match_number = (r * 100) + (idx + 1)
+        match.structural_match_number = (r * ROUND_STRIDE) + (idx + 1)
       })
     }
   }

@@ -5,7 +5,7 @@
  * according to World Taekwondo competition rules.
  */
 
-import { Match, MatchLifecycleState } from '@/types/models'
+import { Match } from '@/types/models'
 
 // ============================================================================
 // Constants
@@ -15,68 +15,29 @@ import { Match, MatchLifecycleState } from '@/types/models'
 export const MINIMUM_RECOVERY_MINUTES = 15
 
 // ============================================================================
-// State Computation
+// Source-match resolution
 // ============================================================================
 
 /**
- * Computes the correct lifecycle state for a match based on its dependencies
- * and athlete availability.
- * 
- * Rules:
- * - AUTO_ADVANCE: Match has a winner but no opponent (BYE)
- * - COMPLETED: Match finished with both athletes contested
- * - IN_PROGRESS: Match currently active
- * - CONTEST: All source matches completed AND both athletes known
- * - WAITING: Otherwise (waiting for source matches or athletes)
+ * Gets the source matches that feed into a given match.
+ *
+ * Accepts either the full match array (O(n) scan) or a precomputed
+ * Map<id, Match> index (O(sources) lookup). Callers that resolve source
+ * matches repeatedly — e.g. isMatchReady() inside a render loop — should pass
+ * the Map to avoid an O(n) filter per call.
  */
-export function computeLifecycleState(
+export function getSourceMatches(
   match: Match,
-  allMatches: Match[]
-): MatchLifecycleState {
-  // Already completed with a BYE (one player missing, has winner)
-  if (
-    match.winner_id !== null &&
-    (match.player1_id === null || match.player2_id === null)
-  ) {
-    return 'AUTO_ADVANCE'
-  }
-
-  // Fully completed match
-  if (match.status === 'completed' && match.winner_id !== null) {
-    return 'COMPLETED'
-  }
-
-  // Currently in progress
-  if (match.status === 'in_progress') {
-    return 'IN_PROGRESS'
-  }
-
-  // Check if all source matches are completed
-  const sourceMatches = getSourceMatches(match, allMatches)
-  const allSourcesComplete = sourceMatches.every(
-    (sm) => sm.lifecycle_state === 'COMPLETED' || sm.lifecycle_state === 'AUTO_ADVANCE'
-  )
-
-  // If we have source matches and they're not all complete, we're WAITING
-  if (sourceMatches.length > 0 && !allSourcesComplete) {
-    return 'WAITING'
-  }
-
-  // Both athletes must be known for CONTEST state
-  if (match.player1_id !== null && match.player2_id !== null) {
-    return 'CONTEST'
-  }
-
-  // Default to WAITING
-  return 'WAITING'
-}
-
-/**
- * Gets the source matches that feed into a given match
- */
-export function getSourceMatches(match: Match, allMatches: Match[]): Match[] {
+  allMatches: Match[] | Map<string, Match>
+): Match[] {
   if (!match.source_match_ids || match.source_match_ids.length === 0) {
     return []
+  }
+
+  if (allMatches instanceof Map) {
+    return match.source_match_ids
+      .map((id) => allMatches.get(id))
+      .filter((m): m is Match => m !== undefined)
   }
 
   return allMatches.filter((m) => match.source_match_ids.includes(m.id))
@@ -111,7 +72,7 @@ export interface ReadinessResult {
  */
 export function isMatchReady(
   match: Match,
-  allMatches: Match[],
+  allMatches: Match[] | Map<string, Match>,
   courtStatus: Map<number, CourtStatus>,
   readiness?: { athlete1Called: boolean; athlete2Called: boolean },
   currentTime: Date = new Date()
@@ -213,71 +174,21 @@ export function completeMatch(
   }
 
   const endTime = new Date()
-  const recoveryTime = new Date(endTime.getTime() + MINIMUM_RECOVERY_MINUTES * 60000)
 
   return {
     lifecycle_state: 'COMPLETED',
     status: 'completed',
     winner_id: winnerId,
     actual_end_time: endTime.toISOString()
-    // Note: athlete availability on NEXT match should be set via propagateWinner
+    // Note: downstream athlete availability is set by the advance_match_winner RPC.
   }
 }
 
-/**
- * After a match completes, update downstream matches with winner info
- * and calculate their readiness.
- */
-export function propagateWinner(
-  completedMatch: Match,
-  allMatches: Match[]
-): { matchId: string; updates: Partial<Match> }[] {
-  const updates: { matchId: string; updates: Partial<Match> }[] = []
-
-  if (!completedMatch.winner_id || !completedMatch.next_match_id) {
-    return updates
-  }
-
-  const nextMatch = allMatches.find((m) => m.id === completedMatch.next_match_id)
-  if (!nextMatch) return updates
-
-  // Calculate when the winner will be available for the next match
-  const completedTime = completedMatch.actual_end_time
-    ? new Date(completedMatch.actual_end_time)
-    : new Date()
-  const availableAt = new Date(completedTime.getTime() + MINIMUM_RECOVERY_MINUTES * 60000)
-
-  // Determine which slot (player1 or player2) the winner fills
-  // by checking which source match position this was
-  const sourceIndex = nextMatch.source_match_ids?.indexOf(completedMatch.id) ?? -1
-
-  const matchUpdate: Partial<Match> = {}
-
-  if (sourceIndex === 0 || nextMatch.player1_id === null) {
-    // First source match or player1 slot is empty
-    if (nextMatch.player1_id === null) {
-      matchUpdate.player1_id = completedMatch.winner_id
-      matchUpdate.athlete1_available_at = availableAt.toISOString()
-    }
-  } else {
-    // Second source match fills player2
-    if (nextMatch.player2_id === null) {
-      matchUpdate.player2_id = completedMatch.winner_id
-      matchUpdate.athlete2_available_at = availableAt.toISOString()
-    }
-  }
-
-  // Recompute lifecycle state for the next match
-  const updatedNextMatch = { ...nextMatch, ...matchUpdate }
-  matchUpdate.lifecycle_state = computeLifecycleState(updatedNextMatch, allMatches)
-
-  updates.push({
-    matchId: nextMatch.id,
-    updates: matchUpdate
-  })
-
-  return updates
-}
+// Note: winner advancement (filling the next match's slots and recomputing
+// lifecycle state) is performed atomically in Postgres via the
+// `advance_match_winner` RPC. The former JS implementations (propagateWinner /
+// computeLifecycleState) were unused and have been removed to avoid a second,
+// O(matches²) source of truth drifting from the DB.
 
 // ============================================================================
 // Filtering Utilities

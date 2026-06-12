@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGr
 import { Trophy, Search, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import BracketGenerator from './bracket/BracketGenerator'
-import { transformMatchToGame } from '@/lib/utils/bracket-data-transformer'
+import { transformMatchToGame, buildBracketIndexes } from '@/lib/utils/bracket-data-transformer'
 import { Game } from '@/lib/types/bracket-models'
 import { MatchResultDialog } from './match-result-dialog'
 import { MatchParticipantsDialog } from './match-participants-dialog'
@@ -367,9 +367,12 @@ export function BracketView({
       // However, our transformMatchToGame builds the tree recursively if we pass all matches
       // But we need to pass the array of Game objects to BracketGenerator
       // BracketGenerator.makeFinals will filter out games that feed into others
-      
-      const games = group.matches.map(match => 
-        transformMatchToGame(match, group.matches, participants)
+
+      // Build the parent/participant lookup indexes ONCE per group and reuse
+      // them for every match, turning O(matches²) into O(matches) per group.
+      const indexes = buildBracketIndexes(group.matches, participants)
+      const games = group.matches.map(match =>
+        transformMatchToGame(match, group.matches, participants, undefined, indexes)
       )
       result[key] = games
     })

@@ -31,12 +31,47 @@ interface Participant {
 }
 
 /**
+ * Precomputed lookup indexes so the recursive transform runs in O(island)
+ * instead of O(island²). Without these, each node did `allMatches.filter(...)`
+ * and `participants.find(...)`, both O(n), per recursion step.
+ */
+export interface BracketIndexes {
+  /** parent matchId -> child matches feeding it, pre-sorted by match_number */
+  childrenByParent: Map<string, Match[]>;
+  /** player_id (and player.id) -> participant */
+  participantById: Map<string, Participant>;
+}
+
+export function buildBracketIndexes(
+  allMatches: Match[],
+  participants: Participant[]
+): BracketIndexes {
+  const childrenByParent = new Map<string, Match[]>();
+  for (const m of allMatches) {
+    if (!m.next_match_id) continue;
+    const arr = childrenByParent.get(m.next_match_id);
+    if (arr) arr.push(m);
+    else childrenByParent.set(m.next_match_id, [m]);
+  }
+  for (const arr of childrenByParent.values()) {
+    arr.sort((a, b) => a.match_number - b.match_number);
+  }
+
+  const participantById = new Map<string, Participant>();
+  for (const p of participants) {
+    if (p.player_id) participantById.set(p.player_id, p);
+    if (p.player?.id) participantById.set(p.player.id, p);
+  }
+
+  return { childrenByParent, participantById };
+}
+
+/**
  * Check if a player is disqualified
  */
-function isPlayerDisqualified(playerId: string | null, participants: Participant[]): boolean {
+function isPlayerDisqualified(playerId: string | null, participantById: Map<string, Participant>): boolean {
   if (!playerId) return false;
-  const participant = participants.find(p => p.player_id === playerId);
-  return !!participant?.disqualified;
+  return !!participantById.get(playerId)?.disqualified;
 }
 
 /**
@@ -86,11 +121,11 @@ export function calculateRoundWins(match: Match): { player1Wins: number, player2
 /**
  * Get display name for a player
  */
-function getPlayerName(playerId: string | null, participants: Participant[], match?: Match, side?: 'player1' | 'player2'): string {
+function getPlayerName(playerId: string | null, participantById: Map<string, Participant>, match?: Match, side?: 'player1' | 'player2'): string {
   if (!playerId) return 'BYE';
 
   // Try finding in participants first (better data source for teams etc)
-  const participant = participants.find(p => p.player_id === playerId || p.player?.id === (playerId as any)); // loose check if id matches
+  const participant = participantById.get(playerId);
 
   if (participant && participant.player) {
     return `${participant.player.first_name} ${participant.player.last_name}`;
@@ -110,10 +145,10 @@ function getPlayerName(playerId: string | null, participants: Participant[], mat
 /**
  * Get team name for a player
  */
-function getTeamName(playerId: string | null, participants: Participant[]): string {
+function getTeamName(playerId: string | null, participantById: Map<string, Participant>): string {
   if (!playerId) return '';
 
-  const participant = participants.find(p => p.player_id === playerId || p.player?.id === (playerId as any));
+  const participant = participantById.get(playerId);
   if (!participant || !participant.team) return 'TBD';
 
   return participant.team.name;
@@ -127,17 +162,18 @@ export function transformMatchToGame(
   match: Match,
   allMatches: Match[],
   participants: Participant[],
-  roundLabel?: string
+  roundLabel?: string,
+  indexes?: BracketIndexes
 ): Game {
+  // Build indexes once at the top-level call; recursion reuses them so the
+  // whole tree is O(island) rather than O(island²).
+  const idx = indexes ?? buildBracketIndexes(allMatches, participants);
+  const { childrenByParent, participantById } = idx;
+
   const { player1Wins, player2Wins } = calculateRoundWins(match);
 
-  // Find source matches (matches that feed into this one)
-  // We look for matches where next_match_id points to this match
-  const sourceMatches = allMatches.filter(m => m.next_match_id === match.id);
-
-  // Sort source matches to determine which is Top (Home) and Bottom (Visitor)
-  // Usually based on match_number
-  const sortedSourceMatches = sourceMatches.sort((a, b) => a.match_number - b.match_number);
+  // Source matches (those feeding into this one), pre-sorted Top/Bottom by match_number.
+  const sortedSourceMatches = childrenByParent.get(match.id) ?? [];
 
   const topSourceMatch = sortedSourceMatches.length > 0 ? sortedSourceMatches[0] : null;
   const bottomSourceMatch = sortedSourceMatches.length > 1 ? sortedSourceMatches[1] : null;
@@ -151,16 +187,16 @@ export function transformMatchToGame(
       round3: match.score_round3_player1
     },
     seed: {
-      displayName: getPlayerName(match.player1_id, participants, match, 'player1'),
+      displayName: getPlayerName(match.player1_id, participantById, match, 'player1'),
       rank: 1, // Placeholder
-      sourceGame: topSourceMatch ? transformMatchToGame(topSourceMatch, allMatches, participants) : null,
+      sourceGame: topSourceMatch ? transformMatchToGame(topSourceMatch, allMatches, participants, undefined, idx) : null,
       sourcePool: null
     },
     team: match.player1_id ? {
       id: match.player1_id,
-      name: getTeamName(match.player1_id, participants)
+      name: getTeamName(match.player1_id, participantById)
     } : undefined,
-    isDisqualified: isPlayerDisqualified(match.player1_id, participants)
+    isDisqualified: isPlayerDisqualified(match.player1_id, participantById)
   };
 
   // Construct SideInfo for Visitor (Bottom)
@@ -172,16 +208,16 @@ export function transformMatchToGame(
       round3: match.score_round3_player2
     },
     seed: {
-      displayName: getPlayerName(match.player2_id, participants, match, 'player2'),
+      displayName: getPlayerName(match.player2_id, participantById, match, 'player2'),
       rank: 2, // Placeholder
-      sourceGame: bottomSourceMatch ? transformMatchToGame(bottomSourceMatch, allMatches, participants) : null,
+      sourceGame: bottomSourceMatch ? transformMatchToGame(bottomSourceMatch, allMatches, participants, undefined, idx) : null,
       sourcePool: null
     },
     team: match.player2_id ? {
       id: match.player2_id,
-      name: getTeamName(match.player2_id, participants)
+      name: getTeamName(match.player2_id, participantById)
     } : undefined,
-    isDisqualified: isPlayerDisqualified(match.player2_id, participants)
+    isDisqualified: isPlayerDisqualified(match.player2_id, participantById)
   };
 
   return {
@@ -231,12 +267,16 @@ export function buildBracketTree(matches: Match[], participants: Participant[]):
     const groupMaxRound = Math.max(...groupMatches.map(m => m.round));
     const finalsMatches = groupMatches.filter(m => m.round === groupMaxRound);
 
+    // Build the lookup indexes once per group and reuse for every root.
+    const indexes = buildBracketIndexes(groupMatches, participants);
+
     finalsMatches.forEach(finalMatch => {
       games.push(transformMatchToGame(
         finalMatch,
         groupMatches,
         participants,
-        getBracketRoundLabel(finalMatch.round, groupMaxRound)
+        getBracketRoundLabel(finalMatch.round, groupMaxRound),
+        indexes
       ));
     });
   });

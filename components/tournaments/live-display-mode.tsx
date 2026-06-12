@@ -1,5 +1,6 @@
 'use client'
 
+import { useMemo } from 'react'
 import { Match, Tournament } from '@/types/models'
 import { Badge } from '@/components/ui/badge'
 import { X } from 'lucide-react'
@@ -15,11 +16,46 @@ interface LiveDisplayModeProps {
 export function LiveDisplayMode({ tournament, matches, participants, onClose }: LiveDisplayModeProps) {
   const courts = Array.from({ length: tournament.courts || 0 }, (_, i) => i + 1)
 
+  // playerId -> participant, for O(1) display lookups instead of O(participants) per call.
+  const participantByPlayerId = useMemo(() => {
+    const map = new Map<
+      string,
+      { player_id: string; player: { first_name: string; last_name: string }; team?: { name?: string } }
+    >()
+    for (const p of participants) map.set(p.player_id, p)
+    return map
+  }, [participants])
+
+  // court -> { current, next } computed in one O(matches) pass instead of
+  // filtering all matches per court on every render.
+  const courtData = useMemo(() => {
+    const map = new Map<number, { current: Match | null; next: Match | null }>()
+    for (const courtNumber of courts) map.set(courtNumber, { current: null, next: null })
+    const queues = new Map<number, Match[]>()
+    for (const m of matches) {
+      if (m.court_number == null) continue
+      const bucket = map.get(m.court_number)
+      if (!bucket) continue
+      if (m.status === 'in_progress') bucket.current = m
+      else if (m.status === 'scheduled') {
+        const q = queues.get(m.court_number) ?? []
+        q.push(m)
+        queues.set(m.court_number, q)
+      }
+    }
+    for (const [court, q] of queues) {
+      q.sort((a, b) => (a.match_number || 0) - (b.match_number || 0))
+      map.get(court)!.next = q[0] ?? null
+    }
+    return map
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [matches, tournament.courts])
+
   const getPlayerDisplay = (playerId: string | null) => {
     if (!playerId) return { name: 'BYE', team: null }
-    const p = participants.find(p => p.player_id === playerId)
+    const p = participantByPlayerId.get(playerId)
     if (!p) return { name: 'TBD', team: null }
-    
+
     return {
       name: `${p.player.first_name} ${p.player.last_name}`,
       team: p.team?.name || 'Unattached'
@@ -69,12 +105,11 @@ export function LiveDisplayMode({ tournament, matches, participants, onClose }: 
           }}
         >
           {courts.map((courtNumber) => {
-            const courtMatches = matches.filter(m => m.court_number === courtNumber)
-            const currentMatch = courtMatches.find(m => m.status === 'in_progress')
-            const queuedMatches = courtMatches
-              .filter(m => m.status === 'scheduled')
-              .sort((a, b) => (a.match_number || 0) - (b.match_number || 0))
-              .slice(0, 1) // Show only next queued match
+            const bucket = courtData.get(courtNumber)
+            const currentMatch = bucket?.current ?? null
+            // Show only the next queued match (kept as an array so existing
+            // queuedMatches[0] render references are unchanged).
+            const queuedMatches = bucket?.next ? [bucket.next] : []
 
             return (
               <div

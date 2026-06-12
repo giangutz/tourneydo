@@ -12,7 +12,7 @@ import {
   getDivisionScheduleConfigs,
   archiveMatchNumbers
 } from '@/lib/db/queries/schedule'
-import { getTournamentMatches } from '@/lib/db/queries/matches'
+import { getMatchesForScheduling } from '@/lib/db/queries/matches'
 import { assignMatchNumbers } from '@/lib/utils/match-scheduler'
 import { getTournamentById } from '@/lib/db/queries/tournaments'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
@@ -57,7 +57,7 @@ export async function regenerateBracketSchedule(
       throw new Error('Schedule config not found. Please configure schedule first.')
     }
 
-    const matches = await getTournamentMatches(tournamentId)
+    const matches = await getMatchesForScheduling(tournamentId)
     if (matches.length === 0) {
       throw new Error('No matches found. Please generate brackets first.')
     }
@@ -68,10 +68,19 @@ export async function regenerateBracketSchedule(
     // Recalculate division priorities
     const priorityConfigs = await calculateDivisionPriorities(tournamentId)
 
-    // Save division configs
+    // Save division configs in a single bulk upsert (keyed on the unique
+    // tournament/division/category triple) instead of N sequential round-trips.
     const supabase = createServerSupabaseClient()
-    for (const divConfig of priorityConfigs) {
-      await supabase.from('division_schedule_config').upsert(divConfig)
+    if (priorityConfigs.length > 0) {
+      const { error: divConfigError } = await supabase
+        .from('division_schedule_config')
+        .upsert(priorityConfigs, { onConflict: 'tournament_id,division_id,category_id' })
+      if (divConfigError) {
+        logger.error(
+          { error: divConfigError, tournamentId },
+          'Failed to upsert division schedule configs'
+        )
+      }
     }
 
     const divisionConfigs = await getDivisionScheduleConfigs(tournamentId)
