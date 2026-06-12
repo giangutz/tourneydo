@@ -57,6 +57,7 @@ interface BracketPageClientProps {
 }
 
 import { useAdminChannel } from '@/lib/realtime/admin-channel'
+import { useRealtimeMatches } from '@/lib/realtime/use-realtime-matches'
 import { BracketGenerationModal } from './bracket/bracket-generation-modal'
 import { BracketValidationDialog } from './bracket/bracket-validation-dialog'
 import { DivisionBreakdown } from './shared/division-breakdown'
@@ -68,8 +69,11 @@ import { getBeltSkillCategory, getCategoryDisplayName } from '@/lib/utils'
 import { BELT_GROUPS } from '@/lib/constants/belts'
 const SKILL_ORDER = [...Object.keys(BELT_GROUPS), 'Unknown']
 
-export function BracketPageClient({ tournament, participants, matches, userRole, placementGroups = [] }: BracketPageClientProps) {
+export function BracketPageClient({ tournament, participants, matches: initialMatches, userRole, placementGroups = [] }: BracketPageClientProps) {
   const { isPending: realtimePending, markManualRefresh } = useAdminChannel(tournament.id)
+  // Apply instant, granular match updates (score/status/advancement) without a
+  // full server refetch; markManualRefresh suppresses the admin-channel reload.
+  const matches = useRealtimeMatches(tournament.id, initialMatches, markManualRefresh)
   const router = useRouter()
   const [isRefreshing, startTransition] = useTransition()
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null)

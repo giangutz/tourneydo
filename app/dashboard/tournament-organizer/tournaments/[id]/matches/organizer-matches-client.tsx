@@ -6,6 +6,7 @@ import { Tournament, Match, Team } from '@/types/models'
 import { Card, CardContent } from '@/components/ui/card'
 import { CourtManager } from '@/components/tournaments/court-manager'
 import { useAdminChannel } from '@/lib/realtime/admin-channel'
+import { useRealtimeMatches } from '@/lib/realtime/use-realtime-matches'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 
@@ -15,9 +16,11 @@ interface OrganizerMatchesClientProps {
   participants: any[]
 }
 
-export function OrganizerMatchesClient({ tournament, matches, participants }: OrganizerMatchesClientProps) {
+export function OrganizerMatchesClient({ tournament, matches: initialMatches, participants }: OrganizerMatchesClientProps) {
   // Realtime updates — isPending indicates data is being refreshed
-  useAdminChannel(tournament.id)
+  const { markManualRefresh } = useAdminChannel(tournament.id)
+  // Patch score/status/court changes instantly without a full refetch.
+  const matches = useRealtimeMatches(tournament.id, initialMatches, markManualRefresh)
 
   // Calculate current tournament day
   const getCurrentDay = (): number => {
