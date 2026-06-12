@@ -1,5 +1,4 @@
-import { Suspense } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { ScheduleConfigForm } from '@/components/tournaments/schedule-config-form'
 import { DailyScheduleCard } from '@/components/tournaments/daily-schedule-card'
 import { ScheduleSummaryStats } from '@/components/tournaments/schedule-summary-stats'
@@ -12,6 +11,9 @@ import Link from 'next/link'
 import { routes } from '@/config/routes'
 import { AthleteClashWarning } from '@/components/tournaments/athlete-clash-warning'
 import { detectClashesFromScheduledMatches } from '@/lib/utils/scheduling/clash-detector'
+import { ScheduleTimeline } from '@/components/tournaments/schedule-timeline'
+import { buildLiveTimelineMatches } from '@/lib/utils/scheduling/live-timeline'
+import type { SchedulePreviewConfig } from '@/lib/actions/preview-schedule.types'
 
 interface SchedulePageProps {
   params: Promise<{
@@ -63,6 +65,17 @@ export default async function SchedulePage({ params }: SchedulePageProps) {
     clashNameLookup
   )
 
+  // Live (already-committed) per-court timeline rows.
+  const liveTimelineMatches = buildLiveTimelineMatches(matches)
+  const timelineConfig: SchedulePreviewConfig = {
+    courts: config?.courts ?? displayConfig.courts,
+    dailyStartTime: config?.daily_start_time ?? displayConfig.daily_start_time,
+    dailyEndTime: config?.daily_end_time ?? displayConfig.daily_end_time,
+    lunchEnabled: config?.lunch_enabled !== false,
+    lunchStartTime: config?.lunch_start_time || '12:00',
+    lunchEndTime: config?.lunch_end_time || '13:00',
+  }
+
   return (
     <div className="space-y-6">
       <div className="mb-4">
@@ -84,6 +97,27 @@ export default async function SchedulePage({ params }: SchedulePageProps) {
 
         {/* Athlete double-booking warning (computed from the live schedule) */}
         <AthleteClashWarning clashes={athleteClashes} />
+
+        {/* Live court timeline (current committed schedule) */}
+        {liveTimelineMatches.length > 0 && (
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-xl font-bold tracking-tight">Court Timeline</h3>
+              <p className="text-sm text-muted-foreground">
+                The current published schedule, laid out per court.
+              </p>
+            </div>
+            <Card>
+              <CardContent className="pt-6">
+                <ScheduleTimeline
+                  matches={liveTimelineMatches}
+                  config={timelineConfig}
+                  clashes={athleteClashes}
+                />
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* Daily Breakdown - Full width at top */}
         <div className="space-y-4">
